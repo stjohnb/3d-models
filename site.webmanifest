@@ -1,0 +1,11 @@
+{
+  "name": "3D Printable Models",
+  "short_name": "3D Models",
+  "description": "Interactive 3D viewer for printable OpenSCAD models.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1a1a2e",
+  "theme_color": "#1a1a2e",
+  "icons": [{ "src": "./favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

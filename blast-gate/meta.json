@@ -1,0 +1,7 @@
+{
+  "description": "Inline blast gate for 51mm OD PVC workshop vacuum lines. Sliding blade opens or closes airflow to dust-collection branches. Includes mounting plate with four screw holes opposite the blade-exit side.",
+  "tags": ["workshop", "utility", "vacuum"],
+  "version": "1.1.1",
+  "difficulty": "intermediate",
+  "relatedModels": ["vacuum-hose"]
+}

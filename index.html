@@ -1,0 +1,1721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Models</title>
+  <link rel="canonical" href="https://www.bstjohn.net/3d-models/">
+  <meta name="theme-color" content="#1a1a2e">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="favicon.svg">
+  <link rel="manifest" href="site.webmanifest">
+
+  <!-- Primary Meta -->
+  <meta name="description" content="Interactive 3D viewer for printable OpenSCAD models — browse, rotate, and download STL files.">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.bstjohn.net/3d-models/">
+  <meta property="og:title" content="3D Printable Models">
+  <meta property="og:description" content="Interactive 3D viewer for printable OpenSCAD models — browse, rotate, and download STL files.">
+  <meta property="og:image" content="https://www.bstjohn.net/3d-models/og-hero.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="3D Printable Models">
+  <meta name="twitter:description" content="Interactive 3D viewer for printable OpenSCAD models — browse, rotate, and download STL files.">
+  <meta name="twitter:image" content="https://www.bstjohn.net/3d-models/og-hero.png">
+
+  <!-- __OEMBED_LINKS__ -->
+
+  <!-- __STRUCTURED_DATA__ -->
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+    header {
+      text-align: center;
+      padding: 2rem 1rem;
+    }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 600;
+    }
+    .gallery {
+      padding: 0 2rem 2rem;
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .project-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 1.5rem 0 1rem;
+    }
+    .project-group h2 {
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin: 0;
+      color: #64b5f6;
+      cursor: pointer;
+      user-select: none;
+    }
+    .download-all-btn {
+      background: transparent;
+      border: 1px solid #64b5f6;
+      color: #64b5f6;
+      padding: 0.25rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      text-decoration: none;
+    }
+    .download-all-btn:hover { background: rgba(100, 181, 246, 0.1); }
+    .download-all-btn:focus-visible {
+      outline: 2px solid #64b5f6;
+      outline-offset: 2px;
+    }
+    .project-group h2::before {
+      content: '\25BC';
+      display: inline-block;
+      margin-right: 0.5rem;
+      font-size: 0.8rem;
+      transition: transform 0.2s;
+    }
+    .project-group.collapsed h2::before {
+      transform: rotate(-90deg);
+    }
+    .project-group.collapsed .project-grid {
+      display: none;
+    }
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 1.5rem;
+    }
+    .card {
+      background: #16213e;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      position: relative;
+    }
+    .fullscreen-btn {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: rgba(0,0,0,0.4);
+      border: none;
+      color: #e0e0e0;
+      font-size: 1.2rem;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1;
+    }
+    .card:hover .fullscreen-btn,
+    .card:focus-within .fullscreen-btn { opacity: 1; }
+    .fullscreen-btn:hover { background: rgba(0,0,0,0.6); }
+    .card-placeholder {
+      width: 100%;
+      height: 300px;
+      display: block;
+      object-fit: cover;
+      background: #0f3460;
+    }
+    .card canvas {
+      width: 100%;
+      height: 300px;
+      display: block;
+      cursor: grab;
+    }
+    .card canvas:active { cursor: grabbing; }
+    .card:fullscreen .card-placeholder,
+    .card:-webkit-full-screen .card-placeholder { display: none; }
+    .color-picker {
+      display: flex;
+      gap: 0.4rem;
+      padding: 0.5rem 1rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .color-swatch {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.15);
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+    }
+    .color-swatch[aria-pressed="true"] {
+      border-color: #fff;
+    }
+    .color-swatch:hover {
+      border-color: rgba(255,255,255,0.6);
+    }
+    .card-info {
+      padding: 1rem;
+      display: flex;
+      gap: 0.75rem;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-info h2 {
+      font-size: 1.1rem;
+      font-weight: 500;
+    }
+    .card-info h3 {
+      font-size: 1rem;
+      font-weight: 450;
+    }
+    .card-links {
+      display: flex;
+      gap: 0.75rem;
+      flex-shrink: 0;
+    }
+    .card-links a {
+      color: #64b5f6;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+    .card-links a:hover { text-decoration: underline; }
+    .print-time {
+      font-size: 0.8rem;
+      color: #aaa;
+      white-space: nowrap;
+    }
+    .card:fullscreen, .card:-webkit-full-screen {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+    }
+    .card:fullscreen canvas, .card:-webkit-full-screen canvas {
+      flex: 1;
+      height: auto;
+      min-height: 0;
+    }
+    .card:focus-visible {
+      outline: 2px solid #64b5f6;
+      outline-offset: 2px;
+    }
+    h2[role="button"]:focus-visible {
+      outline: 2px solid #64b5f6;
+      outline-offset: 2px;
+    }
+    .fullscreen-btn:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+      opacity: 1;
+    }
+    .maximize-btn {
+      position: absolute;
+      top: 3rem;
+      right: 0.5rem;
+      background: rgba(0,0,0,0.4);
+      border: none;
+      color: #e0e0e0;
+      font-size: 1.2rem;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1;
+    }
+    .card:hover .maximize-btn,
+    .card:focus-within .maximize-btn { opacity: 1; }
+    .maximize-btn:hover { background: rgba(0,0,0,0.6); }
+    .maximize-btn:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+      opacity: 1;
+    }
+    .card.card--maximized .maximize-btn { opacity: 1; }
+    .maximize-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 40;
+    }
+    .card.card--maximized {
+      position: fixed;
+      inset: 1rem;
+      z-index: 50;
+      display: flex;
+      flex-direction: column;
+      background: #1a1a2e;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .card.card--maximized canvas {
+      flex: 1;
+      height: auto;
+      min-height: 0;
+    }
+    .card.card--maximized .card-placeholder { display: none; }
+    .card.card--maximized .touch-hint { height: 100%; }
+    body.has-maximized { overflow: hidden; }
+    .qr-btn {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.5rem;
+      background: rgba(0,0,0,0.4);
+      border: none;
+      color: #e0e0e0;
+      font-size: 1.2rem;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.2s;
+      z-index: 1;
+    }
+    .card:hover .qr-btn,
+    .card:focus-within .qr-btn { opacity: 1; }
+    .qr-btn:hover { background: rgba(0,0,0,0.6); }
+    .qr-btn:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+      opacity: 1;
+    }
+    .qr-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .qr-popover {
+      background: #1a1a2e;
+      border-radius: 12px;
+      padding: 1.5rem;
+      text-align: center;
+      max-width: 320px;
+    }
+    .qr-popover img {
+      width: 256px;
+      height: 256px;
+      image-rendering: pixelated;
+      border-radius: 4px;
+    }
+    .qr-popover p {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: #aaa;
+      word-break: break-all;
+    }
+    .color-swatch:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
+    .card-links a:focus-visible {
+      outline: 2px solid #64b5f6;
+      outline-offset: 2px;
+    }
+    .loading {
+      text-align: center;
+      padding: 4rem;
+      font-size: 1.2rem;
+      color: #888;
+    }
+    .touch-hint {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 300px;
+      background: rgba(0, 0, 0, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2rem;
+      pointer-events: none;
+      z-index: 2;
+      opacity: 1;
+      transition: opacity 0.5s ease-out, visibility 0.5s ease-out;
+    }
+    .touch-hint.fade-out {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .touch-hint-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .touch-hint svg {
+      width: 40px;
+      height: 40px;
+    }
+    .touch-hint span {
+      font-size: 0.75rem;
+      color: #fff;
+      white-space: nowrap;
+    }
+    .card:fullscreen .touch-hint,
+    .card:-webkit-full-screen .touch-hint {
+      height: 100%;
+    }
+    .cross-section-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+    }
+    .cross-btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 4px;
+      color: #e0e0e0;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 13px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .cross-btn:hover { background: rgba(255,255,255,0.2); }
+    .cross-btn[aria-pressed="true"] {
+      background: rgba(100, 181, 246, 0.3);
+      color: #64b5f6;
+    }
+    .cross-btn:focus-visible {
+      outline: 2px solid #64b5f6;
+      outline-offset: 2px;
+    }
+    .clip-slider {
+      flex: 1;
+      accent-color: #64b5f6;
+    }
+    .view-controls-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      flex-wrap: wrap;
+    }
+    .view-btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 4px;
+      color: #e0e0e0;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 13px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .view-btn:hover { background: rgba(255,255,255,0.2); }
+    .view-btn:focus-visible { outline: 2px solid #64b5f6; outline-offset: 2px; }
+    .view-btn:disabled { opacity: 0.4; cursor: default; }
+    .view-btn[aria-pressed="true"] { background: rgba(100,181,246,0.3); color: #64b5f6; }
+    .customize-btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 4px;
+      color: #e0e0e0;
+      cursor: pointer;
+      padding: 4px 8px;
+      font-size: 13px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .customize-btn:hover { background: rgba(255,255,255,0.2); }
+    .customize-btn[aria-pressed="true"] {
+      background: rgba(100, 181, 246, 0.3);
+      color: #64b5f6;
+    }
+    .customize-btn:focus-visible {
+      outline: 2px solid #64b5f6;
+      outline-offset: 2px;
+    }
+    .customizer-panel {
+      padding: 6px 12px 10px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      border-top: 1px solid rgba(255,255,255,0.05);
+      background: rgba(0,0,0,0.15);
+    }
+    .customizer-panel.open { display: flex; }
+    .param-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .param-row label {
+      flex: 0 0 auto;
+      min-width: 110px;
+      color: #cfd8dc;
+    }
+    .param-row input[type="range"] {
+      flex: 1;
+      accent-color: #64b5f6;
+    }
+    .param-row input[type="checkbox"] {
+      accent-color: #64b5f6;
+    }
+    .param-row .param-value {
+      flex: 0 0 auto;
+      min-width: 40px;
+      text-align: right;
+      color: #aaa;
+      font-variant-numeric: tabular-nums;
+    }
+    .customizer-status {
+      font-size: 12px;
+      color: #aaa;
+      min-height: 1.1em;
+    }
+    .customizer-status.error { color: #ef5350; }
+    .customizer-download {
+      color: #64b5f6;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .customizer-download:hover { text-decoration: underline; }
+    .customizer-download[hidden] { display: none; }
+    .customizer-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .rerender-btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      border-radius: 4px;
+      color: #e0e0e0;
+      cursor: pointer;
+      padding: 4px 10px;
+      font-size: 13px;
+      flex-shrink: 0;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .rerender-btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
+    .rerender-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    .rerender-btn.dirty {
+      background: rgba(100, 181, 246, 0.3);
+      color: #64b5f6;
+    }
+    .rerender-btn:focus-visible {
+      outline: 2px solid #64b5f6;
+      outline-offset: 2px;
+    }
+    .param-row.param-row--dirty label {
+      color: #64b5f6;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>3D Models</h1>
+  </header>
+  <div id="gallery" class="gallery">
+    <div class="loading">Loading models&hellip;</div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
+    import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
+
+    const gallery = document.getElementById('gallery');
+
+    // openscad-wasm renders run in a dedicated Web Worker so the CGAL/mesh
+    // export work doesn't freeze the main thread. One worker is shared by
+    // every customizer card on the page — the worker processes incoming
+    // messages sequentially, which is the right semantics anyway since the
+    // non-threaded wasm build is single-threaded.
+    let _wasmWorker = null;
+    let _nextRenderId = 1;
+    const _pendingRenders = new Map();
+    function getWasmWorker() {
+      if (_wasmWorker) return _wasmWorker;
+      const url = new URL(`./openscad-worker.js${cacheBust}`, import.meta.url);
+      const worker = new Worker(url, { type: 'module' });
+      worker.addEventListener('message', (event) => {
+        const { id, stl, error } = event.data;
+        const pending = _pendingRenders.get(id);
+        if (!pending) return;
+        _pendingRenders.delete(id);
+        if (error) pending.reject(new Error(error));
+        else pending.resolve(stl);
+      });
+      worker.addEventListener('error', (event) => {
+        // A worker-level error invalidates every in-flight render; reject
+        // them all so the UI can recover with an error status.
+        for (const pending of _pendingRenders.values()) {
+          pending.reject(new Error(event.message || 'Worker error'));
+        }
+        _pendingRenders.clear();
+        worker.terminate();
+        _wasmWorker = null;
+      });
+      _wasmWorker = worker;
+      return worker;
+    }
+
+    function renderInWorker(payload) {
+      const worker = getWasmWorker();
+      const id = _nextRenderId++;
+      return new Promise((resolve, reject) => {
+        _pendingRenders.set(id, { resolve, reject });
+        worker.postMessage({ id, ...payload });
+      });
+    }
+
+    // Per-project library cache: dir -> Promise<Map<filename, source>>.
+    const _projectSourcesCache = new Map();
+    async function loadProjectSources(projectDir) {
+      if (_projectSourcesCache.has(projectDir)) {
+        return _projectSourcesCache.get(projectDir);
+      }
+      const promise = (async () => {
+        const base = `sources/${projectDir}`;
+        const manifestResp = await fetch(`${base}/manifest.json${cacheBust}`);
+        if (!manifestResp.ok) throw new Error(`manifest.json missing for ${projectDir}`);
+        const names = await manifestResp.json();
+        const entries = await Promise.all(names.map(async (name) => {
+          const r = await fetch(`${base}/${encodeURIComponent(name)}${cacheBust}`);
+          if (!r.ok) throw new Error(`failed to fetch ${name}: ${r.status}`);
+          // surface()/import() binary assets must be written to the wasm FS as
+          // raw bytes — decoding a PNG via r.text() corrupts it.
+          const isBinary = /\.(png|stl)$/i.test(name);
+          return [name, isBinary ? new Uint8Array(await r.arrayBuffer()) : await r.text()];
+        }));
+        return new Map(entries);
+      })();
+      promise.catch(() => _projectSourcesCache.delete(projectDir));
+      _projectSourcesCache.set(projectDir, promise);
+      return promise;
+    }
+
+    function formatTime(m) {
+      if (m < 60) return `${m}m`;
+      const h = Math.floor(m / 60);
+      const rem = m % 60;
+      if (rem === 0) return `${h}h`;
+      return `${h}h ${rem}m`;
+    }
+
+    // Touch gesture hint icons (inline SVGs)
+    const TOUCH_ICON_ROTATE = `<svg viewBox="0 0 40 40" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="20" cy="22" r="4"/>
+      <path d="M30 18a12 12 0 1 0-3.5 8.5"/>
+      <path d="M30 22v-4h-4"/>
+    </svg>`;
+    const TOUCH_ICON_ZOOM = `<svg viewBox="0 0 40 40" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 20l-6 6M12 20l-6-6"/>
+      <path d="M28 20l6 6M28 20l6-6"/>
+      <circle cx="12" cy="20" r="3" fill="#fff" stroke="none"/>
+      <circle cx="28" cy="20" r="3" fill="#fff" stroke="none"/>
+    </svg>`;
+    const TOUCH_ICON_PAN = `<svg viewBox="0 0 40 40" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="16" cy="18" r="3" fill="#fff" stroke="none"/>
+      <circle cx="24" cy="18" r="3" fill="#fff" stroke="none"/>
+      <path d="M20 26l-5 5M20 26l5 5M20 26V18"/>
+    </svg>`;
+
+    let touchHintShown = sessionStorage.getItem('touchHintSeen') === '1';
+
+    function showTouchHint(card) {
+      const state = cardState.get(card);
+      if (!state?.hintOverlay) return;
+      const overlay = state.hintOverlay;
+      overlay.style.display = 'flex';
+
+      let dismissed = false;
+      function dismiss() {
+        if (dismissed) return;
+        dismissed = true;
+        clearTimeout(timer);
+        overlay.classList.add('fade-out');
+        overlay.addEventListener('transitionend', () => {
+          overlay.style.display = 'none';
+        }, { once: true });
+        state.canvas.removeEventListener('touchmove', dismiss);
+      }
+
+      const timer = setTimeout(dismiss, 5000);
+      state.canvas.addEventListener('touchmove', dismiss, { once: true, passive: true });
+      sessionStorage.setItem('touchHintSeen', '1');
+    }
+
+    let FILAMENT_COLORS = [];
+
+    function displayName(filename) {
+      return filename.replace(/\.stl$/i, '').replace(/[-_]/g, ' ');
+    }
+
+    // Must stay in sync with scripts/generate-gallery.py:slugify()
+    function slugify(str) {
+      return str.replace(/\.stl$/i, '').replace(/[_\s]+/g, '-').toLowerCase();
+    }
+
+    function createViewer(canvas, stlUrl, onLoad) {
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.localClippingEnabled = true;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f3460);
+
+      const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 10000);
+
+      // Controls are reassignable so the user can switch between Orbit,
+      // Trackball, and Arcball at runtime (issue #230 — OrbitControls' fixed
+      // world-up Y makes models authored in the XZ/YZ plane awkward to spin;
+      // Trackball/Arcball are gimbal-lock-free). makeControls preserves the
+      // current target so switching doesn't jump the view.
+      let controls = null;
+      let controlMode = 'orbit';
+      function makeControls(mode) {
+        const saved = controls ? controls.target.clone() : new THREE.Vector3();
+        if (controls) controls.dispose();
+        if (mode === 'trackball') {
+          controls = new TrackballControls(camera, canvas);
+          controls.handleResize();
+        } else if (mode === 'arcball') {
+          controls = new ArcballControls(camera, canvas, scene);
+          controls.setGizmosVisible(false);
+        } else {
+          controls = new OrbitControls(camera, canvas);
+          controls.enableDamping = true;
+        }
+        controls.target.copy(saved);
+        controls.update();
+        controlMode = mode;
+      }
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(1, 2, 3);
+      scene.add(dirLight);
+      const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+      dirLight2.position.set(-2, -1, -1);
+      scene.add(dirLight2);
+
+      const material = new THREE.MeshPhongMaterial({
+        color: 0x64b5f6,
+        specular: 0x222222,
+        shininess: 40,
+        clippingPlanes: [],
+        clipShadows: false,
+      });
+
+      const handle = {
+        scene,
+        camera,
+        material,
+        mesh: null,
+        defaultCameraPos: null,
+      };
+
+      makeControls('orbit');
+
+      // World-space Y extent of the current mesh — drives the cross-section
+      // clip plane. Recomputed after a rotation since rotating the mesh
+      // changes its axis-aligned bounding box.
+      function computeClipBBox() {
+        if (!handle.mesh) return null;
+        const box = new THREE.Box3().setFromObject(handle.mesh);
+        return { minY: box.min.y, maxY: box.max.y };
+      }
+
+      function rotate90(axis) {
+        if (!handle.mesh) return null;
+        const v = axis === 'x' ? new THREE.Vector3(1, 0, 0)
+          : axis === 'y' ? new THREE.Vector3(0, 1, 0)
+          : new THREE.Vector3(0, 0, 1);
+        handle.mesh.rotateOnWorldAxis(v, Math.PI / 2);
+        return computeClipBBox();
+      }
+
+      function resetView() {
+        if (handle.mesh) handle.mesh.rotation.set(0, 0, 0);
+        if (handle.defaultCameraPos) camera.position.copy(handle.defaultCameraPos);
+        controls.target.set(0, 0, 0);
+        camera.up.set(0, 1, 0);
+        makeControls(controlMode);
+        return computeClipBBox();
+      }
+
+      function setControlMode(mode) {
+        makeControls(mode);
+      }
+
+      function installGeometry(geometry) {
+        geometry.computeBoundingBox();
+        const halfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
+        geometry.center();
+
+        if (handle.mesh) {
+          scene.remove(handle.mesh);
+          handle.mesh.geometry.dispose();
+        }
+        const mesh = new THREE.Mesh(geometry, material);
+        scene.add(mesh);
+        handle.mesh = mesh;
+
+        const box = geometry.boundingBox;
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const dist = maxDim * 1.8;
+        camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
+        handle.defaultCameraPos = camera.position.clone();
+        controls.update();
+
+        return { minY: -halfSizeY, maxY: halfSizeY };
+      }
+
+      const loader = new STLLoader();
+      loader.load(stlUrl, (geometry) => {
+        // The customizer may have already replaced the mesh while this
+        // default STL was downloading — skip the install in that case.
+        if (handle.customized) {
+          geometry.dispose?.();
+          return;
+        }
+        const bbox = installGeometry(geometry);
+        if (onLoad) onLoad(bbox);
+      });
+
+      let rafId = null;
+
+      function resize() {
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        if (canvas.width !== w || canvas.height !== h) {
+          renderer.setSize(w, h, false);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          controls.handleResize?.();
+        }
+      }
+
+      function animate() {
+        rafId = requestAnimationFrame(animate);
+        resize();
+        controls.update();
+        renderer.render(scene, camera);
+      }
+
+      function start() {
+        if (rafId === null) animate();
+      }
+
+      function stop() {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      }
+
+      animate();
+      Object.assign(handle, {
+        start, stop, installGeometry,
+        rotate90, resetView, setControlMode,
+        getControlMode: () => controlMode,
+        getControls: () => controls,
+      });
+      return handle;
+    }
+
+    // Swap a card's rendered mesh with a fresh STL (e.g. from the
+    // customizer). Returns a promise that resolves once the geometry is
+    // installed. Card must already be activated.
+    async function replaceMesh(card, stlUrl) {
+      const state = cardState.get(card);
+      if (!state?.viewer) return;
+      const geometry = await new Promise((resolve, reject) => {
+        new STLLoader().load(stlUrl, resolve, undefined, reject);
+      });
+      state.viewer.customized = true;
+      const bbox = state.viewer.installGeometry(geometry);
+      state.clipBBox = bbox;
+      // Enable the cross-section controls if they're still waiting on the
+      // default STL — the customized geometry is enough to drive them.
+      const ccBtn = card.querySelector('.cross-btn');
+      if (ccBtn) ccBtn.disabled = false;
+      const ccSlider = card.querySelector('.clip-slider');
+      if (ccSlider) ccSlider.disabled = false;
+      card.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
+      // If the cross-section is active, re-anchor the clip plane to the
+      // new bounding box so the slider keeps making sense.
+      if (state.clipPlane) {
+        const slider = card.querySelector('.clip-slider');
+        const pct = slider ? (Number(slider.value) / 100) : 0.5;
+        state.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);
+      }
+    }
+
+    // Cache-busting hash injected at build time
+    const BUILD_HASH = '__BUILD_HASH__';
+    const cacheBust = BUILD_HASH.startsWith('__') ? '' : `?v=${BUILD_HASH}`;
+
+    function showQrPopover(qrPath, modelName) {
+      document.querySelector('.qr-overlay')?.remove();
+
+      const overlay = document.createElement('div');
+      overlay.className = 'qr-overlay';
+      const popover = document.createElement('div');
+      popover.className = 'qr-popover';
+
+      const img = document.createElement('img');
+      img.src = qrPath + cacheBust;
+      img.alt = `QR code for ${modelName}`;
+      popover.appendChild(img);
+
+      const caption = document.createElement('p');
+      caption.textContent = modelName;
+      popover.appendChild(caption);
+
+      overlay.appendChild(popover);
+      function dismiss() {
+        overlay.remove();
+        document.removeEventListener('keydown', onKey);
+      }
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) dismiss();
+      });
+      document.body.appendChild(overlay);
+
+      function onKey(e) {
+        if (e.key === 'Escape') dismiss();
+      }
+      document.addEventListener('keydown', onKey);
+    }
+
+    // Map from card element to viewer state
+    const cardState = new Map();
+    let visibilityObserver = null;
+
+    function activateCard(card) {
+      const state = cardState.get(card);
+      if (!state || state.initialized) return;
+      state.initialized = true;
+      state.placeholder.style.display = 'none';
+      state.canvas.style.display = 'block';
+      state.viewer = createViewer(state.canvas, state.stlUrl, (bbox) => {
+        state.clipBBox = bbox;
+        const slider = card.querySelector('.clip-slider');
+        if (slider) slider.disabled = false;
+        const btn = card.querySelector('.cross-btn');
+        if (btn) btn.disabled = false;
+        card.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
+      });
+      if (state.selectedColor !== 0x64b5f6) {
+        state.viewer.material.color.setHex(state.selectedColor);
+      }
+      // Show touch gesture hints immediately on mobile (once per session)
+      if (!touchHintShown && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
+        touchHintShown = true;
+        showTouchHint(card);
+      }
+      if (visibilityObserver) visibilityObserver.observe(card);
+    }
+
+    function toggleMaximize(card) {
+      if (document.fullscreenElement) return;
+      const isMaximized = card.classList.contains('card--maximized');
+      if (isMaximized) {
+        card.classList.remove('card--maximized');
+        document.body.classList.remove('has-maximized');
+        document.querySelector('.maximize-backdrop')?.remove();
+        card.querySelector('.maximize-btn')?.setAttribute('aria-label', 'Maximize model preview');
+      } else {
+        document.querySelectorAll('.card--maximized').forEach(c => {
+          c.classList.remove('card--maximized');
+          c.querySelector('.maximize-btn')?.setAttribute('aria-label', 'Maximize model preview');
+        });
+        document.querySelector('.maximize-backdrop')?.remove();
+        const backdrop = document.createElement('div');
+        backdrop.className = 'maximize-backdrop';
+        backdrop.addEventListener('click', () => toggleMaximize(card));
+        document.body.appendChild(backdrop);
+        card.classList.add('card--maximized');
+        document.body.classList.add('has-maximized');
+        card.querySelector('.maximize-btn')?.setAttribute('aria-label', 'Close maximized preview');
+      }
+    }
+
+    function parseHash() {
+      const hash = decodeURIComponent(window.location.hash.slice(1));
+      if (!hash) return null;
+      const sep = hash.indexOf('/');
+      if (sep === -1) return { project: hash, model: null };
+      return { project: hash.slice(0, sep), model: hash.slice(sep + 1) };
+    }
+
+    function navigateToHash() {
+      const target = parseHash();
+      if (!target) return;
+
+      const section = gallery.querySelector(`.project-group[data-slug="${CSS.escape(target.project)}"]`);
+      if (!section) return;
+
+      section.classList.remove('collapsed');
+      section.querySelector('h2')?.setAttribute('aria-expanded', 'true');
+
+      if (!target.model) {
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+
+      const card = section.querySelector(`.card[data-slug="${CSS.escape(target.model)}"]`);
+      if (!card) return;
+
+      activateCard(card);
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    async function init() {
+      let models;
+      try {
+        const [modelsResp, colorsResp] = await Promise.all([
+          fetch(`models.json${cacheBust}`),
+          fetch(`filament-colors.json${cacheBust}`),
+        ]);
+        if (!modelsResp.ok) throw new Error(modelsResp.status);
+        if (!colorsResp.ok) throw new Error(colorsResp.status);
+        models = await modelsResp.json();
+        FILAMENT_COLORS = (await colorsResp.json()).map(c => {
+          if (!/^[0-9a-fA-F]{6}$/.test(c.hex)) throw new Error(`Invalid hex value for color "${c.name}": "${c.hex}"`);
+          const hex = parseInt(c.hex, 16);
+          return { name: c.name, hex };
+        });
+      } catch (e) {
+        console.error(e);
+        gallery.innerHTML = '<div class="loading">Failed to load models</div>';
+        return;
+      }
+
+      // In PR previews, changed.json lists projects with modified models
+      // Sections not in that list are collapsed; on the main site it won't exist
+      let changedProjects = null;
+      try {
+        const changedResp = await fetch(`changed.json${cacheBust}`);
+        if (changedResp.ok) changedProjects = await changedResp.json();
+      } catch (e) { /* main site — all sections collapse by default */ }
+
+      gallery.innerHTML = '';
+
+      for (const [project, projectData] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
+        const files = projectData.files;
+        const section = document.createElement('div');
+        section.className = 'project-group';
+        section.setAttribute('role', 'group');
+        section.setAttribute('aria-label', project);
+        section.dataset.slug = slugify(project);
+        const isCollapsed = changedProjects ? !changedProjects.includes(project) : true;
+        if (isCollapsed) {
+          section.classList.add('collapsed');
+        }
+
+        const heading = document.createElement('h2');
+        heading.textContent = project;
+        heading.setAttribute('role', 'button');
+        heading.setAttribute('tabindex', '0');
+        heading.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+
+        function toggleSection() {
+          section.classList.toggle('collapsed');
+          const expanded = !section.classList.contains('collapsed');
+          heading.setAttribute('aria-expanded', String(expanded));
+          // When expanding, check for uninitialized visible cards
+          if (expanded) {
+            for (const card of section.querySelectorAll('.card')) {
+              const state = cardState.get(card);
+              if (state && !state.initialized) {
+                const rect = card.getBoundingClientRect();
+                if (rect.bottom > 0 && rect.top < window.innerHeight) {
+                  activateCard(card);
+                }
+              }
+            }
+          }
+        }
+
+        heading.addEventListener('click', toggleSection);
+        heading.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleSection();
+          }
+        });
+
+        const header = document.createElement('div');
+        header.className = 'project-header';
+        header.appendChild(heading);
+
+        if (projectData.zip) {
+          const zipBtn = document.createElement('a');
+          zipBtn.className = 'download-all-btn';
+          zipBtn.href = `${projectData.zip}${cacheBust}`;
+          zipBtn.download = projectData.zip;
+          zipBtn.textContent = `Download All (${files.length} STLs)`;
+          zipBtn.setAttribute('aria-label', `Download all ${files.length} STLs for ${project}`);
+          header.appendChild(zipBtn);
+        }
+
+        if (projectData.sourceZip) {
+          const srcBtn = document.createElement('a');
+          srcBtn.className = 'download-all-btn';
+          srcBtn.href = `${projectData.sourceZip}${cacheBust}`;
+          srcBtn.download = projectData.sourceZip;
+          srcBtn.textContent = 'Download Source';
+          srcBtn.setAttribute('aria-label', `Download source files for ${project}`);
+          header.appendChild(srcBtn);
+        }
+
+        section.appendChild(header);
+
+        const grid = document.createElement('div');
+        grid.className = 'project-grid';
+
+        for (const model of files) {
+          const card = document.createElement('div');
+          card.className = 'card';
+          card.setAttribute('tabindex', '0');
+          card.dataset.slug = slugify(model.stl);
+
+          const stlUrl = `${model.stl}${cacheBust}`;
+          const pngUrl = `${model.stl.replace(/\.stl$/i, '.png')}${cacheBust}`;
+
+          // PNG placeholder shown until viewer activates
+          const placeholder = document.createElement('img');
+          placeholder.className = 'card-placeholder';
+          placeholder.src = pngUrl;
+          placeholder.alt = displayName(model.stl);
+          placeholder.loading = 'lazy';
+          placeholder.decoding = 'async';
+          card.appendChild(placeholder);
+
+          const modelName = displayName(model.stl);
+
+          // Canvas hidden until viewer activates
+          const canvas = document.createElement('canvas');
+          canvas.style.display = 'none';
+          canvas.setAttribute('role', 'img');
+          canvas.setAttribute('aria-label', `Interactive 3D preview of ${modelName}`);
+          card.appendChild(canvas);
+
+          // Fallback if PNG doesn't exist: show canvas immediately
+          placeholder.onerror = () => {
+            placeholder.style.display = 'none';
+            activateCard(card);
+          };
+
+          // Touch gesture hint overlay (hidden until first touch on mobile)
+          const hintOverlay = document.createElement('div');
+          hintOverlay.className = 'touch-hint';
+          hintOverlay.setAttribute('aria-hidden', 'true');
+          hintOverlay.style.display = 'none';
+          hintOverlay.innerHTML = `
+            <div class="touch-hint-item">${TOUCH_ICON_ROTATE}<span>Rotate</span></div>
+            <div class="touch-hint-item">${TOUCH_ICON_ZOOM}<span>Zoom</span></div>
+            <div class="touch-hint-item">${TOUCH_ICON_PAN}<span>Pan</span></div>
+          `;
+          card.appendChild(hintOverlay);
+
+          cardState.set(card, {
+            canvas,
+            placeholder,
+            stlUrl,
+            hintOverlay,
+            initialized: false,
+            viewer: null,
+            selectedColor: 0x64b5f6,
+            clipBBox: null,
+            clipPlane: null,
+          });
+
+          const fsBtn = document.createElement('button');
+          fsBtn.className = 'fullscreen-btn';
+          fsBtn.textContent = '\u26F6';
+          fsBtn.setAttribute('aria-label', 'Toggle fullscreen');
+          fsBtn.addEventListener('click', () => {
+            activateCard(card);
+            window.history.replaceState(null, '', `#${section.dataset.slug}/${card.dataset.slug}`);
+            if (document.fullscreenElement) {
+              document.exitFullscreen();
+            } else {
+              if (card.classList.contains('card--maximized')) toggleMaximize(card);
+              card.requestFullscreen();
+            }
+          });
+          card.appendChild(fsBtn);
+
+          const maxBtn = document.createElement('button');
+          maxBtn.className = 'maximize-btn';
+          maxBtn.setAttribute('aria-label', 'Maximize model preview');
+          maxBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+  <path d="M1 1h4v1.5H3.06L5.5 4.94 4.44 6 2 3.56V5.5H.5V1H1zm12 0v4.5H11.5V3.56L9.06 6 8 4.94 10.44 2.5H8.5V1H13zm0 12h-4.5v-1.5h1.94L8 9.06 9.06 8 11.5 10.44V8.5H13V13zm-12 0V8.5H.5v1.94L2.94 8 4 9.06 1.56 11.5H3.5V13H1z"/>
+</svg>`;
+          maxBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            activateCard(card);
+            toggleMaximize(card);
+          });
+          card.appendChild(maxBtn);
+
+          if (model.qr) {
+            const qrBtn = document.createElement('button');
+            qrBtn.className = 'qr-btn';
+            qrBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+              <rect x="1" y="1" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="3" y="3" width="3" height="3"/>
+              <rect x="10" y="1" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="12" y="3" width="3" height="3"/>
+              <rect x="1" y="10" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <rect x="3" y="12" width="3" height="3"/>
+              <rect x="11" y="11" width="2" height="2"/>
+              <rect x="15" y="11" width="2" height="2"/>
+              <rect x="11" y="15" width="2" height="2"/>
+              <rect x="15" y="15" width="2" height="2"/>
+              <rect x="13" y="13" width="2" height="2"/>
+            </svg>`;
+            qrBtn.setAttribute('aria-label', `Show QR code for ${modelName}`);
+            qrBtn.addEventListener('click', (e) => {
+              e.stopPropagation();
+              showQrPopover(model.qr, modelName);
+            });
+            card.appendChild(qrBtn);
+          }
+
+          const colorPicker = document.createElement('div');
+          colorPicker.className = 'color-picker';
+          colorPicker.setAttribute('aria-label', 'Change filament color');
+          for (const color of FILAMENT_COLORS) {
+            const swatch = document.createElement('button');
+            swatch.className = 'color-swatch';
+            swatch.style.backgroundColor = `#${color.hex.toString(16).padStart(6, '0')}`;
+            swatch.title = color.name;
+            swatch.setAttribute('aria-label', color.name);
+            if (color.hex === 0x64b5f6) swatch.setAttribute('aria-pressed', 'true');
+            swatch.addEventListener('click', () => {
+              colorPicker.querySelectorAll('.color-swatch').forEach(s => s.removeAttribute('aria-pressed'));
+              swatch.setAttribute('aria-pressed', 'true');
+              const state = cardState.get(card);
+              if (state) {
+                state.selectedColor = color.hex;
+                if (state.viewer) state.viewer.material.color.setHex(color.hex);
+              }
+            });
+            colorPicker.appendChild(swatch);
+          }
+          card.appendChild(colorPicker);
+
+          // Cross-section controls
+          const crossRow = document.createElement('div');
+          crossRow.className = 'cross-section-row';
+
+          const crossBtn = document.createElement('button');
+          crossBtn.className = 'cross-btn';
+          crossBtn.textContent = '✂ Cross Section';
+          crossBtn.setAttribute('aria-label', 'Toggle cross section');
+          crossBtn.setAttribute('aria-pressed', 'false');
+          crossBtn.disabled = true;
+
+          const clipSlider = document.createElement('input');
+          clipSlider.type = 'range';
+          clipSlider.className = 'clip-slider';
+          clipSlider.min = '0';
+          clipSlider.max = '100';
+          clipSlider.value = '50';
+          clipSlider.setAttribute('aria-label', 'Cross section depth');
+          clipSlider.disabled = true;
+          clipSlider.style.display = 'none';
+
+          crossBtn.addEventListener('click', () => {
+            const state = cardState.get(card);
+            if (!state?.viewer) return;
+            const active = crossBtn.getAttribute('aria-pressed') === 'true';
+            if (active) {
+              state.viewer.material.clippingPlanes = [];
+              state.clipPlane = null;
+              clipSlider.style.display = 'none';
+              crossBtn.setAttribute('aria-pressed', 'false');
+            } else {
+              const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+              if (state.clipBBox) {
+                const { minY, maxY } = state.clipBBox;
+                plane.constant = minY + 0.5 * (maxY - minY);
+              }
+              state.viewer.material.clippingPlanes = [plane];
+              state.clipPlane = plane;
+              clipSlider.value = '50';
+              clipSlider.style.display = '';
+              crossBtn.setAttribute('aria-pressed', 'true');
+            }
+          });
+
+          clipSlider.addEventListener('input', () => {
+            const state = cardState.get(card);
+            if (!state?.clipPlane || !state.clipBBox) return;
+            const pct = clipSlider.value / 100;
+            const { minY, maxY } = state.clipBBox;
+            state.clipPlane.constant = minY + pct * (maxY - minY);
+          });
+
+          crossRow.appendChild(crossBtn);
+          crossRow.appendChild(clipSlider);
+
+          // View controls — 90° rotation per axis, reset, and a switch between
+          // Orbit / Trackball / Arcball controls (issue #230). Disabled until a
+          // mesh is loaded; enabled by the same hook as the cross-section row.
+          const viewRow = document.createElement('div');
+          viewRow.className = 'view-controls-row';
+
+          // Re-anchor the cross-section clip plane after a rotation/reset
+          // changes the model's world-space Y extent.
+          function applyClipBBox(bbox) {
+            if (!bbox) return;
+            const state = cardState.get(card);
+            if (!state) return;
+            state.clipBBox = bbox;
+            if (state.clipPlane) {
+              const pct = Number(clipSlider.value) / 100;
+              state.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);
+            }
+          }
+
+          for (const axis of ['x', 'y', 'z']) {
+            const rb = document.createElement('button');
+            rb.className = 'view-btn';
+            rb.textContent = `Rotate ${axis.toUpperCase()}`;
+            rb.setAttribute('aria-label', `Rotate model 90 degrees about the ${axis.toUpperCase()} axis`);
+            rb.disabled = true;
+            rb.addEventListener('click', () => {
+              const state = cardState.get(card);
+              if (!state?.viewer) return;
+              applyClipBBox(state.viewer.rotate90(axis));
+            });
+            viewRow.appendChild(rb);
+          }
+
+          const resetBtn = document.createElement('button');
+          resetBtn.className = 'view-btn';
+          resetBtn.textContent = 'Reset';
+          resetBtn.setAttribute('aria-label', 'Reset view orientation and camera');
+          resetBtn.disabled = true;
+          resetBtn.addEventListener('click', () => {
+            const state = cardState.get(card);
+            if (!state?.viewer) return;
+            applyClipBBox(state.viewer.resetView());
+          });
+          viewRow.appendChild(resetBtn);
+
+          const modeDefs = [
+            { mode: 'orbit', label: 'Orbit' },
+            { mode: 'trackball', label: 'Trackball' },
+            { mode: 'arcball', label: 'Arcball' },
+          ];
+          const modeButtons = [];
+          for (const def of modeDefs) {
+            const b = document.createElement('button');
+            b.className = 'view-btn mode-btn';
+            b.textContent = def.label;
+            b.setAttribute('aria-label', `Use ${def.label} controls`);
+            b.setAttribute('aria-pressed', def.mode === 'orbit' ? 'true' : 'false');
+            b.disabled = true;
+            b.addEventListener('click', () => {
+              const state = cardState.get(card);
+              if (!state?.viewer) return;
+              state.viewer.setControlMode(def.mode);
+              modeButtons.forEach(mb => mb.setAttribute('aria-pressed',
+                mb === b ? 'true' : 'false'));
+            });
+            viewRow.appendChild(b);
+            modeButtons.push(b);
+          }
+
+          // In-browser parametric customizer — only present when the model
+          // ships a validated parameters manifest. Lazy-loads openscad-wasm
+          // on first click; failures degrade silently (default STL stays).
+          if (model.parameters?.parameters?.length) {
+            const customizeBtn = document.createElement('button');
+            customizeBtn.className = 'customize-btn';
+            customizeBtn.textContent = '⚙ Customize';
+            customizeBtn.setAttribute('aria-label', `Customize ${modelName} parameters`);
+            customizeBtn.setAttribute('aria-pressed', 'false');
+            crossRow.appendChild(customizeBtn);
+
+            const panel = document.createElement('div');
+            panel.className = 'customizer-panel';
+
+            const status = document.createElement('div');
+            status.className = 'customizer-status';
+            status.setAttribute('aria-live', 'polite');
+
+            const downloadLink = document.createElement('a');
+            downloadLink.className = 'customizer-download';
+            downloadLink.hidden = true;
+            downloadLink.download = model.stl.replace(/\.stl$/i, '') + '__custom.stl';
+            downloadLink.textContent = '⬇ Download customized STL';
+
+            // Re-render button + status share a row beneath the param list.
+            const actions = document.createElement('div');
+            actions.className = 'customizer-actions';
+            const rerenderBtn = document.createElement('button');
+            rerenderBtn.type = 'button';
+            rerenderBtn.className = 'rerender-btn';
+            rerenderBtn.textContent = '⟳ Re-render';
+            rerenderBtn.setAttribute('aria-label', `Re-render ${modelName} with current parameters`);
+            actions.appendChild(rerenderBtn);
+            actions.appendChild(status);
+
+            const paramRows = [];
+            const paramValues = {};
+            function markDirty(row) {
+              if (row) row.classList.add('param-row--dirty');
+              rerenderBtn.classList.add('dirty');
+            }
+            function clearDirty() {
+              for (const r of panel.querySelectorAll('.param-row--dirty')) {
+                r.classList.remove('param-row--dirty');
+              }
+              rerenderBtn.classList.remove('dirty');
+            }
+
+            for (const p of model.parameters.parameters) {
+              const row = document.createElement('div');
+              row.className = 'param-row';
+              const label = document.createElement('label');
+              label.textContent = p.label;
+              const inputId = `param-${card.dataset.slug}-${p.name}`;
+              label.htmlFor = inputId;
+              row.appendChild(label);
+              if (p.type === 'number') {
+                const input = document.createElement('input');
+                input.type = 'range';
+                input.id = inputId;
+                input.min = String(p.min);
+                input.max = String(p.max);
+                input.step = String(p.step);
+                input.value = String(p.default);
+                const display = document.createElement('span');
+                display.className = 'param-value';
+                display.textContent = String(p.default);
+                paramValues[p.name] = Number(p.default);
+                input.addEventListener('input', () => {
+                  const v = Number(input.value);
+                  paramValues[p.name] = v;
+                  display.textContent = String(v);
+                  markDirty(row);
+                });
+                row.appendChild(input);
+                row.appendChild(display);
+                paramRows.push({ p, input, display, row });
+              } else if (p.type === 'boolean') {
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.id = inputId;
+                input.checked = Boolean(p.default);
+                paramValues[p.name] = Boolean(p.default);
+                input.addEventListener('change', () => {
+                  paramValues[p.name] = input.checked;
+                  markDirty(row);
+                });
+                row.appendChild(input);
+                paramRows.push({ p, input, row });
+              }
+              panel.appendChild(row);
+            }
+            panel.appendChild(actions);
+            panel.appendChild(downloadLink);
+
+            let inFlight = false;
+
+            async function runRender(initialLabel = 'Rendering…') {
+              if (inFlight) return;
+              inFlight = true;
+              rerenderBtn.disabled = true;
+              const renderedParams = { ...paramValues };
+              status.classList.remove('error');
+              status.textContent = initialLabel;
+              const startMs = performance.now();
+              let url;
+              try {
+                const sources = await loadProjectSources(projectData.dir);
+                const entryName = model.source.split('/').pop();
+                const stlBytes = await renderInWorker({
+                  sources: Array.from(sources.entries()),
+                  entry: entryName,
+                  params: { ...renderedParams },
+                  projectDir: projectData.dir,
+                });
+                const blob = new Blob([stlBytes], { type: 'model/stl' });
+                url = URL.createObjectURL(blob);
+                await replaceMesh(card, url);
+                const prevHref = downloadLink.dataset.blobUrl;
+                if (prevHref) URL.revokeObjectURL(prevHref);
+                downloadLink.href = url;
+                downloadLink.dataset.blobUrl = url;
+                downloadLink.hidden = false;
+                const ms = Math.round(performance.now() - startMs);
+                status.textContent = `Rendered in ${(ms / 1000).toFixed(1)}s`;
+                const stillMatch = Object.keys(renderedParams).every(k => paramValues[k] === renderedParams[k]);
+                if (stillMatch) clearDirty();
+              } catch (err) {
+                if (url) URL.revokeObjectURL(url);
+                console.error('Customizer render failed:', err);
+                status.classList.add('error');
+                status.textContent = `Error: ${err.message || err}`;
+              } finally {
+                inFlight = false;
+                rerenderBtn.disabled = false;
+              }
+            }
+
+            rerenderBtn.addEventListener('click', () => runRender());
+
+            customizeBtn.addEventListener('click', () => {
+              const open = panel.classList.toggle('open');
+              customizeBtn.setAttribute('aria-pressed', String(open));
+              if (open) {
+                activateCard(card);
+                if (downloadLink.hidden) {
+                  runRender('Loading initial preview…');
+                }
+              }
+            });
+
+            card.appendChild(crossRow);
+            card.appendChild(panel);
+            card.appendChild(viewRow);
+          } else {
+            card.appendChild(crossRow);
+            card.appendChild(viewRow);
+          }
+
+          card.addEventListener('click', (e) => {
+            if (e.target.closest('button, a, input, .color-picker')) return;
+            window.history.replaceState(null, '', `#${section.dataset.slug}/${card.dataset.slug}`);
+          });
+
+          const standaloneUrl = `standalone/${encodeURI(model.stl.replace(/\.stl$/i, '.html'))}`;
+          const info = document.createElement('div');
+          info.className = 'card-info';
+          const h3 = document.createElement('h3');
+          h3.textContent = modelName;
+          info.appendChild(h3);
+
+          if (model.estimated_minutes) {
+            const t = document.createElement('span');
+            t.className = 'print-time';
+            t.textContent = `~${formatTime(model.estimated_minutes)}`;
+            info.appendChild(t);
+          }
+
+          const links = document.createElement('div');
+          links.className = 'card-links';
+
+          const dl = document.createElement('a');
+          dl.href = model.stl + cacheBust;
+          dl.setAttribute('download', '');
+          dl.setAttribute('aria-label', `Download STL for ${modelName}`);
+          dl.textContent = 'Download STL';
+          links.appendChild(dl);
+
+          const sa = document.createElement('a');
+          sa.href = standaloneUrl + cacheBust;
+          sa.setAttribute('aria-label', `View standalone HTML viewer for ${modelName}`);
+          sa.textContent = 'Standalone';
+          links.appendChild(sa);
+
+          info.appendChild(links);
+          card.appendChild(info);
+
+          grid.appendChild(card);
+        }
+
+        section.appendChild(grid);
+        gallery.appendChild(section);
+      }
+
+      // Pause/resume animation for off-screen initialized viewers
+      visibilityObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const state = cardState.get(entry.target);
+          if (!state?.viewer) continue;
+          if (entry.isIntersecting) {
+            state.viewer.start();
+          } else {
+            state.viewer.stop();
+          }
+        }
+      });
+
+      // Lazy-load: initialize viewers as cards scroll into view
+      const initObserver = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const card = entry.target;
+          const state = cardState.get(card);
+          if (!state || state.initialized) {
+            initObserver.unobserve(card);
+            continue;
+          }
+          // Skip cards in collapsed sections (expand handler will catch them)
+          if (card.closest('.project-group')?.classList.contains('collapsed')) continue;
+          activateCard(card);
+          initObserver.unobserve(card);
+        }
+      }, { rootMargin: '200px' });
+
+      // Observe all cards
+      for (const card of cardState.keys()) {
+        initObserver.observe(card);
+      }
+
+      // Keyboard navigation
+      function getVisibleCards() {
+        return [...document.querySelectorAll('.project-group:not(.collapsed) .card')];
+      }
+
+      document.addEventListener('keydown', (e) => {
+        // Skip if typing in an input/textarea or if modifier keys are held
+        const tag = e.target.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+        if (e.key === 'Escape') {
+          if (document.fullscreenElement) return;
+          const maximized = document.querySelector('.card--maximized');
+          if (maximized) {
+            e.preventDefault();
+            toggleMaximize(maximized);
+            return;
+          }
+        }
+
+        const card = e.target.closest('.card');
+
+        // Arrow key navigation between cards (only when a .card itself is focused)
+        if ((e.key === 'ArrowRight' || e.key === 'ArrowDown' ||
+             e.key === 'ArrowLeft' || e.key === 'ArrowUp') &&
+            e.target.classList.contains('card')) {
+          const cards = getVisibleCards();
+          const idx = cards.indexOf(e.target);
+          if (idx === -1) return;
+          const next = (e.key === 'ArrowRight' || e.key === 'ArrowDown')
+            ? idx + 1 : idx - 1;
+          if (next >= 0 && next < cards.length) {
+            e.preventDefault();
+            cards[next].focus();
+            activateCard(cards[next]);
+          }
+          return;
+        }
+
+        // Card-level shortcuts (when focus is on a card or within a card)
+        if (card) {
+          if (e.key === 'f' || e.key === 'F') {
+            e.preventDefault();
+            activateCard(card);
+            if (document.fullscreenElement) {
+              document.exitFullscreen();
+            } else {
+              if (card.classList.contains('card--maximized')) toggleMaximize(card);
+              card.requestFullscreen();
+            }
+            return;
+          }
+          if (e.key === 'd' || e.key === 'D') {
+            e.preventDefault();
+            const dl = card.querySelector('a[download]');
+            if (dl) dl.click();
+            return;
+          }
+          if (e.key === 'c' || e.key === 'C') {
+            e.preventDefault();
+            const btn = card.querySelector('.cross-btn');
+            if (btn) btn.click();
+            return;
+          }
+          if (e.key === 'm' || e.key === 'M') {
+            if (document.fullscreenElement) return;
+            e.preventDefault();
+            activateCard(card);
+            toggleMaximize(card);
+            return;
+          }
+          if (e.key === 'r' || e.key === 'R') {
+            const btn = card.querySelector('.rerender-btn');
+            if (btn && !btn.disabled) {
+              e.preventDefault();
+              btn.click();
+            }
+            return;
+          }
+        }
+      });
+
+      // Deep-link: navigate to hash target on initial load
+      navigateToHash();
+
+      // Handle hash changes (back/forward, manual URL edit)
+      window.addEventListener('hashchange', navigateToHash);
+    }
+
+    init();
+  </script>
+</body>
+</html>

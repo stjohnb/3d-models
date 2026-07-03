@@ -1,0 +1,13 @@
+# 3D Printable Models
+
+> A collection of OpenSCAD 3D-printable models with an interactive Three.js web viewer.
+> Browse, rotate, and download STLs for vacuum fittings, toothbrush holders, terrain models, and more.
+
+## Site
+
+- [3D Models viewer](https://www.bstjohn.net/3d-models/)
+- [Model manifest (JSON)](https://www.bstjohn.net/3d-models/models.json)
+
+## Source
+
+- [GitHub repository](https://github.com/St-John-Software/3d-models)
