@@ -1,0 +1,5 @@
+# This file is served at /3d-models/robots.txt.
+# Authoritative copy for crawlers must live at the origin root (infra task).
+User-agent: *
+Allow: /
+Sitemap: https://www.bstjohn.net/3d-models/sitemap.xml

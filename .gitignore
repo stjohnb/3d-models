@@ -1,0 +1,7 @@
+*.stl
+.cache/
+.mcp-claws.json
+__pycache__/
+*.py[cod]
+# Claude agent memory store (belongs in ~/.claude, not the repo)
+memory/

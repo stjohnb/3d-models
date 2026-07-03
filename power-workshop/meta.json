@@ -1,0 +1,8 @@
+{
+  "description": "Replacement attachments for the Fisher-Price Power Workshop toy, matching original square-peg connection interface.",
+  "tags": ["toy-parts", "replacement", "fisher-price"],
+  "version": "1.1.0",
+  "difficulty": "intermediate",
+  "complex_interior": true,
+  "mating_pairs": [["test_male.stl", "test_female.stl"]]
+}
