@@ -1,0 +1,61 @@
+name: Notify on main build failure
+
+# Triggers removed for the public snapshot — this workflow is intentionally disabled.
+# See the private source repository for the active version.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  notify:
+    runs-on: [self-hosted, linux]
+    concurrency:
+      group: notify-failure
+      cancel-in-progress: false
+    if: github.event.workflow_run.conclusion == 'failure'
+    steps:
+      - name: Create failure issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh label create bug --color d73a4a --description "Something isn't working" --repo "$REPO" 2>/dev/null || true
+          existing=$(gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --search "Build failure: ${WORKFLOW_NAME} in:title" \
+            --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            gh issue create \
+              --repo "$REPO" \
+              --title "Build failure: ${WORKFLOW_NAME}" \
+              --body "Workflow **${WORKFLOW_NAME}** failed on \`main\`: ${RUN_URL}" \
+              --label bug
+          fi
+
+  close-on-success:
+    runs-on: [self-hosted, linux]
+    concurrency:
+      group: close-on-success
+      cancel-in-progress: false
+    if: github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Close failure issue if build recovered
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          REPO: ${{ github.repository }}
+        run: |
+          existing=$(gh issue list \
+            --repo "$REPO" \
+            --state open \
+            --search "Build failure: ${WORKFLOW_NAME} in:title" \
+            --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$REPO" \
+              --comment "Build recovered — closing automatically."
+          fi

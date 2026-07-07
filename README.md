@@ -1,5 +1,7 @@
 # 3D Models
 
+*This is a public, auto-published snapshot of a personal, self-hosted 3D-printing project. It's mirrored from a private source repository for browsing — some references (e.g. author-specific hosting) reflect that private setup and won't apply to your own environment.*
+
 A collection of 3D-printable models designed in OpenSCAD.
 
 **[Browse and download all models](https://www.bstjohn.net/3d-models/)**
