@@ -14,10 +14,13 @@ Two workflow files live in `.github/workflows/`:
 ## Trigger and Concurrency (`build.yml`)
 
 - **Triggers**: `push` to `main`, `pull_request` (opened, synchronize, reopened)
-- **Runner**: `[self-hosted, linux]` — the runner is expected to have OpenSCAD,
-  ImageMagick, ADMesh, qrencode, xvfb, Python 3, and AWS CLI pre-installed.
-  Each dependency install step checks availability first and only installs if
-  missing.
+- **Runner**: `[self-hosted, linux, ryzen]` — pinned to the `ryzen` runner
+  (rather than any `[self-hosted, linux]` box) so the render memory caps
+  below are calibrated against a host of known RAM capacity; the `ryzen`
+  label must exist on that runner's registration or the job queues forever.
+  The runner is expected to have OpenSCAD, ImageMagick, ADMesh, qrencode,
+  xvfb, Python 3, and AWS CLI pre-installed. Each dependency install step
+  checks availability first and only installs if missing.
 - **Concurrency**: Groups by `pages-main` or `pages-pr-{N}`. In-progress runs
   are cancelled when a new commit arrives.
 - **Permissions**: `contents: write`, `pull-requests: write`, `id-token: write`
@@ -70,7 +73,7 @@ step:
 ### 2.6. Run Python Unit Tests for Build Scripts
 
 Runs `python3 -m unittest test_render_view test_oembed_helpers
-test_fetch_openscad_wasm test_render_cache -v` from within the `scripts/` directory. These are
+test_fetch_openscad_wasm test_render_cache test_capped_openscad -v` from within the `scripts/` directory. These are
 fast unit tests that mock external I/O (network, filesystem) and run on every
 push. They guard the helper functions used throughout the CI pipeline against
 regressions.
@@ -136,10 +139,15 @@ available; if not, installs via `apt-get`. Follows the same idempotent
 ### 6. Render STL Files
 
 Finds all `.scad` files (excluding `.github/`) and renders each to
-`site/{name}.stl` using `--export-format binstl` (binary STL output).
-Output is captured to a log file (`> /tmp/scad.log 2>&1`) so OpenSCAD's
-exit code is preserved (earlier versions piped through `tee`, which masked
-the exit code). The log is replayed via `cat` for CI visibility.
+`site/{name}.stl` via `scripts/capped-openscad.sh --export-format binstl -o
+site/{name}.stl {file}` (binary STL output). The wrapper runs OpenSCAD under
+a memory ceiling and wall-clock timeout (`RENDER_MEM_MAX` / `RENDER_TIMEOUT`,
+workflow-level env, default `8G` / `600`s) so a pathological render — heavy
+CSG, a cold cache, an under-provisioned runner — fails the step cleanly
+instead of freezing the self-hosted runner (see issue #272). Output is
+captured to a log file (`> /tmp/scad.log 2>&1`) so OpenSCAD's exit code is
+preserved (earlier versions piped through `tee`, which masked the exit
+code). The log is replayed via `cat` for CI visibility.
 
 Before any render attempt, the filename is validated against an allow-list
 regex (`^[A-Za-z0-9._ -]+$`). Files whose basename contains characters
@@ -147,7 +155,17 @@ outside this set cause the step to exit with an error immediately. This is a
 defense-in-depth security check that prevents adversarially-named files from
 injecting unexpected content into generated paths, HTML, or JSON.
 
-Library detection uses a three-tier strategy:
+Failure classification checks the wrapper's exit code for a cap hit
+**before** the existing library-detection strategy runs: if the exit code is
+`124` (timeout fired) or `>=128` (SIGKILLed — systemd `MemoryMax` or the OOM
+killer), the step emits `::error::render exceeded memory/time cap` and
+hard-fails immediately. This ordering matters because a SIGKILLed render
+produces a non-zero exit and no STL — the same signature the "suspected
+library" heuristic (tier 3 below) looks for. Without the cap-hit check
+running first, a cap hit would be silently swallowed as "suspected library"
+and the build could go green with the STL missing.
+
+Once a cap hit is ruled out, library detection uses a three-tier strategy:
 
 1. **Convention skip**: Files with an underscore prefix (`_*.scad`) are
    skipped immediately — no render attempt.
@@ -303,13 +321,16 @@ the optional `sourceZip` field.
 ### 10. Render PNG Thumbnails
 
 For each rendered STL, finds the corresponding `.scad` source and renders an
-800x600 PNG thumbnail. Xvfb is invoked with `--auto-servernum` and retried up
-to 3 times to tolerate transient `Xvfb failed to start` errors on the
-self-hosted runner. Falls back to direct rendering with a warning if
-`xvfb-run` is not installed.
+800x600 PNG thumbnail via `scripts/capped-openscad.sh`, with a step-level
+`RENDER_MEM_MAX=4G` / `RENDER_TIMEOUT=120` override (lower than the STL
+render cap, since thumbnails are supplementary). Xvfb is invoked with
+`--auto-servernum` and retried up to 3 times to tolerate transient `Xvfb
+failed to start` errors on the self-hosted runner. Falls back to direct
+rendering with a warning if `xvfb-run` is not installed.
 
-Individual thumbnail failures emit a GitHub Actions warning but do not fail
-the build — STL files are the core output, thumbnails are supplementary.
+Individual thumbnail failures — including a cap hit — emit a GitHub Actions
+warning but do not fail the build — STL files are the core output,
+thumbnails are supplementary.
 
 ### 10.5. Render Extra Orthographic Views for Complex-Interior Models
 
@@ -317,8 +338,9 @@ For any model whose project has `complex_interior: true` in `meta.json`,
 three additional orthographic PNGs are rendered: `top`, `bottom`, and
 `front`. Each is 800×600, saved as `site/<model-name>_<view>.png` (e.g.,
 `site/drill_socket_top.png`), using `--projection=ortho --viewall
---autocenter` for consistent framing. Currently only `power-workshop`
-declares `complex_interior: true`.
+--autocenter` for consistent framing, also via `scripts/capped-openscad.sh`
+with the same 4G/120s step-level cap as thumbnails. Currently only
+`power-workshop` declares `complex_interior: true`.
 
 Xvfb handling here uses a simpler fallback than step 10: if `xvfb-run` is
 available the render script runs under it; if Xvfb fails to start, the
@@ -570,13 +592,34 @@ multiple fail, all errors are visible.
 
 ## Design Decisions
 
+- **Capped OpenSCAD renders**: Every `openscad` invocation in the render
+  steps (STL, thumbnails, orthographic views) runs through
+  `scripts/capped-openscad.sh`, which wraps the call in a `systemd-run
+  --user --scope -p MemoryMax=...` cgroup plus a `timeout`, falling back to
+  `ulimit -v` + `timeout` on runners without a working `systemd-run --user`
+  session. This turns a runaway render (heavy CSG, a cold cache, an
+  under-provisioned runner) into a clean, logged step failure instead of a
+  frozen self-hosted runner — the pipeline's original exposure (issue #272).
+  `RENDER_MEM_MAX`/`RENDER_TIMEOUT` default to `8G`/`600s` at the workflow
+  level for STL renders and are overridden to `4G`/`120s` at the step level
+  for thumbnails and orthographic views. On a cap hit the wrapper prints
+  `render exceeded memory/time cap` to stderr; the STL render step checks
+  the exit code (`124` timeout, `>=128` SIGKILLed) **before** its
+  library-detection heuristics, because those exit codes would otherwise be
+  misclassified as "suspected library" and silently skipped — see the
+  Render STL Files step. The build job is pinned to `[self-hosted, linux,
+  ryzen]` rather than any `[self-hosted, linux]` box so the memory cap is
+  calibrated against a host of known RAM capacity; `notify-failures.yml` is
+  deliberately left unpinned so failure notifications still fire when
+  `ryzen` is down.
 - **Library detection**: Uses a three-tier strategy: (1) underscore-prefixed
   files are skipped by convention, (2) OpenSCAD's "top level object is
   empty" / "nothing to export" log output identifies libraries at render
   time, (3) a fallback heuristic catches edge cases where OpenSCAD exits
-  non-zero with no real output (≤84 bytes). Output is captured via file
-  redirect (`> /tmp/scad.log 2>&1`) rather than piped through `tee`, so
-  OpenSCAD's exit code is preserved for the error-handling logic.
+  non-zero with no real output (≤84 bytes). These tiers only run after the
+  render-cap check above rules out a timeout/OOM exit. Output is captured
+  via file redirect (`> /tmp/scad.log 2>&1`) rather than piped through
+  `tee`, so OpenSCAD's exit code is preserved for the error-handling logic.
 - **CI-generated zip bundles**: Zip files are pre-built in CI and deployed
   as static assets alongside STLs, rather than generated client-side. This
   fits the project's fully-static architecture — no new client-side
