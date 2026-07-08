@@ -142,7 +142,9 @@ Finds all `.scad` files (excluding `.github/`) and renders each to
 `site/{name}.stl` via `scripts/capped-openscad.sh --export-format binstl -o
 site/{name}.stl {file}` (binary STL output). The wrapper runs OpenSCAD under
 a memory ceiling and wall-clock timeout (`RENDER_MEM_MAX` / `RENDER_TIMEOUT`,
-workflow-level env, default `8G` / `600`s) so a pathological render — heavy
+workflow-level env, default `28G` / `3600`s — sized for the heaviest models,
+the full-res 512 px `nz-ski-fields` part renders, which take tens of minutes
+each on a cold cache on the 32 GB ryzen runner) so a pathological render — heavy
 CSG, a cold cache, an under-provisioned runner — fails the step cleanly
 instead of freezing the self-hosted runner (see issue #272). Output is
 captured to a log file (`> /tmp/scad.log 2>&1`) so OpenSCAD's exit code is
@@ -600,8 +602,11 @@ multiple fail, all errors are visible.
   session. This turns a runaway render (heavy CSG, a cold cache, an
   under-provisioned runner) into a clean, logged step failure instead of a
   frozen self-hosted runner — the pipeline's original exposure (issue #272).
-  `RENDER_MEM_MAX`/`RENDER_TIMEOUT` default to `8G`/`600s` at the workflow
-  level for STL renders and are overridden to `4G`/`120s` at the step level
+  `RENDER_MEM_MAX`/`RENDER_TIMEOUT` default to `28G`/`3600s` at the workflow
+  level for STL renders (sized for the heaviest models — the full-res
+  `nz-ski-fields` part renders — on the 32 GB ryzen runner; see the env-block
+  comment in `build.yml`) and are overridden to
+  `4G`/`120s` at the step level
   for thumbnails and orthographic views. On a cap hit the wrapper prints
   `render exceeded memory/time cap` to stderr; the STL render step checks
   the exit code (`124` timeout, `>=128` SIGKILLed) **before** its

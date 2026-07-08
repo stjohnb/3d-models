@@ -9,10 +9,12 @@ Edges are labeled `include` or `use`.
 
 ```mermaid
 graph TD
+  assembly["assembly.scad"]
   lake["lake.scad"]
   _ski_fields(["_ski_fields.scad"])
   snow["snow.scad"]
   terrain["terrain.scad"]
+  assembly -->|include| _ski_fields
   lake -->|include| _ski_fields
   snow -->|include| _ski_fields
   terrain -->|include| _ski_fields

@@ -18,8 +18,17 @@ concurrency:
 env:
   # Memory/time caps for capped-openscad.sh STL renders (issue #272).
   # Thumbnail/orthographic-view steps override these lower via step-level env.
-  RENDER_MEM_MAX: 8G
-  RENDER_TIMEOUT: "600"
+  #
+  # DELIBERATE VALUES — do not lower without checking the heaviest models:
+  # the full-res (512 px) nz-ski-fields part renders. The #248 merge build
+  # spent 56 min cold-rendering the three parts, and the full-res assembly
+  # variant measured 31 min / >8G peak on the ryzen runner (32 GB) before it
+  # moved to a 128 px preview heightmap (#271). 28G is cgroup-enforced by
+  # capped-openscad.sh, so a runaway render still fails cleanly without
+  # freezing the host. Renders are cached, so the full cost only recurs when
+  # a heavy .scad source (or the OpenSCAD version) changes.
+  RENDER_MEM_MAX: 28G
+  RENDER_TIMEOUT: "3600"
 
 jobs:
   build:
@@ -735,7 +744,7 @@ jobs:
                       meta = {}
                   # Only propagate viewer-relevant fields to the manifest.
                   # license, relatedModels, and mating_pairs are intentionally excluded.
-                  for field in ('description', 'tags', 'difficulty', 'version', 'hardware'):
+                  for field in ('description', 'tags', 'difficulty', 'version', 'hardware', 'assembly'):
                       if field in meta:
                           entry[field] = meta[field]
               if openscad_version:

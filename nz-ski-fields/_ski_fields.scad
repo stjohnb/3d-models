@@ -17,6 +17,11 @@ lake_level_m      = 310;   // Lake Wakatipu surface elevation (m)
 snow_line_m       = 1300;
 
 // Heightmap constants (keep in sync with heightmap.json)
+// Renderable files may override heightmap_file and px_count together to trade
+// resolution for mesh size — assembly.scad uses the 128 px preview copy so its
+// exported STL stays small enough for the in-browser viewer. The two must
+// agree: xy_scale is derived from px_count.
+heightmap_file = "heightmap.png";
 px_count     = 512;
 real_area_km = 35;
 elev_min_m   = 278.14453125;
@@ -39,7 +44,7 @@ function elev_to_z(e) = (e - elev_min_m) / elev_range_m * z_mm_total;
 // The terrain heightfield surface (no base). Bottom sits at z = 0.
 module terrain_surface() {
   scale([xy_scale, xy_scale, z_scale])
-    surface(file = "heightmap.png", center = true,
+    surface(file = heightmap_file, center = true,
             invert = false, convexity = 10);
 }
 

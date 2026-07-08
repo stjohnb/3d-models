@@ -98,6 +98,7 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             arcballcontrols_uri="data:text/javascript;base64,EEEE",
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
+            composite_parts_js="[]",
         )
 
     def test_format_succeeds_and_includes_controls(self):
@@ -136,9 +137,44 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             arcballcontrols_uri="data:text/javascript;base64,EEEE",
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
+            composite_parts_js="[]",
         )
         self.assertIn('&lt;script&gt;', html)
         self.assertNotIn('<script>alert(1)</script>', html)
+
+    def test_format_succeeds(self):
+        """The new {composite_parts_js} placeholder is substituted, not left literal."""
+        html = self._render()
+        self.assertIn('const COMPOSITE_PARTS = [];', html)
+        self.assertNotIn('{composite_parts_js}', html)
+
+
+class TestCompositePartsJs(unittest.TestCase):
+    """_js_escape / _composite_parts_js must neutralise <, >, & in embedded data."""
+
+    def test_js_escape_neutralises_script_break(self):
+        result = gs._js_escape('</script>&<x>')
+        self.assertNotIn('<', result)
+        self.assertNotIn('>', result)
+        self.assertNotIn('&', result)
+        self.assertIn('\\u003c', result)
+        self.assertIn('\\u003e', result)
+        self.assertIn('\\u0026', result)
+
+    def test_composite_parts_js_escapes_crafted_payload(self):
+        parts = [{"stl_b64": "AAAA</script>&<", "color": "#64b5f6"}]
+        result = gs._composite_parts_js(parts)
+        self.assertNotIn('<', result)
+        self.assertNotIn('>', result)
+        self.assertNotIn('&', result)
+        self.assertIn('\\u003c', result)
+
+    def test_composite_parts_js_valid_part_round_trips(self):
+        parts = [{"stl_b64": "AAAA", "color": "#64b5f6"}]
+        result = gs._composite_parts_js(parts)
+        self.assertIn('#64b5f6', result)
+        # No escapable characters, so it stays valid JSON.
+        self.assertEqual(json.loads(result), parts)
 
 
 if __name__ == "__main__":
