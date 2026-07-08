@@ -15,7 +15,7 @@ import re
 import sys
 import urllib.request
 
-from oembed_helpers import display_name
+from oembed_helpers import display_name, load_meta_failures
 
 # Three.js version — must match index.html importmap
 THREEJS_VERSION = "0.170.0"
@@ -103,6 +103,16 @@ def fetch_url(url: str, expected_sha256: str | None = None) -> bytes:
 
 def b64_data_uri(data: bytes, mime: str) -> str:
     return f"data:{mime};base64,{base64.b64encode(data).decode()}"
+
+
+def _js_escape(s: str) -> str:
+    """Escape <, >, & so a JSON literal can't break out of a <script> block."""
+    return s.replace('<', '\\u003c').replace('>', '\\u003e').replace('&', '\\u0026')
+
+
+def _composite_parts_js(parts) -> str:
+    """Serialise composite parts (list of {"stl_b64", "color"}) to a safe JS literal."""
+    return _js_escape(json.dumps(parts))
 
 
 def strip_stl_ext(filename: str) -> str:
@@ -331,6 +341,10 @@ HTML_TEMPLATE = """\
 
     const STL_BASE64 = "{stl_base64}";
 
+    // Non-empty only for a coloured multi-part composite (issue #275): each
+    // entry is {{ stl_b64, color }}. When empty, the single STL_BASE64 loads.
+    const COMPOSITE_PARTS = {composite_parts_js};
+
     const FILAMENT_COLORS = {filament_colors_js};
 
     const container = document.getElementById('viewer');
@@ -385,27 +399,78 @@ HTML_TEMPLATE = """\
       clipShadows: false,
     }});
 
-    // Decode STL from base64
-    const binary = atob(STL_BASE64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const geometry = new STLLoader().parse(bytes.buffer);
-    geometry.computeBoundingBox();
-    const clipHalfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
-    // Mutable: rotating the mesh changes its world-space Y extent.
-    let clipBounds = {{ minY: -clipHalfSizeY, maxY: clipHalfSizeY }};
-    geometry.center();
+    // displayObject is the Mesh (single model) or Group (composite) the view
+    // controls rotate/reset. clipMaterials are the materials the cross-section
+    // toggles. clipBounds is mutable: rotating changes the world-space Y extent.
+    let displayObject;
+    let defaultCamPos;
+    let clipBounds;
+    const clipMaterials = [];
 
-    const mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
+    function b64ToGeometry(b64) {{
+      const binary = atob(b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      return new STLLoader().parse(bytes.buffer);
+    }}
 
-    const size = new THREE.Vector3();
-    geometry.boundingBox.getSize(size);
-    const maxDim = Math.max(size.x, size.y, size.z);
-    const dist = maxDim * 1.8;
-    camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
-    const defaultCamPos = camera.position.clone();
-    controls.update();
+    if (COMPOSITE_PARTS.length) {{
+      // Coloured multi-part composite: each already-co-registered part STL as
+      // its own mesh/material in one Group (issue #275).
+      const geometries = COMPOSITE_PARTS.map(p => b64ToGeometry(p.stl_b64));
+      const union = new THREE.Box3();
+      for (const g of geometries) {{
+        g.computeBoundingBox();
+        union.union(g.boundingBox);
+      }}
+      const center = new THREE.Vector3();
+      union.getCenter(center);
+
+      const group = new THREE.Group();
+      geometries.forEach((geometry, i) => {{
+        geometry.translate(-center.x, -center.y, -center.z);
+        const mat = new THREE.MeshPhongMaterial({{
+          color: COMPOSITE_PARTS[i].color,
+          specular: 0x222222,
+          shininess: 40,
+          clippingPlanes: [],
+          clipShadows: false,
+        }});
+        group.add(new THREE.Mesh(geometry, mat));
+        clipMaterials.push(mat);
+      }});
+      scene.add(group);
+      displayObject = group;
+
+      const size = new THREE.Vector3();
+      union.getSize(size);
+      clipBounds = {{ minY: -size.y / 2, maxY: size.y / 2 }};
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const dist = maxDim * 1.8;
+      camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
+      defaultCamPos = camera.position.clone();
+      controls.update();
+    }} else {{
+      // Decode STL from base64
+      const geometry = b64ToGeometry(STL_BASE64);
+      geometry.computeBoundingBox();
+      const clipHalfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
+      clipBounds = {{ minY: -clipHalfSizeY, maxY: clipHalfSizeY }};
+      geometry.center();
+
+      const mesh = new THREE.Mesh(geometry, material);
+      scene.add(mesh);
+      displayObject = mesh;
+      clipMaterials.push(material);
+
+      const size = new THREE.Vector3();
+      geometry.boundingBox.getSize(size);
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const dist = maxDim * 1.8;
+      camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
+      defaultCamPos = camera.position.clone();
+      controls.update();
+    }}
 
     function resize() {{
       const w = canvas.clientWidth;
@@ -437,21 +502,23 @@ HTML_TEMPLATE = """\
       }}
     }});
 
-    // Color picker
-    const colorContainer = document.getElementById('colors');
-    for (const color of FILAMENT_COLORS) {{
-      const swatch = document.createElement('button');
-      swatch.className = 'color-swatch';
-      swatch.style.backgroundColor = '#' + color.hex.toString(16).padStart(6, '0');
-      swatch.title = color.name;
-      swatch.setAttribute('aria-label', color.name);
-      if (color.hex === 0x64b5f6) swatch.setAttribute('aria-pressed', 'true');
-      swatch.addEventListener('click', () => {{
-        colorContainer.querySelectorAll('.color-swatch').forEach(s => s.removeAttribute('aria-pressed'));
-        swatch.setAttribute('aria-pressed', 'true');
-        material.color.setHex(color.hex);
-      }});
-      colorContainer.appendChild(swatch);
+    // Color picker — a composite has fixed per-part colours, so no swatches.
+    if (!COMPOSITE_PARTS.length) {{
+      const colorContainer = document.getElementById('colors');
+      for (const color of FILAMENT_COLORS) {{
+        const swatch = document.createElement('button');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = '#' + color.hex.toString(16).padStart(6, '0');
+        swatch.title = color.name;
+        swatch.setAttribute('aria-label', color.name);
+        if (color.hex === 0x64b5f6) swatch.setAttribute('aria-pressed', 'true');
+        swatch.addEventListener('click', () => {{
+          colorContainer.querySelectorAll('.color-swatch').forEach(s => s.removeAttribute('aria-pressed'));
+          swatch.setAttribute('aria-pressed', 'true');
+          material.color.setHex(color.hex);
+        }});
+        colorContainer.appendChild(swatch);
+      }}
     }}
 
     // Fullscreen
@@ -471,14 +538,14 @@ HTML_TEMPLATE = """\
     crossBtn.addEventListener('click', () => {{
       const active = crossBtn.getAttribute('aria-pressed') === 'true';
       if (active) {{
-        material.clippingPlanes = [];
+        for (const m of clipMaterials) m.clippingPlanes = [];
         clipPlane = null;
         clipSlider.style.display = 'none';
         crossBtn.setAttribute('aria-pressed', 'false');
       }} else {{
         clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
         clipPlane.constant = clipBounds.minY + 0.5 * (clipBounds.maxY - clipBounds.minY);
-        material.clippingPlanes = [clipPlane];
+        for (const m of clipMaterials) m.clippingPlanes = [clipPlane];
         clipSlider.value = '50';
         clipSlider.style.display = '';
         crossBtn.setAttribute('aria-pressed', 'true');
@@ -492,8 +559,9 @@ HTML_TEMPLATE = """\
     }});
 
     // View controls — rotate 90° per world axis, reset, and switch controls.
+    // displayObject is the Mesh (single) or Group (composite) built above.
     function recomputeClip() {{
-      const box = new THREE.Box3().setFromObject(mesh);
+      const box = new THREE.Box3().setFromObject(displayObject);
       clipBounds = {{ minY: box.min.y, maxY: box.max.y }};
       if (clipPlane) {{
         const pct = Number(clipSlider.value) / 100;
@@ -505,7 +573,7 @@ HTML_TEMPLATE = """\
       const v = axis === 'x' ? new THREE.Vector3(1, 0, 0)
         : axis === 'y' ? new THREE.Vector3(0, 1, 0)
         : new THREE.Vector3(0, 0, 1);
-      mesh.rotateOnWorldAxis(v, Math.PI / 2);
+      displayObject.rotateOnWorldAxis(v, Math.PI / 2);
       recomputeClip();
     }}
 
@@ -513,7 +581,7 @@ HTML_TEMPLATE = """\
     document.getElementById('rot-y').addEventListener('click', () => rotateMesh('y'));
     document.getElementById('rot-z').addEventListener('click', () => rotateMesh('z'));
     document.getElementById('reset-view').addEventListener('click', () => {{
-      mesh.rotation.set(0, 0, 0);
+      displayObject.rotation.set(0, 0, 0);
       camera.position.copy(defaultCamPos);
       controls.target.set(0, 0, 0);
       camera.up.set(0, 1, 0);
@@ -585,6 +653,7 @@ def main():
 
     # Parse .scad-map and generate one HTML per STL
     models = []
+    stl_to_dir = {}  # stl basename -> project dir (for meta.json lookup)
     with open(SCAD_MAP) as f:
         for line in f:
             line = line.strip()
@@ -593,8 +662,60 @@ def main():
             parts = line.split("\t", 2)
             if len(parts) >= 3:
                 models.append(parts[0])  # stl filename
+                stl_to_dir[parts[0]] = parts[1]  # project dir
             else:
                 print(f"  Warning: malformed .scad-map line: {line!r}")
+
+    # Cache parsed meta.json per project dir so composite lookups are cheap.
+    meta_cache = {}
+    failed_meta = load_meta_failures()
+
+    def load_meta(project_dir):
+        if project_dir in meta_cache:
+            return meta_cache[project_dir]
+        meta = {}
+        meta_path = os.path.join(project_dir, "meta.json")
+        # Same deferred-enforcement gate models.json uses (build.yml): a
+        # meta.json that failed schema validation is treated as absent here
+        # rather than blocking every other project's standalone viewer.
+        if os.path.isfile(meta_path) and meta_path not in failed_meta:
+            try:
+                with open(meta_path) as mf:
+                    meta = json.load(mf)
+            except (OSError, json.JSONDecodeError):
+                meta = {}
+        meta_cache[project_dir] = meta
+        return meta
+
+    def build_composite_js(stl):
+        """Return a safe JS literal of composite parts, or "[]" if not a composite."""
+        project_dir = stl_to_dir.get(stl)
+        if not project_dir:
+            return "[]"
+        assembly = load_meta(project_dir).get("assembly")
+        if not isinstance(assembly, dict) or assembly.get("stl") != stl:
+            return "[]"
+        parts_list = []
+        for part in assembly.get("parts", []):
+            if not isinstance(part, dict):
+                print(f"  Warning: malformed composite part entry for {stl}, skipping part")
+                continue
+            color = part.get("color", "")
+            if not re.fullmatch(r"#[0-9a-fA-F]{6}", color):
+                print(f"  Warning: invalid composite color {color!r} for {stl}, skipping part")
+                continue
+            part_stl = part.get("stl")
+            if not isinstance(part_stl, str) or not part_stl:
+                print(f"  Warning: composite part missing stl filename for {stl}, skipping part")
+                continue
+            part_path = os.path.join("site", part_stl)
+            if not os.path.isfile(part_path):
+                print(f"  Warning: composite part {part_path} not found, skipping")
+                continue
+            with open(part_path, "rb") as pf:
+                part_b64 = base64.b64encode(pf.read()).decode()
+            parts_list.append({"stl_b64": part_b64, "color": color})
+        return _composite_parts_js(parts_list)
 
     print(f"\nGenerating standalone viewers for {len(models)} models...")
     generated = 0
@@ -612,6 +733,8 @@ def main():
             stl_data = f.read()
         stl_b64 = base64.b64encode(stl_data).decode()
 
+        composite_js = build_composite_js(stl)
+
         html = HTML_TEMPLATE.format(
             title=html_mod.escape(name),
             three_uri=js_uris["three"],
@@ -621,6 +744,7 @@ def main():
             arcballcontrols_uri=js_uris["ArcballControls"],
             stl_base64=stl_b64,
             filament_colors_js=filament_colors_js,
+            composite_parts_js=composite_js,
         )
 
         with open(out_path, "w") as f:

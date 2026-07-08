@@ -1,6 +1,14 @@
 {
-  "description": "Topographic 3D terrain model of the Wakatipu and Cardrona Valley region (South Island, NZ; ~35 km x 35 km). Includes Fernhill, Coronet Peak, Coronet Peak Flight Park, The Remarkables, and the former Snow Park NZ site (Pisa Range). 100 mm model, 2.0x vertical exaggeration, 3 mm flat base. Also ships as three material-separated parts (lake / terrain / snow) that share the same footprint and stack back into the full model: Lake Wakatipu prints as a separate insert filling its footprint up to the water surface, with an estimated sloped lakebed so the banks incline believably, and snow caps above a global snow line. Elevation data: AWS Open Data Terrain Tiles (Mapzen terrarium, zoom 14).",
+  "description": "Topographic 3D terrain model of the Wakatipu and Cardrona Valley region (South Island, NZ; ~35 km x 35 km). Includes Fernhill, Coronet Peak, Coronet Peak Flight Park, The Remarkables, and the former Snow Park NZ site (Pisa Range). 100 mm model, 2.0x vertical exaggeration, 3 mm flat base. Also ships as three material-separated parts (lake / terrain / snow) that share the same footprint and stack back into the full model: Lake Wakatipu prints as a separate insert filling its footprint up to the water surface, with an estimated sloped lakebed so the banks incline believably, and snow caps above a global snow line. Elevation data: AWS Open Data Terrain Tiles (Mapzen terrarium, zoom 14). An assembly.scad preview stacks all three parts into the full model (blue lake, grey terrain, white snow caps).",
   "tags": ["terrain", "topographic", "decorative", "new-zealand", "ski-fields"],
   "difficulty": "beginner",
-  "version": "1.2.0"
+  "version": "1.3.0",
+  "assembly": {
+    "stl": "assembly.stl",
+    "parts": [
+      { "stl": "lake.stl",    "color": "#64b5f6" },
+      { "stl": "terrain.stl", "color": "#9e9e9e" },
+      { "stl": "snow.stl",    "color": "#f5f5f5" }
+    ]
+  }
 }

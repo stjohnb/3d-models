@@ -196,12 +196,21 @@
       // Find the matching STL file by slugifying project and model names
       let stlFile = null;
       let projectName = null;
+      let composite = null;
       for (const [project, projectData] of Object.entries(models)) {
         if (slugify(project) !== projectSlug) continue;
         projectName = project;
         for (const model of projectData.files) {
           if (slugify(model.stl) === modelSlug) {
             stlFile = model.stl;
+            // Composite (coloured multi-part) preview — see issue #275.
+            // Colours re-validated as defence-in-depth beyond the schema.
+            composite = (projectData.assembly && projectData.assembly.stl === model.stl
+                && Array.isArray(projectData.assembly.parts))
+              ? projectData.assembly.parts
+                  .filter(p => typeof p.stl === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color))
+                  .map(p => ({ url: `${p.stl}${cacheBust}`, color: p.color }))
+              : null;
             break;
           }
         }
@@ -286,38 +295,89 @@
       let clipBBox = null;
       let clipPlane = null;
       let defaultCamPos = null;
+      // The scene object the view controls rotate/reset — a Mesh for single
+      // models, a Group for composites (issue #275).
+      let displayObject = null;
+      // Materials the cross-section toggles: one for a single model, one per
+      // coloured part for a composite.
+      const clipMaterials = [];
 
       const crossBtnEl = document.getElementById('cross-btn');
       const clipSliderEl = document.getElementById('clip-slider');
 
-      const loader = new STLLoader();
-      loader.load(`${stlFile}${cacheBust}`, (geometry) => {
-        geometry.computeBoundingBox();
-        const halfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
-        geometry.center();
-        clipBBox = { minY: -halfSizeY, maxY: halfSizeY };
-
-        if (crossBtnEl) crossBtnEl.disabled = false;
-
-        const mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);
-
-        const box = geometry.boundingBox;
-        const size = new THREE.Vector3();
-        box.getSize(size);
+      function frameAndEnable(size) {
         const maxDim = Math.max(size.x, size.y, size.z);
         const dist = maxDim * 1.8;
         camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
         defaultCamPos = camera.position.clone();
         controls.update();
-
+        if (crossBtnEl) crossBtnEl.disabled = false;
         document.querySelectorAll('#view-controls .view-btn').forEach(b => { b.disabled = false; });
-      }, undefined, () => {
-        errored = true;
-        animating = false;
-        renderer.dispose();
-        showError('Failed to load model');
-      });
+      }
+
+      if (composite && composite.length) {
+        // Coloured multi-part composite: load each already-co-registered part
+        // STL as its own mesh/material in one Group (issue #275).
+        Promise.all(composite.map(p => new Promise((res, rej) =>
+          new STLLoader().load(p.url, res, undefined, rej)
+        ))).then((geometries) => {
+          const union = new THREE.Box3();
+          for (const g of geometries) {
+            g.computeBoundingBox();
+            union.union(g.boundingBox);
+          }
+          const center = new THREE.Vector3();
+          union.getCenter(center);
+
+          const group = new THREE.Group();
+          geometries.forEach((geometry, i) => {
+            geometry.translate(-center.x, -center.y, -center.z);
+            const mat = new THREE.MeshPhongMaterial({
+              color: composite[i].color,
+              specular: 0x222222,
+              shininess: 40,
+              clippingPlanes: [],
+              clipShadows: false,
+            });
+            group.add(new THREE.Mesh(geometry, mat));
+            clipMaterials.push(mat);
+          });
+          scene.add(group);
+          displayObject = group;
+
+          const size = new THREE.Vector3();
+          union.getSize(size);
+          clipBBox = { minY: -size.y / 2, maxY: size.y / 2 };
+          frameAndEnable(size);
+        }).catch(() => {
+          errored = true;
+          animating = false;
+          renderer.dispose();
+          showError('Failed to load model');
+        });
+      } else {
+        const loader = new STLLoader();
+        loader.load(`${stlFile}${cacheBust}`, (geometry) => {
+          geometry.computeBoundingBox();
+          const halfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
+          geometry.center();
+          clipBBox = { minY: -halfSizeY, maxY: halfSizeY };
+
+          const mesh = new THREE.Mesh(geometry, material);
+          scene.add(mesh);
+          displayObject = mesh;
+          clipMaterials.push(material);
+
+          const size = new THREE.Vector3();
+          geometry.boundingBox.getSize(size);
+          frameAndEnable(size);
+        }, undefined, () => {
+          errored = true;
+          animating = false;
+          renderer.dispose();
+          showError('Failed to load model');
+        });
+      }
 
       function resize() {
         const w = canvas.clientWidth;
@@ -352,7 +412,7 @@
         crossBtnEl.addEventListener('click', () => {
           const active = crossBtnEl.getAttribute('aria-pressed') === 'true';
           if (active) {
-            material.clippingPlanes = [];
+            for (const m of clipMaterials) m.clippingPlanes = [];
             clipPlane = null;
             if (clipSliderEl) clipSliderEl.style.display = 'none';
             crossBtnEl.setAttribute('aria-pressed', 'false');
@@ -361,7 +421,7 @@
             if (clipBBox) {
               clipPlane.constant = clipBBox.minY + 0.5 * (clipBBox.maxY - clipBBox.minY);
             }
-            material.clippingPlanes = [clipPlane];
+            for (const m of clipMaterials) m.clippingPlanes = [clipPlane];
             if (clipSliderEl) {
               clipSliderEl.value = '50';
               clipSliderEl.style.display = '';
@@ -380,11 +440,10 @@
       }
 
       // View controls — rotate 90° per world axis, reset, and switch controls.
-      // The mesh is loader-local, so look it up from the scene.
+      // displayObject is the Mesh (single) or Group (composite) added above.
       function recomputeClip() {
-        const mesh = scene.children.find(o => o.isMesh);
-        if (!mesh) return;
-        const box = new THREE.Box3().setFromObject(mesh);
+        if (!displayObject) return;
+        const box = new THREE.Box3().setFromObject(displayObject);
         clipBBox = { minY: box.min.y, maxY: box.max.y };
         if (clipPlane) {
           const pct = Number(clipSliderEl.value) / 100;
@@ -393,12 +452,11 @@
       }
 
       function rotateMesh(axis) {
-        const mesh = scene.children.find(o => o.isMesh);
-        if (!mesh) return;
+        if (!displayObject) return;
         const v = axis === 'x' ? new THREE.Vector3(1, 0, 0)
           : axis === 'y' ? new THREE.Vector3(0, 1, 0)
           : new THREE.Vector3(0, 0, 1);
-        mesh.rotateOnWorldAxis(v, Math.PI / 2);
+        displayObject.rotateOnWorldAxis(v, Math.PI / 2);
         recomputeClip();
       }
 
@@ -406,8 +464,7 @@
       document.getElementById('rot-y')?.addEventListener('click', () => rotateMesh('y'));
       document.getElementById('rot-z')?.addEventListener('click', () => rotateMesh('z'));
       document.getElementById('reset-view')?.addEventListener('click', () => {
-        const mesh = scene.children.find(o => o.isMesh);
-        if (mesh) mesh.rotation.set(0, 0, 0);
+        if (displayObject) displayObject.rotation.set(0, 0, 0);
         if (defaultCamPos) camera.position.copy(defaultCamPos);
         controls.target.set(0, 0, 0);
         camera.up.set(0, 1, 0);

@@ -706,7 +706,7 @@
       return str.replace(/\.stl$/i, '').replace(/[_\s]+/g, '-').toLowerCase();
     }
 
-    function createViewer(canvas, stlUrl, onLoad) {
+    function createViewer(canvas, stlUrl, onLoad, composite) {
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.localClippingEnabled = true;
@@ -762,6 +762,9 @@
         scene,
         camera,
         material,
+        // Materials whose clipping planes the cross-section toggles. A single
+        // model has just `material`; a composite has one per coloured part.
+        materials: [material],
         mesh: null,
         defaultCameraPos: null,
       };
@@ -824,17 +827,78 @@
         return { minY: -halfSizeY, maxY: halfSizeY };
       }
 
-      const loader = new STLLoader();
-      loader.load(stlUrl, (geometry) => {
-        // The customizer may have already replaced the mesh while this
-        // default STL was downloading — skip the install in that case.
-        if (handle.customized) {
-          geometry.dispose?.();
-          return;
-        }
-        const bbox = installGeometry(geometry);
-        if (onLoad) onLoad(bbox);
-      });
+      // Composite models render each already-co-registered part STL as its
+      // own coloured mesh in a single Group — colour that a monochrome STL
+      // export can't carry (issue #275).
+      function loadComposite(parts) {
+        Promise.all(parts.map(p => new Promise((res, rej) =>
+          new STLLoader().load(p.url, res, undefined, rej)
+        ))).then((geometries) => {
+          // A customizer render could (in principle) have raced ahead; bail if
+          // so — mirrors the single-load guard.
+          if (handle.customized) {
+            for (const g of geometries) g.dispose?.();
+            return;
+          }
+          // Union bounding box across all parts, then centre the whole group
+          // at the origin (matches how single models call geometry.center()).
+          const union = new THREE.Box3();
+          for (const g of geometries) {
+            g.computeBoundingBox();
+            union.union(g.boundingBox);
+          }
+          const center = new THREE.Vector3();
+          union.getCenter(center);
+
+          const group = new THREE.Group();
+          const partMaterials = [];
+          geometries.forEach((geometry, i) => {
+            geometry.translate(-center.x, -center.y, -center.z);
+            const mat = new THREE.MeshPhongMaterial({
+              color: parts[i].color,
+              specular: 0x222222,
+              shininess: 40,
+              clippingPlanes: [],
+              clipShadows: false,
+            });
+            group.add(new THREE.Mesh(geometry, mat));
+            partMaterials.push(mat);
+          });
+
+          scene.add(group);
+          handle.mesh = group;
+          handle.materials = partMaterials;
+
+          const size = new THREE.Vector3();
+          union.getSize(size);
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const dist = maxDim * 1.8;
+          camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
+          handle.defaultCameraPos = camera.position.clone();
+          controls.update();
+
+          const halfSizeY = size.y / 2;
+          if (onLoad) onLoad({ minY: -halfSizeY, maxY: halfSizeY });
+        }).catch((err) => {
+          console.error('Failed to load composite parts', err);
+        });
+      }
+
+      if (composite && composite.length) {
+        loadComposite(composite);
+      } else {
+        const loader = new STLLoader();
+        loader.load(stlUrl, (geometry) => {
+          // The customizer may have already replaced the mesh while this
+          // default STL was downloading — skip the install in that case.
+          if (handle.customized) {
+            geometry.dispose?.();
+            return;
+          }
+          const bbox = installGeometry(geometry);
+          if (onLoad) onLoad(bbox);
+        });
+      }
 
       let rafId = null;
 
@@ -959,8 +1023,8 @@
         const btn = card.querySelector('.cross-btn');
         if (btn) btn.disabled = false;
         card.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
-      });
-      if (state.selectedColor !== 0x64b5f6) {
+      }, state.composite);
+      if (!state.composite && state.selectedColor !== 0x64b5f6) {
         state.viewer.material.color.setHex(state.selectedColor);
       }
       // Show touch gesture hints immediately on mobile (once per session)
@@ -1138,6 +1202,17 @@
           const stlUrl = `${model.stl}${cacheBust}`;
           const pngUrl = `${model.stl.replace(/\.stl$/i, '.png')}${cacheBust}`;
 
+          // Composite descriptor: when meta.json declares this STL's card is a
+          // coloured multi-part assembly, load the part STLs instead (issue
+          // #275). Colours are re-validated here as defence-in-depth even
+          // though the schema already enforces #rrggbb.
+          const composite = (projectData.assembly && projectData.assembly.stl === model.stl
+              && Array.isArray(projectData.assembly.parts))
+            ? projectData.assembly.parts
+                .filter(p => typeof p.stl === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color))
+                .map(p => ({ url: `${p.stl}${cacheBust}`, color: p.color }))
+            : null;
+
           // PNG placeholder shown until viewer activates
           const placeholder = document.createElement('img');
           placeholder.className = 'card-placeholder';
@@ -1178,6 +1253,7 @@
             canvas,
             placeholder,
             stlUrl,
+            composite,
             hintOverlay,
             initialized: false,
             viewer: null,
@@ -1239,28 +1315,31 @@
             card.appendChild(qrBtn);
           }
 
-          const colorPicker = document.createElement('div');
-          colorPicker.className = 'color-picker';
-          colorPicker.setAttribute('aria-label', 'Change filament color');
-          for (const color of FILAMENT_COLORS) {
-            const swatch = document.createElement('button');
-            swatch.className = 'color-swatch';
-            swatch.style.backgroundColor = `#${color.hex.toString(16).padStart(6, '0')}`;
-            swatch.title = color.name;
-            swatch.setAttribute('aria-label', color.name);
-            if (color.hex === 0x64b5f6) swatch.setAttribute('aria-pressed', 'true');
-            swatch.addEventListener('click', () => {
-              colorPicker.querySelectorAll('.color-swatch').forEach(s => s.removeAttribute('aria-pressed'));
-              swatch.setAttribute('aria-pressed', 'true');
-              const state = cardState.get(card);
-              if (state) {
-                state.selectedColor = color.hex;
-                if (state.viewer) state.viewer.material.color.setHex(color.hex);
-              }
-            });
-            colorPicker.appendChild(swatch);
+          // A composite has fixed per-part colours — no filament swatch.
+          if (!composite) {
+            const colorPicker = document.createElement('div');
+            colorPicker.className = 'color-picker';
+            colorPicker.setAttribute('aria-label', 'Change filament color');
+            for (const color of FILAMENT_COLORS) {
+              const swatch = document.createElement('button');
+              swatch.className = 'color-swatch';
+              swatch.style.backgroundColor = `#${color.hex.toString(16).padStart(6, '0')}`;
+              swatch.title = color.name;
+              swatch.setAttribute('aria-label', color.name);
+              if (color.hex === 0x64b5f6) swatch.setAttribute('aria-pressed', 'true');
+              swatch.addEventListener('click', () => {
+                colorPicker.querySelectorAll('.color-swatch').forEach(s => s.removeAttribute('aria-pressed'));
+                swatch.setAttribute('aria-pressed', 'true');
+                const state = cardState.get(card);
+                if (state) {
+                  state.selectedColor = color.hex;
+                  if (state.viewer) state.viewer.material.color.setHex(color.hex);
+                }
+              });
+              colorPicker.appendChild(swatch);
+            }
+            card.appendChild(colorPicker);
           }
-          card.appendChild(colorPicker);
 
           // Cross-section controls
           const crossRow = document.createElement('div');
@@ -1288,7 +1367,7 @@
             if (!state?.viewer) return;
             const active = crossBtn.getAttribute('aria-pressed') === 'true';
             if (active) {
-              state.viewer.material.clippingPlanes = [];
+              for (const m of state.viewer.materials) m.clippingPlanes = [];
               state.clipPlane = null;
               clipSlider.style.display = 'none';
               crossBtn.setAttribute('aria-pressed', 'false');
@@ -1298,7 +1377,7 @@
                 const { minY, maxY } = state.clipBBox;
                 plane.constant = minY + 0.5 * (maxY - minY);
               }
-              state.viewer.material.clippingPlanes = [plane];
+              for (const m of state.viewer.materials) m.clippingPlanes = [plane];
               state.clipPlane = plane;
               clipSlider.value = '50';
               clipSlider.style.display = '';

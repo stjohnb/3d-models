@@ -22,11 +22,13 @@ runs-on: [self-hosted, macos]   # for macOS jobs
 
 Never use `ubuntu-latest`, `ubuntu-22.04`, `windows-latest`, `windows-2022`, or any other GitHub-hosted Linux/Windows runner. macOS GitHub-hosted runners (`macos-latest`, `macos-14`) are the only exception. Always include the OS label — bare `runs-on: self-hosted` is not acceptable.
 
+`build.yml`'s `build` job additionally pins a third label — `runs-on: [self-hosted, linux, ryzen]` — so the OpenSCAD render memory caps (`scripts/capped-openscad.sh`) are calibrated against a host of known RAM capacity (issue #272). Preserve this pin; don't widen it back to plain `[self-hosted, linux]`.
+
 ## OpenSCAD conventions
 
 - **Library files**: underscore-prefixed (`_*.scad`). Define shared parameters and modules; produce no top-level geometry. CI skips these during STL rendering.
 - **Renderable files**: each produces exactly one STL. Contain top-level geometry directly or include/use a library and call a module.
-- **Resolution**: `$fn = 64` in all `.scad` sources.
+- **Resolution**: `$fn = 64` in all `.scad` sources (set once per project, typically in the shared library file that renderable files include). Exception: `hex-connector` has no circular geometry, so it sets per-cylinder `$fn = 6` overrides on its hexagonal prisms instead of a global `$fn = 64`.
 - **Dimensions**: all dimensions declared as named variables at the top of each file, in mm.
 - **Beveled transitions**: use `hull()` between thin extrusions (`0.01` mm) at different Z positions with different cross-sections.
 - **Viewer rotation**: OpenSCAD is Z-up; Three.js expects Y-up. Assembly/preview files and tube-shaped models apply `rotate([-90, 0, 0])` at the top level. Symmetric/upright models and individual print-oriented files omit it.

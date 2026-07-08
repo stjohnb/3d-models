@@ -30,6 +30,14 @@ multiple filaments:
 piece starts at that same flat plane and continues to the peaks. The three parts
 share the same footprint and stack back into the full model.
 
+`assembly.scad` is a preview that stacks all three parts back into the full
+model, coloured blue (lake) / grey (terrain) / white (snow) in the thumbnail.
+It is a single-colour STL when downloaded. Unlike the printable parts it
+renders from `heightmap_preview.png`, a 128 px downsample of the heightmap
+(regeneration command in `assembly.scad`), so the exported STL stays small
+enough (~3 MB) for the in-browser viewer — the full-resolution assembly
+produced an STL large enough to crash browsers loading the preview page.
+
 > **Height calibration:** OpenSCAD's `surface()` maps an 8-bit PNG's 0–255 grey
 > range to height 0–100, so `_ski_fields.scad` divides the Z scale by 100 (not
 > 255). This realizes the stated `z_exaggeration` and keeps `elev_to_z()` in

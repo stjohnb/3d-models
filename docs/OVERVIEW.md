@@ -22,6 +22,8 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── ideas/                # Feature ideas, rejected patterns, and cross-project learnings
 ├── scripts/
 │   ├── scad-dep-graph.sh       # Generates per-project Mermaid dependency graphs
+│   ├── capped-openscad.sh      # Wraps openscad in a memory + wall-clock cap (CI render steps; issue #272)
+│   ├── test_capped_openscad.py # Tests for capped-openscad.sh (mem/timeout cap behavior, exit code propagation)
 │   ├── generate-standalone.py  # Generates self-contained single-file HTML viewers
 │   ├── generate-gallery.py     # Generates README model gallery from models.json
 │   ├── oembed_helpers.py       # Shared Python helpers (slugify, parse_scad_map, load_meta_failures, etc.)
@@ -41,7 +43,9 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_wasm_customizer.mjs  # Node.js integration test for the in-browser WASM customizer pipeline
 │   ├── sync_public_snapshot.py  # Builds a sanitized public snapshot for stjohnb/3d-models; not used by CI
 │   └── test_sync_public_snapshot.py  # Tests for sync_public_snapshot
+├── README.md             # Project readme; gallery section auto-generated (see below)
 ├── filament-colors.json  # Shared color palette (single source of truth)
+├── .openscad-version     # Committed expected OpenSCAD version baseline; CI warns on drift
 ├── index.html            # Single-page 3D viewer (deployed to S3)
 ├── embed.html            # Minimal single-model viewer for iframe/OEmbed embedding
 ├── openscad-worker.js    # Web Worker — runs openscad-wasm renders off the main thread
@@ -373,11 +377,18 @@ Three subagent definitions live in `.claude/agents/`:
 See [ci-pipeline.md](ci-pipeline.md) for detailed documentation.
 
 **Summary**: On push to `main` or PR, the pipeline (`build.yml`) runs on a
-**self-hosted Linux runner** (`[self-hosted, linux]`), verifies dependency graphs, validates project metadata,
+**self-hosted Linux runner pinned to `ryzen`** (`[self-hosted, linux, ryzen]`,
+so the render memory caps below are calibrated against a host of known RAM
+capacity — see issue #272), verifies dependency graphs, validates project metadata,
 installs tools (OpenSCAD, ImageMagick, ADMesh, qrencode, zip), prepares the
 Xvfb environment (clears stale X lock files from prior interrupted runs),
-renders all `.scad` files to STL (using `--export-format binstl` for binary
-output), validates mesh integrity (including bounding-box extraction for
+renders all `.scad` files to STL via `scripts/capped-openscad.sh` (wrapping
+`openscad --export-format binstl` under a memory ceiling and wall-clock
+timeout — `RENDER_MEM_MAX`/`RENDER_TIMEOUT`, default `8G`/`600s` — so a
+pathological render fails the step cleanly instead of freezing the runner; a
+timeout or SIGKILL exit is checked and hard-fails the build *before* the
+library-detection heuristic runs, so a cap hit can't be silently swallowed as
+"suspected library"), validates mesh integrity (including bounding-box extraction for
 print-time estimates), checks mating part interference for pairs declared in
 `meta.json`'s `mating_pairs` field (using `trimesh` and `manifold3d` to detect
 geometric overlap — stored as `interference.json`, with CI warning annotations
@@ -404,7 +415,8 @@ comment.
 
 | Item | Location | Notes |
 |------|----------|-------|
-| CI runner | `[self-hosted, linux]` in `build.yml` and `notify-failures.yml` | Expects OpenSCAD, ImageMagick, ADMesh, qrencode, zip, xvfb, Python 3, AWS CLI |
+| CI runner | `[self-hosted, linux, ryzen]` in `build.yml`; `[self-hosted, linux]` in `notify-failures.yml` | Expects OpenSCAD, ImageMagick, ADMesh, qrencode, zip, xvfb, Python 3, AWS CLI. `build.yml`'s `build` job is pinned to `ryzen` so render memory caps are calibrated to a known host (issue #272) — the label must exist on the runner or the job queues forever |
+| Render memory/time caps | `scripts/capped-openscad.sh`; `RENDER_MEM_MAX`/`RENDER_TIMEOUT` env in `build.yml` | Wraps every `openscad` call (STL render: `8G`/`600s`; thumbnails and orthographic views: `4G`/`120s`). Timeout (124) or SIGKILL (≥128) hard-fails the build before the "suspected library" heuristic can silently swallow it |
 | OpenSCAD version baseline | `.openscad-version` | Committed expected version string; CI warns on mismatch |
 | AWS deployment role | `secrets.AWS_ROLE_ARN` | OIDC role for S3 sync |
 | S3 bucket path | `s3://www.bstjohn.net/3d-models/` | Production deployment target |
