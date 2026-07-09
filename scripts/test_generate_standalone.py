@@ -99,6 +99,7 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
             composite_parts_js="[]",
+            source_link_html="",
         )
 
     def test_format_succeeds_and_includes_controls(self):
@@ -138,6 +139,7 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
             composite_parts_js="[]",
+            source_link_html="",
         )
         self.assertIn('&lt;script&gt;', html)
         self.assertNotIn('<script>alert(1)</script>', html)
@@ -175,6 +177,38 @@ class TestCompositePartsJs(unittest.TestCase):
         self.assertIn('#64b5f6', result)
         # No escapable characters, so it stays valid JSON.
         self.assertEqual(json.loads(result), parts)
+
+
+class TestSourceLinkHtml(unittest.TestCase):
+    """_source_link_html must link to the public mirror and escape safely."""
+
+    def test_basic_link(self):
+        result = gs._source_link_html("power-workshop/drill_bit.scad")
+        self.assertIn(
+            "https://github.com/stjohnb/3d-models/blob/main/power-workshop/drill_bit.scad",
+            result,
+        )
+        self.assertIn('target="_blank"', result)
+        self.assertIn('rel="noopener noreferrer"', result)
+
+    def test_space_in_path_segment(self):
+        result = gs._source_link_html("toothbrush/Toothbrush assembly.scad")
+        self.assertIn("Toothbrush%20assembly.scad", result)
+        href_start = result.index('href="') + len('href="')
+        href_end = result.index('"', href_start)
+        self.assertNotIn(" ", result[href_start:href_end])
+
+    def test_empty_source(self):
+        self.assertEqual(gs._source_link_html(""), "")
+
+    def test_escapes_crafted_payload(self):
+        result = gs._source_link_html('a/b"c<d&e.scad')
+        href_start = result.index('href="') + len('href="')
+        href_end = result.index('"', href_start)
+        href = result[href_start:href_end]
+        self.assertNotIn('"', href)
+        self.assertNotIn('<', href)
+        self.assertNotIn('&', href)
 
 
 if __name__ == "__main__":

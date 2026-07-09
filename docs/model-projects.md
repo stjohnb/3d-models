@@ -101,13 +101,15 @@ snow) that share the same footprint and stack back into the full model.
 | `lake.scad` | Renderable — Lake Wakatipu insert, fills lake footprint from model bottom to water surface; applies `rotate([-90, 0, 0])` for the web viewer |
 | `terrain.scad` | Renderable — lower terrain from base to snow line; applies `rotate([-90, 0, 0])` for the web viewer |
 | `snow.scad` | Renderable — snow caps above `snow_line_m`; applies `rotate([-90, 0, 0])` for the web viewer |
+| `assembly.scad` | Renderable — thumbnail-only preview stacking all three parts in colour (blue lake / grey terrain / white snow) via `color()`; renders Z-up (no viewer rotation, unlike the parts above) from a 128px heightmap downsample so the exported STL stays small. Viewers no longer load `assembly.stl` — they instead render `lake.stl`/`terrain.stl`/`snow.stl` together as a coloured composite, per `meta.json`'s `assembly` field (see [web-viewer.md](web-viewer.md#composite-multi-colour-assembly-previews)) |
 | `heightmap.png` | Committed binary asset — 512×512 8-bit grayscale heightmap (0..255 → `elev_min..elev_max` metres from `heightmap.json`) |
 | `lake_bed.png` | Committed binary asset — 128×128 8-bit grayscale bathymetry map (grey 255 = bed at water surface / shore; grey 0 = full depth at model bottom) baked by `scripts/generate_lake_bed.py` |
+| `heightmap_preview.png` | Committed binary asset — 128×128 downsample of `heightmap.png` (Pillow `LANCZOS`), used only by `assembly.scad` |
 | `heightmap.json` | Sidecar metadata — `elev_min_m`, `elev_max_m`, `elev_range_m`, bbox params, source attribution |
 | `lake.parameters.json` | Parameter manifest — exposes `lake_level_m`, `model_size_mm`, `base_thickness_mm` |
 | `terrain.parameters.json` | Parameter manifest — exposes `snow_line_m`, `z_exaggeration`, `model_size_mm`, `base_thickness_mm` |
 | `snow.parameters.json` | Parameter manifest — exposes `snow_line_m`, `z_exaggeration`, `model_size_mm` |
-| `meta.json` | Project metadata (description, tags, difficulty, version 1.2.0) |
+| `meta.json` | Project metadata (description, tags, difficulty, version 1.3.0, `assembly` composite descriptor) |
 | `README.md` | Landmarks, multi-material split guide, lake/snow tuning, data source, regeneration commands |
 | `dependency-graph.md` | Auto-generated `include` dependency graph |
 
@@ -116,6 +118,15 @@ no overlap and no gap. `terrain.scad` = `terrain_solid` minus the lake footprint
 minus everything above `snow_line_m`. `snow.scad` = `terrain_solid` intersected
 with everything above `snow_line_m`. `lake.scad` = lake insert up to the water
 surface. All three apply `rotate([-90, 0, 0])` at the top level.
+
+**Composite assembly preview**: `assembly.scad` exists only to produce the
+gallery thumbnail PNG — a prior version tried to ship it as a real, viewer-
+loaded merged STL, but the full-resolution union was heavy enough to freeze
+a CI runner (issue #272) and was too large for browsers to load on the
+gallery page. The interactive viewer instead composites the three already-
+printable part STLs client-side (each in its declared colour, no offset
+needed since they share the same footprint and origin) — see
+[web-viewer.md](web-viewer.md#composite-multi-colour-assembly-previews).
 
 **Snow**: uses a single global elevation cut — all terrain above `snow_line_m`
 (default 1300 m) is capped everywhere on the map. The valley floor stays bare;

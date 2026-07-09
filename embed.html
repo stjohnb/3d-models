@@ -87,6 +87,20 @@
       z-index: 1;
     }
     .open-link:hover { background: rgba(0, 0, 0, 0.7); text-decoration: underline; }
+    .source-link {
+      position: absolute;
+      bottom: 0.5rem;
+      left: 0.5rem;
+      color: #64b5f6;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 0.75rem;
+      text-decoration: none;
+      z-index: 1;
+    }
+    .source-link:hover { background: rgba(0, 0, 0, 0.7); text-decoration: underline; }
     .error-message {
       display: flex;
       align-items: center;
@@ -152,11 +166,18 @@
       return str.replace(/\.stl$/i, '').replace(/[_\s]+/g, '-').toLowerCase();
     }
 
+    // Keep in sync with PUBLIC_REPO_URL in scripts/oembed_helpers.py and index.html.
+    const PUBLIC_REPO = 'https://github.com/stjohnb/3d-models';
+    function publicSourceUrl(source) {
+      if (!source) return '';
+      return `${PUBLIC_REPO}/blob/main/${source.split('/').map(encodeURIComponent).join('/')}`;
+    }
+
     function showError(msg) {
       const div = document.createElement('div');
       div.className = 'error-message';
       div.textContent = msg;
-      // Remove canvas but preserve other elements (e.g. open-link)
+      // Remove canvas but preserve other elements (e.g. open-link, source-link)
       const canvas = document.querySelector('canvas');
       if (canvas) canvas.remove();
       document.body.appendChild(div);
@@ -195,6 +216,7 @@
 
       // Find the matching STL file by slugifying project and model names
       let stlFile = null;
+      let sourcePath = null;
       let projectName = null;
       let composite = null;
       for (const [project, projectData] of Object.entries(models)) {
@@ -203,6 +225,7 @@
         for (const model of projectData.files) {
           if (slugify(model.stl) === modelSlug) {
             stlFile = model.stl;
+            sourcePath = model.source;
             // Composite (coloured multi-part) preview — see issue #275.
             // Colours re-validated as defence-in-depth beyond the schema.
             composite = (projectData.assembly && projectData.assembly.stl === model.stl
@@ -235,6 +258,16 @@
       link.rel = 'noopener';
       link.textContent = 'Open in viewer';
       document.body.appendChild(link);
+
+      if (sourcePath) {
+        const srcLink = document.createElement('a');
+        srcLink.className = 'source-link';
+        srcLink.href = publicSourceUrl(sourcePath);
+        srcLink.target = '_blank';
+        srcLink.rel = 'noopener noreferrer';
+        srcLink.textContent = 'View source';
+        document.body.appendChild(srcLink);
+      }
 
       // Create canvas
       const canvas = document.createElement('canvas');

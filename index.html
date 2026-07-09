@@ -706,6 +706,13 @@
       return str.replace(/\.stl$/i, '').replace(/[_\s]+/g, '-').toLowerCase();
     }
 
+    // Keep in sync with PUBLIC_REPO_URL in scripts/oembed_helpers.py and embed.html.
+    const PUBLIC_REPO = 'https://github.com/stjohnb/3d-models';
+    function publicSourceUrl(source) {
+      if (!source) return '';
+      return `${PUBLIC_REPO}/blob/main/${source.split('/').map(encodeURIComponent).join('/')}`;
+    }
+
     function createViewer(canvas, stlUrl, onLoad, composite) {
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
       renderer.setPixelRatio(window.devicePixelRatio);
@@ -1188,6 +1195,17 @@
           header.appendChild(srcBtn);
         }
 
+        if (projectData.dir) {
+          const repoBtn = document.createElement('a');
+          repoBtn.className = 'download-all-btn';
+          repoBtn.href = `${PUBLIC_REPO}/tree/main/${projectData.dir.split('/').map(encodeURIComponent).join('/')}`;
+          repoBtn.target = '_blank';
+          repoBtn.rel = 'noopener noreferrer';
+          repoBtn.textContent = 'View on GitHub';
+          repoBtn.setAttribute('aria-label', `View ${project} source directory on GitHub`);
+          header.appendChild(repoBtn);
+        }
+
         section.appendChild(header);
 
         const grid = document.createElement('div');
@@ -1658,6 +1676,16 @@
           sa.setAttribute('aria-label', `View standalone HTML viewer for ${modelName}`);
           sa.textContent = 'Standalone';
           links.appendChild(sa);
+
+          if (model.source) {
+            const src = document.createElement('a');
+            src.href = publicSourceUrl(model.source);
+            src.target = '_blank';
+            src.rel = 'noopener noreferrer';
+            src.setAttribute('aria-label', `View OpenSCAD source for ${modelName} on GitHub`);
+            src.textContent = 'Source';
+            links.appendChild(src);
+          }
 
           info.appendChild(links);
           card.appendChild(info);

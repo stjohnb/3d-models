@@ -87,6 +87,19 @@ Additional options:
 --commit-message MSG     Commit message (default: "Sync public snapshot")
 ```
 
+## `README.public.md`
+
+The repo root also has a hand-maintained `README.public.md`: plain project-
+intro text with no snapshot/mirror/private-repo language, covering
+architecture, conventions, local rendering, and test instructions, and
+linking only to the safe doc paths already listed above. It is meant to
+replace `README.md` in the public snapshot (the LLM-generated gallery
+README isn't meaningful without the CI-populated `models.json`/thumbnails
+that don't exist in the mirror). As of this writing,
+`scripts/sync_public_snapshot.py` does **not yet** swap it in — the
+snapshot still stages `README.md` as-is — so wiring `README.public.md` into
+the sync step is outstanding follow-up work, not yet implemented.
+
 ## One-directional sync
 
 The snapshot is one-directional. Changes are never pulled back from

@@ -9,7 +9,7 @@ import os
 import tempfile
 import unittest
 
-from oembed_helpers import slugify, display_name, thumbnail_name, parse_scad_map
+from oembed_helpers import slugify, display_name, thumbnail_name, parse_scad_map, public_source_url
 
 
 class TestSlugify(unittest.TestCase):
@@ -155,6 +155,27 @@ class TestParseScadMap(unittest.TestCase):
         result = parse_scad_map(path)
         self.assertEqual(len(result), 1)
         self.assertEqual(result['part.stl']['dir'], 'project-b')
+
+
+class TestPublicSourceUrl(unittest.TestCase):
+
+    def test_basic(self):
+        self.assertEqual(
+            public_source_url('power-workshop/drill_bit.scad'),
+            'https://github.com/stjohnb/3d-models/blob/main/power-workshop/drill_bit.scad',
+        )
+
+    def test_space_in_path_segment(self):
+        url = public_source_url('toothbrush/Toothbrush assembly.scad')
+        self.assertTrue(url.endswith('/toothbrush/Toothbrush%20assembly.scad'))
+
+    def test_empty_source(self):
+        self.assertEqual(public_source_url(''), '')
+
+    def test_points_at_public_mirror_not_private_repo(self):
+        url = public_source_url('power-workshop/drill_bit.scad')
+        self.assertIn('stjohnb/3d-models', url)
+        self.assertNotIn('St-John-Software', url)
 
 
 if __name__ == '__main__':

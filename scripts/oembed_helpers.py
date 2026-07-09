@@ -3,8 +3,24 @@
 import os
 import re
 import sys
+from urllib.parse import quote
 
 BASE_URL = 'https://www.bstjohn.net/3d-models'
+
+PUBLIC_REPO_URL = 'https://github.com/stjohnb/3d-models'
+PUBLIC_REPO_BLOB = f'{PUBLIC_REPO_URL}/blob/main'
+
+
+def public_source_url(source):
+    """Return the public-mirror URL for a repo-relative source path.
+
+    Encodes each path segment (source paths may contain spaces) but leaves
+    the '/' separators intact. Returns '' for a falsy path.
+    """
+    if not source:
+        return ''
+    encoded = '/'.join(quote(part, safe='') for part in source.split('/'))
+    return f'{PUBLIC_REPO_BLOB}/{encoded}'
 
 
 def load_meta_failures():

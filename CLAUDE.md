@@ -58,6 +58,10 @@ The `slugify()` function — strip `.stl`, replace `[_\s]+` with `-`, lowercase 
 
 If you change one, change all four in the same PR.
 
+## Public source links
+
+Every model card, embed overlay, and standalone-viewer footer links back to the model's `.scad` source in the **public mirror** at `https://github.com/stjohnb/3d-models` (not the private repo). The `PUBLIC_REPO` constant / `publicSourceUrl()` helper must remain identical across `index.html`, `embed.html`, and `scripts/oembed_helpers.py` (`PUBLIC_REPO_URL` / `public_source_url()`) — the same class of invariant as `slugify()`. If you change one, change all three in the same PR.
+
 ## `meta.json` schema
 
 Validated against `meta.schema.json` (JSON Schema draft 2020-12). Only `description` is required. Do not add fields to `meta.json` without updating `meta.schema.json` first.
