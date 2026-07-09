@@ -97,6 +97,56 @@ the viewer initializes (if changed before activation). White uses `#f5f5f5`
 (not pure white) and Black uses `#2a2a2a` (not pure black) to preserve
 surface detail under the Phong lighting model.
 
+### Composite Multi-Colour Assembly Previews
+
+STL export is monochrome, so a single merged mesh can't reproduce an
+OpenSCAD `color()` preview's per-part colours — and for `nz-ski-fields`, a
+full-resolution merged assembly mesh was heavy enough to freeze a CI runner
+(issue #272) and crash browsers loading the gallery page. Instead, a
+project's `meta.json` can declare an `assembly` object (schema-validated by
+`meta.schema.json`, propagated into `models.json`):
+
+```json
+"assembly": {
+  "stl": "assembly.stl",
+  "parts": [
+    { "stl": "lake.stl",    "color": "#64b5f6" },
+    { "stl": "terrain.stl", "color": "#9e9e9e" },
+    { "stl": "snow.stl",    "color": "#f5f5f5" }
+  ]
+}
+```
+
+`stl` names the project STL whose card this composite replaces; `parts` are
+STL/colour pairs that must already be co-registered (share the same origin
+and footprint) so they can be loaded into one scene with no offset. Every
+viewer computes a `composite` descriptor by matching the card's model
+against `projectData.assembly.stl`, re-validating each part's `color` against
+`/^#[0-9a-fA-F]{6}$/` as defence-in-depth even though the schema already
+enforces it:
+
+- **`index.html` / `embed.html`**: `createViewer()`'s `loadComposite(parts)`
+  loads every part STL with `STLLoader`, computes the union bounding box
+  across all parts, centers the whole group at the origin (mirroring
+  `geometry.center()` for a single model), and adds one `THREE.Mesh` per
+  part — each with its own `MeshPhongMaterial` — into a `THREE.Group`. The
+  cross-section toggle iterates `handle.materials` (one material for a
+  single model, one per part for a composite) so clipping still applies to
+  every part. A composite card **suppresses the filament color picker**
+  entirely, since colours are fixed per part, not user-selectable.
+- **Standalone viewers** (`generate-standalone.py`): `build_composite_js()`
+  reads the same `assembly` object from the project's `meta.json` at build
+  time, resolves each part's STL to a base64 blob, and serialises
+  `COMPOSITE_PARTS` into the generated HTML. The standalone JS scene-setup
+  mirrors `index.html`'s `loadComposite()` logic and also skips the color
+  picker for composite pages.
+
+`nz-ski-fields/assembly.scad` still exists, but only as the **thumbnail
+source** — it renders Z-up (no `rotate([-90, 0, 0])`, unlike the printable
+parts) from a downsampled 128px heightmap so OpenSCAD's default camera looks
+down onto the coloured terrain for the PNG. Its STL output is no longer
+loaded by any viewer.
+
 ### 3D Controls
 
 Each model card has a row of control buttons that appear below the 3D canvas once
@@ -217,6 +267,26 @@ which downloads Three.js 0.170.0 once, verifies SHA-256 hashes, caches
 assets locally (`.cache/threejs/`), and uses the same scene setup (colors,
 lighting, camera) as the main viewer. Includes a filament color picker and
 fullscreen button.
+
+## Public Source Links
+
+Every model card in `index.html`, the "Open in viewer" overlay in
+`embed.html`, and the footer of each standalone viewer link back to the
+model's `.scad` source in the **public mirror** at
+`https://github.com/stjohnb/3d-models` (not the private
+`St-John-Software/3d-models` repo), e.g.
+`https://github.com/stjohnb/3d-models/blob/main/power-workshop/drill_bit.scad`.
+Each project header in `index.html` also gets a "View on GitHub" link to its
+source directory (`tree/main/<dir>`). `index.html` and `embed.html` derive the
+link from `models.json`'s `files[].source`; `generate-standalone.py` derives
+it from `site/.scad-map`'s third (source-path) column. Source paths are
+percent-encoded per path segment (never the `/`) since a small number of
+`.scad` filenames contain spaces.
+
+**Invariant**: the `PUBLIC_REPO` constant and `publicSourceUrl()` helper must
+stay textually identical across `index.html`, `embed.html`, and
+`scripts/oembed_helpers.py` (`PUBLIC_REPO_URL` / `public_source_url()`) — the
+same class of three-location sync rule as `slugify()`.
 
 ## OEmbed Endpoints
 

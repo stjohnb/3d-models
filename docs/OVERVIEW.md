@@ -44,6 +44,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── sync_public_snapshot.py  # Builds a sanitized public snapshot for stjohnb/3d-models; not used by CI
 │   └── test_sync_public_snapshot.py  # Tests for sync_public_snapshot
 ├── README.md             # Project readme; gallery section auto-generated (see below)
+├── README.public.md      # Hand-maintained readme text for the public snapshot (stjohnb/3d-models); see public-snapshot.md
 ├── filament-colors.json  # Shared color palette (single source of truth)
 ├── .openscad-version     # Committed expected OpenSCAD version baseline; CI warns on drift
 ├── index.html            # Single-page 3D viewer (deployed to S3)
@@ -90,7 +91,7 @@ generated artifacts produced by CI.
 | `blast-gate/` | Sliding blast gate for 51mm OD PVC vacuum lines; related to `vacuum-hose` |
 | `hex-connector/` | Single-piece hex male/female connector, 30mm tall, loose press fit |
 | `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons and a slot the laptop slides into |
-| `nz-ski-fields/` | Topographic NZ terrain model split into three separately-printable parts (lake/terrain/snow) |
+| `nz-ski-fields/` | Topographic NZ terrain model split into three separately-printable parts (lake/terrain/snow); viewer shows them as a coloured composite assembly |
 | `power-workshop/` | Fisher-Price Power Workshop replacement parts sharing a square-peg connection |
 | `sink-tray/` | Single-file sink tray foot with counterbore |
 | `toothbrush/` | Multi-part holder system with dovetail-attached clips and a removable drip tray |
@@ -155,11 +156,12 @@ from downstream consumption (models.json, structured data).
 | `relatedModels` | `array` of `string` | Directory names of related projects |
 | `mating_pairs` | `array` of 2-element `string` arrays | Pairs of STL filenames that must fit without geometric overlap (validated by `check_interference.py`) |
 | `complex_interior` | `boolean` | When `true`, CI renders three extra orthographic views (`_top`, `_bottom`, `_front`) to expose internal cavity geometry; currently only `power-workshop` uses this |
+| `assembly` | `object` `{stl, parts}` | Declares that one project STL's viewer card is a coloured multi-part composite rather than a single mesh — see "Composite Multi-Colour Assembly Previews" below; currently only `nz-ski-fields` uses this |
 
 Metadata is merged into `models.json` at build time. Only viewer-relevant
 fields are propagated (`description`, `tags`, `difficulty`, `version`,
-`hardware`). `license`, `relatedModels`, and `mating_pairs` are intentionally
-excluded from the manifest.
+`hardware`, `assembly`). `license`, `relatedModels`, and `mating_pairs` are
+intentionally excluded from the manifest.
 
 The manifest also includes a `rendered_with` field per model entry in the manifest,
 recording the OpenSCAD version used to produce the STLs in that CI run
@@ -185,6 +187,27 @@ Complex models split into:
 2. **Individual render files** that `include`/`use` the library and call one module
 3. **Test print files** that orient parts for printing (e.g., dovetail face down)
 4. **Assembly files** that combine parts for preview in the viewer
+
+### Composite Multi-Colour Assembly Previews (nz-ski-fields)
+
+STL export is monochrome, so a merged assembly mesh can't show its parts in
+different colours the way an OpenSCAD `color()` preview can — and a full-
+resolution merged mesh for `nz-ski-fields` was heavy enough to freeze a CI
+runner (issue #272) and crash browsers loading the viewer page. Instead, a
+project can declare an `assembly` object in `meta.json` (`{stl, parts:
+[{stl, color}, ...]}`, schema-validated) that tells every viewer to load a
+set of already-co-registered part STLs — each rendered in its own fixed
+colour — into one scene in place of the single named STL. `nz-ski-fields`'s
+`lake.stl` / `terrain.stl` / `snow.stl` share the same footprint and origin,
+so loading them together with no offset reproduces the full stacked model.
+The `assembly.scad` source itself stays Z-up (no viewer rotation) and
+renders at reduced heightmap resolution — it now exists purely as the
+gallery thumbnail source, not as a viewer-loaded mesh; the interactive
+composite is assembled client-side from the printable parts' own STLs.
+`index.html`, `embed.html`, and `generate-standalone.py` all implement this
+composite path; a composite card also suppresses the filament color picker,
+since colours are fixed per part. Full detail in
+[web-viewer.md](web-viewer.md#composite-multi-colour-assembly-previews).
 
 ### Dovetail Joint System (toothbrush)
 
@@ -270,8 +293,13 @@ This is applied selectively: dedicated assembly/preview files
 look awkward in Z-up orientation (`vacuum-hose/adapter.scad`,
 `vacuum-hose/reducer.scad`), and terrain/surface models (`nz-ski-fields/lake.scad`,
 `nz-ski-fields/terrain.scad`, `nz-ski-fields/snow.scad`)
-apply it. Individual power-workshop attachment files (`flathead_attachment.scad`,
-`drill_bit.scad`, etc.) do **not** apply it — they are oriented peg-down
+apply it. `nz-ski-fields/assembly.scad` is the one exception among
+assembly/preview files: it deliberately renders Z-up (no rotation) because
+it is thumbnail-only — its STL is never loaded by a viewer, so only the
+default OpenSCAD camera angle for the PNG matters (see "Composite
+Multi-Colour Assembly Previews" above). Individual power-workshop attachment
+files (`flathead_attachment.scad`, `drill_bit.scad`, etc.) do **not** apply
+it — they are oriented peg-down
 (Z-up), matching their natural print orientation. Symmetric or upright models
 (`hex-connector`, `sink-tray`, `macbook-pro-laptop-stand`) also omit it.
 
@@ -314,9 +342,10 @@ generates self-contained standalone HTML viewers (`site/standalone/`) and
 per-model OEmbed JSON endpoints (`site/oembed/`).
 
 Every feature — core functionality, the XSS-safety convention, print-time
-estimates, lazy loading, filament colors, 3D controls, cross-section view,
-maximize preview, deep links, QR codes, touch gesture hints, and
-accessibility — is documented in detail in [web-viewer.md](web-viewer.md).
+estimates, lazy loading, filament colors, composite multi-colour assembly
+previews, 3D controls, cross-section view, maximize preview, deep links, QR
+codes, touch gesture hints, and accessibility — is documented in detail in
+[web-viewer.md](web-viewer.md).
 
 ## Slugify Convention
 

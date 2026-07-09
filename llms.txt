@@ -10,4 +10,4 @@
 
 ## Source
 
-- [GitHub repository](https://github.com/St-John-Software/3d-models)
+- [GitHub repository](https://github.com/stjohnb/3d-models)
