@@ -458,6 +458,7 @@ comment.
 | Structured data | `<!-- __STRUCTURED_DATA__ -->` in `index.html` | Replaced by CI with Schema.org JSON-LD |
 | OEmbed links | `<!-- __OEMBED_LINKS__ -->` in `index.html` | Replaced by CI with `<link rel="alternate">` tags |
 | Filament colors | `filament-colors.json` | 8 preset colors; Blue is default. Single source of truth loaded by `index.html` at runtime and injected into standalone viewers at build time by `generate-standalone.py` |
+| Analytics | Plausible script tag in `index.html` and `embed.html` | Self-hosted at `plausible.bstjohn.net`, `data-domain="bstjohn.net"`; cookieless. Standalone viewers (`site/standalone/`) deliberately omit it so they stay self-contained/offline |
 | Touch hint timeout | 5000 ms in `showTouchHint()` | Fade-out delay for gesture overlay |
 | Zip bundle threshold | 2+ STL files per project | Single-file projects don't get an STL zip; all projects get a source zip |
 | Lazy-load margin | `rootMargin: '200px'` | IntersectionObserver pre-loads 200px before viewport |
