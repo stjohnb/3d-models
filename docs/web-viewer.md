@@ -299,3 +299,7 @@ are injected into `index.html`, but since all tags live in a single page,
 auto-discovery only works for the site root — not for individual model deep
 links (hash fragments aren't sent to the server). For per-model OEmbed,
 consuming platforms should be configured with explicit endpoint URLs.
+
+## Analytics
+
+`index.html` and `embed.html` load a self-hosted Plausible script with the `file-downloads`, `hash`, `outbound-links`, `pageview-props`, and `tagged-events` extensions. The `hash` extension makes the viewer's `#project-slug/model-slug` deep links register as distinct pageviews. The `file-downloads` extension auto-tracks STL and zip download clicks. Standalone viewers (`site/standalone/`) intentionally omit the analytics script to remain self-contained and work offline.

@@ -103,10 +103,10 @@ Audit of [specification.website/checklist](https://specification.website/checkli
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Privacy policy | N/A | No cookies, no analytics, no third-party tracking scripts — compliance by absence |
-| Cookie consent | N/A | No cookies set |
+| Privacy policy | N/A | Plausible is cookieless and stores no personal data — no consent banner or policy required |
+| Cookie consent | N/A | Plausible is cookieless and does not use local storage |
 | GPC (Global Privacy Control) | N/A | No cookies or tracking |
-| Third-party scripts | ✅ | Three.js from CDN only (no analytics, no ads, no tracking) |
+| Third-party scripts | ✅ | Three.js from CDN plus self-hosted Plausible at `plausible.bstjohn.net` (no ads, no cross-site tracking) |
 
 ## Resilience
 
