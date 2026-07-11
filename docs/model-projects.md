@@ -15,7 +15,12 @@ washers.
 | `_adjustable_bracket.scad` | Shared library — parameters and modules for both pieces (no top-level geometry) |
 | `piece_a.scad` | Renderable — wall piece with rounded head and adjustment slot |
 | `piece_b.scad` | Renderable — bracket piece with U-channel hook |
+| `piece_a.parameters.json` | In-browser customizer manifest for `piece_a` |
+| `piece_b.parameters.json` | In-browser customizer manifest for `piece_b` |
 | `meta.json` | Project metadata (description, tags, difficulty, hardware BOM) |
+| `dependency-graph.md` | Auto-generated `include` dependency graph |
+| `bracket.md` | Design notes |
+| `sketch.jpg` | Reference sketch |
 
 ### blast-gate/
 
@@ -30,6 +35,8 @@ Related model: `vacuum-hose`.
 | `gate_body.scad` | Renderable — housing with two pipe sockets and mounting plate |
 | `gate_blade.scad` | Renderable — sliding blade with grip handle |
 | `gate_assembly.scad` | Renderable — assembly preview (blade in fully-closed position), oriented for web viewer |
+| `gate_body.parameters.json` | In-browser customizer manifest for `gate_body` |
+| `gate_blade.parameters.json` | In-browser customizer manifest for `gate_blade` |
 | `meta.json` | Project metadata (v1.1.1, difficulty: intermediate, relatedModels: vacuum-hose) |
 | `dependency-graph.md` | Auto-generated `include` dependency graph |
 
@@ -61,6 +68,7 @@ protrusion-up; no supports needed.
 |------|------|
 | `_hex_connector.scad` | Library — parameters and `hex_connector()` module (no top-level geometry) |
 | `hex_connector.scad` | Renderable — includes library, calls `hex_connector()` |
+| `hex_connector.parameters.json` | In-browser customizer manifest for `hex_connector` |
 | `meta.json` | Project metadata (description, tags, version, difficulty) |
 | `dependency-graph.md` | Auto-generated `include` dependency graph |
 
@@ -169,6 +177,8 @@ share a common square-peg connection that plugs into the power handle.
 | `test_male.scad` | Renderable — male connection only (shaft + collar), for test printing fit |
 | `test_female.scad` | Renderable — female socket in a short cylinder, for test printing fit (via shared library) |
 | `meta.json` | Project metadata (description, tags, difficulty) |
+| `dependency-graph.md` | Auto-generated `include` dependency graph |
+| `images/`, `Screenshot 2026-02-22 at 18.00.38.png` | Reference photos |
 
 #### Shared Connection Pattern
 
@@ -253,7 +263,9 @@ of the socket (socket bottom is at z=24.5, bore top at z=21.0).
 | File | Role |
 |------|------|
 | `tray_foot.scad` | Renderable — cylindrical foot with counterbore for screw attachment |
+| `tray_foot.parameters.json` | In-browser customizer manifest for `tray_foot` |
 | `meta.json` | Project metadata (description, tags, difficulty) |
+| `IMG_2843.jpg`, `IMG_2844.jpg` | Reference photos |
 
 ### toothbrush/
 
@@ -270,6 +282,7 @@ vertical backplate, dovetail-attached clips, and a removable drip tray.
 | `Toothbrush clip test.scad` | Renderable — single brush clip, oriented for test printing |
 | `Toothpaste clip test.scad` | Renderable — single paste clip, oriented for test printing |
 | `meta.json` | Project metadata (description, tags, difficulty) |
+| `dependency-graph.md` | Auto-generated `include`/`use` dependency graph |
 
 See [OVERVIEW.md](OVERVIEW.md#dovetail-joint-system-toothbrush) for the
 dovetail joint system used between the backplate and clips.
@@ -283,6 +296,8 @@ directory: an adapter and a reducer.
 |------|------|
 | `adapter.scad` | Renderable — male-to-male adapter joining 50mm OD hose to 35mm OD hose; 2mm tip taper over 10mm aids insertion |
 | `reducer.scad` | Renderable — reducer connecting 49mm OD hose to 30mm ID hose; tapered ends for snug fit |
+| `adapter.parameters.json` | In-browser customizer manifest for `adapter` |
+| `reducer.parameters.json` | In-browser customizer manifest for `reducer` |
 | `meta.json` | Project metadata (description, tags, difficulty, version) |
 
 Both files share the same helper/module structure: `disc(d, h=0.01)` (thin
