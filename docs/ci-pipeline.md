@@ -13,7 +13,11 @@ Two workflow files live in `.github/workflows/`:
 
 ## Trigger and Concurrency (`build.yml`)
 
-- **Triggers**: `push` to `main`, `pull_request` (opened, synchronize, reopened)
+- **Triggers**: `push` to `main`, `pull_request` (opened, synchronize, reopened).
+  Documentation-only changes are skipped via `paths-ignore` (`docs/**`,
+  `ideas/**`, root `*.md`, `LICENSE`); a run is skipped only when *all*
+  changed files match those patterns, so any PR that also touches a `.scad`,
+  script, or site source still builds.
 - **Runner**: `[self-hosted, linux, ryzen]` — pinned to the `ryzen` runner
   (rather than any `[self-hosted, linux]` box) so the render memory caps
   below are calibrated against a host of known RAM capacity; the `ryzen`

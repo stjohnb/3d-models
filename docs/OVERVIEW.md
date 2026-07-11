@@ -413,7 +413,7 @@ installs tools (OpenSCAD, ImageMagick, ADMesh, qrencode, zip), prepares the
 Xvfb environment (clears stale X lock files from prior interrupted runs),
 renders all `.scad` files to STL via `scripts/capped-openscad.sh` (wrapping
 `openscad --export-format binstl` under a memory ceiling and wall-clock
-timeout — `RENDER_MEM_MAX`/`RENDER_TIMEOUT`, default `8G`/`600s` — so a
+timeout — `RENDER_MEM_MAX`/`RENDER_TIMEOUT`, default `28G`/`3600s` — so a
 pathological render fails the step cleanly instead of freezing the runner; a
 timeout or SIGKILL exit is checked and hard-fails the build *before* the
 library-detection heuristic runs, so a cap hit can't be silently swallowed as
@@ -445,7 +445,7 @@ comment.
 | Item | Location | Notes |
 |------|----------|-------|
 | CI runner | `[self-hosted, linux, ryzen]` in `build.yml`; `[self-hosted, linux]` in `notify-failures.yml` | Expects OpenSCAD, ImageMagick, ADMesh, qrencode, zip, xvfb, Python 3, AWS CLI. `build.yml`'s `build` job is pinned to `ryzen` so render memory caps are calibrated to a known host (issue #272) — the label must exist on the runner or the job queues forever |
-| Render memory/time caps | `scripts/capped-openscad.sh`; `RENDER_MEM_MAX`/`RENDER_TIMEOUT` env in `build.yml` | Wraps every `openscad` call (STL render: `8G`/`600s`; thumbnails and orthographic views: `4G`/`120s`). Timeout (124) or SIGKILL (≥128) hard-fails the build before the "suspected library" heuristic can silently swallow it |
+| Render memory/time caps | `scripts/capped-openscad.sh`; `RENDER_MEM_MAX`/`RENDER_TIMEOUT` env in `build.yml` | Wraps every `openscad` call (STL render: `28G`/`3600s`, sized to the heaviest model's measured cost after the 2026-07-07 runner-freeze incident; thumbnails and orthographic views: `4G`/`120s`). Timeout (124) or SIGKILL (≥128) hard-fails the build before the "suspected library" heuristic can silently swallow it |
 | OpenSCAD version baseline | `.openscad-version` | Committed expected version string; CI warns on mismatch |
 | AWS deployment role | `secrets.AWS_ROLE_ARN` | OIDC role for S3 sync |
 | S3 bucket path | `s3://www.bstjohn.net/3d-models/` | Production deployment target |
