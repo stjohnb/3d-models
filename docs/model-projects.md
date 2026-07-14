@@ -55,6 +55,54 @@ at `z = ±slot_h/2` spanning the full body depth in X. Socket stubs extend at
 - `catch_notch_depth = 0.8`, `catch_notch_width = 3.0` — small recesses cut into inner Y-walls at the fully-closed blade position; keeps ≥1 mm of wall remaining (`y_rail = 2mm` per side)
 - `catch_bump_h = catch_notch_depth - 0.1` — matching protrusions on the blade leading edge; 0.1 mm clearance at the notch far wall so the blade snaps in and resists vibration-driven opening
 
+### esp32-display-case/
+
+Two-part snap-fit enclosure for the ESP32-2432S028R 2.8" 240×320 resistive-touch
+TFT board ("Cheap Yellow Display" / CYD), with an integrated snap-in holder for
+the board's bundled touchscreen stylus. A rear shell clears the back-side
+components (ESP32, USB, JST connectors) and carries two saddle clips for the
+stylus on one exterior long wall; a front bezel with a display window snaps
+over the shell's exterior via a skirt, sandwiching the board between them.
+Both parts print upright (Z-up) with no viewer rotation — symmetric/upright
+model, like `hex-connector` and `sink-tray`.
+
+| File | Role |
+|------|------|
+| `_esp32_display_case.scad` | Shared library — all parameters and modules (`rbox`, `pen_clip`, `case_back`, `case_front`); no top-level geometry |
+| `case_back.scad` | Renderable — rear shell with cavity, corner support posts, side-wall vents, and stylus clips |
+| `case_front.scad` | Renderable — front bezel with display window and snap skirt |
+| `case_back.parameters.json` | In-browser customizer manifest for `case_back` (board dims, wall, fit clearance, port margin, stylus holder toggle/dims) |
+| `case_front.parameters.json` | In-browser customizer manifest for `case_front` (board dims, window size/offset, skirt clearance) |
+| `meta.json` | Project metadata (description, tags: electronics/enclosure/esp32, difficulty: intermediate, hardware BOM) |
+| `dependency-graph.md` | Auto-generated `include` dependency graph |
+
+**Board dimensions are published CYD community specs, not calipered** —
+flagged "VERIFY w/ calipers" in the source and exposed as customizer
+parameters so a test print can confirm fit. The stylus dimensions (`pen_*`)
+are measured from caliper photos (issue #268): shaft diameter 4.1mm, overall
+length ~87.4mm — close enough to the PCB long edge (86.5mm) that the stylus
+runs the case's full length with only minor overhang at each end.
+
+**Stylus clip (`pen_clip`)**: a saddle clip whose axis runs along Y, with the
+mouth facing +Z so the pen drops in from above (support-free print). The clip
+wraps `pen_clip_grip` degrees (default 220, i.e. >180) around the shaft — the
+mouth opening is narrower than the shaft's diameter, which is what retains it.
+Two clips sit on the shell's `+X` exterior wall, spaced `pen_clip_span` (55mm)
+apart; each sinks 0.8mm into the wall so it fuses with the shell during
+rendering.
+
+**Cavity and venting**: the interior cavity is cut from the top of the floor
+(`wall` thick) up through `component_depth + pcb_thickness`. Four corner
+support posts stand inside the cavity (added after the cut, flush with the
+cavity walls). Each of the four exterior walls gets a through-cut vent/port
+slot, retaining a thin `floor_rail` (1.2mm) at the bottom; the long (X) walls'
+vent width is reduced to fit between the two stylus clip footprints when
+`pen_holder` is enabled.
+
+**Front bezel skirt**: a downward skirt (`skirt_depth`, `skirt_wall`) sized to
+the shell's exterior plus `skirt_clearance` (0.3mm) slides over the rear
+shell and snaps by friction fit — no separate latch geometry.
+
 ### hex-connector/
 
 A single-piece hexagonal connector: female socket at the bottom (10mm deep) and

@@ -12,6 +12,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ```
 ├── adjustable-bracket/   # Two-piece adjustable bracket with bolt slot
 ├── blast-gate/           # Inline sliding blast gate for 51mm PVC vacuum lines
+├── esp32-display-case/   # Two-part snap-fit case for the ESP32-2432S028R display board, w/ stylus holder
 ├── hex-connector/        # Single-piece hexagonal male-female connector
 ├── macbook-pro-laptop-stand/  # Parametric vertical laptop dock with swept arch frame
 ├── nz-ski-fields/        # Topographic terrain model of the NZ ski-fields region (3-part split)
@@ -89,6 +90,7 @@ generated artifacts produced by CI.
 |---|---|
 | `adjustable-bracket/` | Two interlocking pieces (M5 bolt through adjustment slot), span ~125–155mm |
 | `blast-gate/` | Sliding blast gate for 51mm OD PVC vacuum lines; related to `vacuum-hose` |
+| `esp32-display-case/` | Two-part snap-fit case for the ESP32-2432S028R ("Cheap Yellow Display") board, with an integrated snap-in stylus holder |
 | `hex-connector/` | Single-piece hex male/female connector, 30mm tall, loose press fit |
 | `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons and a slot the laptop slides into |
 | `nz-ski-fields/` | Topographic NZ terrain model split into three separately-printable parts (lake/terrain/snow); viewer shows them as a coloured composite assembly |
@@ -270,7 +272,8 @@ a render fails, the precomputed STL remains visible — graceful
 degradation is automatic.
 
 Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
-`blast-gate` (`gate_body`, `gate_blade`), `hex-connector` (`hex_connector`),
+`blast-gate` (`gate_body`, `gate_blade`),
+`esp32-display-case` (`case_back`, `case_front`), `hex-connector` (`hex_connector`),
 `macbook-pro-laptop-stand` (`laptop_stand`),
 `nz-ski-fields` (`lake`, `terrain`, `snow`),
 `sink-tray` (`tray_foot`), and `vacuum-hose` (`adapter`, `reducer`). Adding one
@@ -301,7 +304,8 @@ Multi-Colour Assembly Previews" above). Individual power-workshop attachment
 files (`flathead_attachment.scad`, `drill_bit.scad`, etc.) do **not** apply
 it — they are oriented peg-down
 (Z-up), matching their natural print orientation. Symmetric or upright models
-(`hex-connector`, `sink-tray`, `macbook-pro-laptop-stand`) also omit it.
+(`hex-connector`, `sink-tray`, `macbook-pro-laptop-stand`, `esp32-display-case`)
+also omit it.
 
 ## Iterative Design Helpers
 
