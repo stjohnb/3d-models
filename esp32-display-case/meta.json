@@ -1,0 +1,10 @@
+{
+  "description": "Two-part snap-fit case for the ESP32-2432S028R 2.8\" resistive-touch display board (\"Cheap Yellow Display\"), with an integrated snap-in holder for the bundled touchscreen stylus. A rear shell clears the back-side components and a front bezel with a display window snaps over it.",
+  "tags": ["electronics", "enclosure", "esp32"],
+  "version": "1.0.0",
+  "difficulty": "intermediate",
+  "hardware": [
+    { "item": "ESP32-2432S028R display board (Cheap Yellow Display)", "quantity": 1 },
+    { "item": "Bundled resistive-touch stylus (~87mm, ~4mm shaft)", "quantity": 1 }
+  ]
+}
