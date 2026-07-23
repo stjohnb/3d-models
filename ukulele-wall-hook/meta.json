@@ -1,0 +1,9 @@
+{
+  "description": "Wall-mounted hook that cradles a ukulele by its neck, behind the headstock.",
+  "tags": ["household", "organizer", "wall-mount"],
+  "version": "1.0.0",
+  "difficulty": "beginner",
+  "hardware": [
+    { "item": "Wall screw (#8 or 4-5mm)", "quantity": 2, "notes": "Countersunk/pan head; length to suit wall type. Use wall anchors for drywall." }
+  ]
+}
