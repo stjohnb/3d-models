@@ -19,6 +19,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── power-workshop/       # Fisher-Price Power Workshop replacement parts
 ├── sink-tray/            # Sink tray foot
 ├── toothbrush/           # Toothbrush/toothpaste holder system
+├── ukulele-wall-hook/    # Single-piece wall-mounted yoke that cradles a ukulele neck
 ├── vacuum-hose/          # Vacuum hose fittings (adapter and reducer)
 ├── ideas/                # Feature ideas, rejected patterns, and cross-project learnings
 ├── scripts/
@@ -100,6 +101,7 @@ generated artifacts produced by CI.
 | `power-workshop/` | Fisher-Price Power Workshop replacement parts sharing a square-peg connection |
 | `sink-tray/` | Single-file sink tray foot with counterbore |
 | `toothbrush/` | Multi-part holder system with dovetail-attached clips and a removable drip tray |
+| `ukulele-wall-hook/` | Single-piece wall-mounted yoke with two upturned prongs that cradle a ukulele neck behind the headstock |
 | `vacuum-hose/` | Adapter and reducer fittings for workshop dust collection hose |
 
 Full per-project file tables, geometry conventions, coordinate systems, and
@@ -279,7 +281,8 @@ Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
 `esp32-display-case` (`case_back`, `case_front`), `hex-connector` (`hex_connector`),
 `macbook-pro-laptop-stand` (`laptop_stand`),
 `nz-ski-fields` (`lake`, `terrain`, `snow`),
-`sink-tray` (`tray_foot`), and `vacuum-hose` (`adapter`, `reducer`). Adding one
+`sink-tray` (`tray_foot`), `ukulele-wall-hook` (`ukulele_hook`), and
+`vacuum-hose` (`adapter`, `reducer`). Adding one
 for a new model is just a matter of dropping a `<basename>.parameters.json` next
 to the renderable `.scad`; CI picks it up automatically.
 
@@ -307,8 +310,8 @@ Multi-Colour Assembly Previews" above). Individual power-workshop attachment
 files (`flathead_attachment.scad`, `drill_bit.scad`, etc.) do **not** apply
 it — they are oriented peg-down
 (Z-up), matching their natural print orientation. Symmetric or upright models
-(`hex-connector`, `sink-tray`, `macbook-pro-laptop-stand`, `esp32-display-case`)
-also omit it.
+(`hex-connector`, `sink-tray`, `macbook-pro-laptop-stand`, `esp32-display-case`,
+`ukulele-wall-hook`) also omit it.
 
 ## Iterative Design Helpers
 

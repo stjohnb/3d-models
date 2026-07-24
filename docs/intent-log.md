@@ -229,3 +229,8 @@ This is a chronological, append-only record of the repo owner's (@stjohnb's) sta
 ### 2026-07-22
 
 - Issue #288 flags GitHub's dependency-graph alert that the repo has no Dependabot configuration for its `github-actions` ecosystem, citing an unrelated repo's experience with unmanaged, un-updated dependencies as the cautionary example. Resolved by adding `.github/dependabot.yml` scoped to `github-actions` only (weekly, grouped into a single PR, no default label) — no other ecosystem (npm, pip) applies, since the repo has no root `package.json` and OpenSCAD/Python tooling isn't a Dependabot-supported ecosystem here (#288).
+
+### 2026-07-23
+
+- Issue #293 requests a new model — "a hook to hang a ukulele from a wall" — with no further spec attached, another example (like #111's drill-bit widening) of a terse, essentially unspecified issue where the implementer has to make reasonable dimensional judgment calls up front. Resolved by PR #294 adding `ukulele-wall-hook/`, a single-piece wall-mounted yoke with two upturned prongs cradling the neck.
+- The owner's only PR #294 review comment supplies the missing physical constraint after the fact: "The ukulele's neck is 36mm wide at the narrow point where the hook will grab it. Is the model good for that?" — the same pattern as the connector-fit saga (#11 etc.) and the drill-socket corrections, where dimensional ground-truth arrives via review comment on a print-oriented part rather than in the original issue. The model's `tip_gap` (cradle opening width) was kept several mm above 36mm to accommodate this without further iteration recorded.

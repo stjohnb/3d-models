@@ -517,8 +517,10 @@ pattern as OpenSCAD and ImageMagick.
 
 ### 20. Deploy to S3
 
-Uses OIDC (`aws-actions/configure-aws-credentials@v4`) with the
-`AWS_ROLE_ARN` secret.
+Uses OIDC (`aws-actions/configure-aws-credentials@v6`) with the
+`AWS_ROLE_ARN` secret. v6 requires an explicit `role-session-name` input for
+STS assume-role to succeed (a v4→v6 upgrade broke this silently; fixed by
+passing `github-actions-${{ github.run_id }}`, #291).
 
 - **Main branch**: `aws s3 sync ./site s3://www.bstjohn.net/3d-models/ --delete`
   (excludes `pr-preview/`). Gated on mesh validation **and** metadata
@@ -552,7 +554,7 @@ Posts or updates a bot comment on the PR with:
   deployments for the PR in reverse-chronological order, parsed from the
   existing comment text using a regex pattern.
 
-Uses `actions/github-script@v7`. Finds and updates an existing bot comment
+Uses `actions/github-script@v9`. Finds and updates an existing bot comment
 (matched by the "Model Preview" heading) to avoid duplicate comments on
 subsequent pushes.
 
