@@ -129,18 +129,23 @@ call and applies `rotate([0, 0, 30])` to orient flat faces at top and bottom
 Vertical laptop dock: two swept arch ribbons joined at end-feet, with a central
 slot the closed laptop slides into edge-down. Slot floor is flat (XY face) so
 the laptop's bottom edge seats level between two vertical side walls. Symmetric /
-upright model — no viewer rotation; prints base-down without supports.
+upright model — no viewer rotation; prints base-down without supports. Ships in
+two variants: the original single-slot stand and a dual-slot stand that holds
+two laptops side by side.
 
 | File | Role |
 |------|------|
 | `laptop_stand.scad` | Renderable — parametric arch stand; profiles sampled from an existing mesh and scaled by `sx`/`sy`/`sz` factors |
 | `laptop_stand.parameters.json` | Parameter manifest — exposes `slot_gap` (5–40 mm, default 18), `groove_depth`, `stand_width`, `stand_depth`, `stand_height` |
-| `meta.json` | Project metadata (description, tags, difficulty: intermediate, version 1.0.0) |
+| `dual_laptop_stand.scad` | Renderable — dual-slot variant; same arch profiles, two parallel channels at ±`slot_spacing`/2 in Y |
+| `dual_laptop_stand.parameters.json` | Parameter manifest — exposes `slot_gap_1` (default 18), `slot_gap_2` (default 16), `slot_spacing` (default 40), `groove_depth`, `stand_width` (240), `stand_depth` (180), `stand_height` |
+| `meta.json` | Project metadata (description, tags, difficulty: intermediate, version 1.1.0) |
 
 **Key parameters**: `slot_gap = 18 mm` (laptop thickness + clearance); `slot_length` is always
 wider than the arch so no un-slotted band remains at the shoulders. The arch profiles
 (`outer_half`, `inner_half`) are sampled coordinates scaled by `sx/sy/sz` from the
-reference size (240 × 150 × 100 mm).
+reference size (240 × 150 × 100 mm). The dual variant uses `stand_depth = 180 mm`
+(vs 150) so both slots fit within the depth-tapered crown with a ~23 mm divider wall.
 
 ### nz-ski-fields/
 
@@ -334,6 +339,30 @@ vertical backplate, dovetail-attached clips, and a removable drip tray.
 
 See [OVERVIEW.md](OVERVIEW.md#dovetail-joint-system-toothbrush) for the
 dovetail joint system used between the backplate and clips.
+
+### ukulele-wall-hook/
+
+Single-piece wall-mounted yoke that cradles a ukulele neck behind the
+headstock. A rounded mounting plate (50×70×6mm, two counterbored screw holes
+for #8/4-5mm wall screws) carries two capsule-section prongs that project
+forward and curl upward, forming an upward-opening cradle. Authored
+plate-upright (plate tall in +Z, prongs projecting in +Y) — an "upright"
+model like `hex-connector`/`sink-tray`, so it omits the `rotate([-90, 0, 0])`
+viewer rotation.
+
+| File | Role |
+|------|------|
+| `ukulele_hook.scad` | Renderable — single file, no library split, no inter-file dependencies (no `dependency-graph.md`, same as `sink-tray`/`hex-connector`) |
+| `ukulele_hook.parameters.json` | In-browser customizer manifest (`plate_w`, `plate_h`, `prong_len`, `screw_spacing`) |
+| `meta.json` | Project metadata (description, tags: household/organizer/wall-mount, difficulty: beginner, hardware BOM: 2 wall screws) |
+
+**Key parameters**: `tip_gap` (56mm, center-to-center of prong tips) sets the
+neck-cradle clear width (`tip_gap - 2*prong_r` = 42mm). A ukulele neck narrows
+to ~36mm at the nut (confirmed via PR #294 review comment), so `tip_gap` is
+kept several mm above that so the neck drops in without binding. `prong_root_y`
+(prong root sphere's Y offset) must stay `>= prong_r` so the root capsule's
+back pole never punches through the Y=0 wall-facing face while still
+overlapping the plate for a manifold union.
 
 ### vacuum-hose/
 

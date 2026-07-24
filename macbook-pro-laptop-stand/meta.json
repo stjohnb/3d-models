@@ -1,6 +1,6 @@
 {
-  "description": "Vertical laptop dock — two swept arch ribbons joined at end-feet, with a central slot the closed laptop slides into edge-down. Parametric: set the slot width to your laptop's thickness (default 18 mm).",
+  "description": "Vertical laptop dock — two swept arch ribbons joined at end-feet, with slots the closed laptop slides into edge-down. Ships in two variants: the original single-slot stand (18 mm slot) and a dual-slot stand that holds two laptops side by side (18 mm front slot, 16 mm rear slot). Both are fully parametric — set the slot widths to your laptops' thicknesses.",
   "tags": ["desk", "organizer", "laptop-stand"],
-  "version": "1.0.0",
+  "version": "1.1.0",
   "difficulty": "intermediate"
 }
