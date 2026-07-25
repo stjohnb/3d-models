@@ -94,8 +94,8 @@
     .open-link:hover { background: rgba(0, 0, 0, 0.7); text-decoration: underline; }
     .source-link {
       position: absolute;
-      bottom: 0.5rem;
-      left: 0.5rem;
+      bottom: 2.4rem;
+      right: 0.5rem;
       color: #64b5f6;
       background: rgba(0, 0, 0, 0.5);
       padding: 0.3rem 0.6rem;
@@ -106,6 +106,24 @@
       z-index: 1;
     }
     .source-link:hover { background: rgba(0, 0, 0, 0.7); text-decoration: underline; }
+    .printing-notes {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      max-width: 45%;
+      max-height: 60%;
+      overflow-y: auto;
+      color: #e0e0e0;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 0.75rem;
+      z-index: 1;
+    }
+    .printing-notes summary { cursor: pointer; color: #64b5f6; }
+    .printing-notes ul { margin: 0.4rem 0 0 1rem; }
+    .printing-notes li { margin-bottom: 0.3rem; line-height: 1.35; }
     .error-message {
       display: flex;
       align-items: center;
@@ -224,9 +242,14 @@
       let sourcePath = null;
       let projectName = null;
       let composite = null;
+      let viewerRotateX = false;
+      let printingNotes = null;
       for (const [project, projectData] of Object.entries(models)) {
         if (slugify(project) !== projectSlug) continue;
         projectName = project;
+        printingNotes = Array.isArray(projectData.printing_notes)
+          ? projectData.printing_notes.filter(n => typeof n === 'string' && n.trim())
+          : null;
         for (const model of projectData.files) {
           if (slugify(model.stl) === modelSlug) {
             stlFile = model.stl;
@@ -239,6 +262,7 @@
                   .filter(p => typeof p.stl === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color))
                   .map(p => ({ url: `${p.stl}${cacheBust}`, color: p.color }))
               : null;
+            viewerRotateX = !!projectData.viewer_rotate_x;
             break;
           }
         }
@@ -272,6 +296,22 @@
         srcLink.rel = 'noopener noreferrer';
         srcLink.textContent = 'View source';
         document.body.appendChild(srcLink);
+      }
+
+      if (printingNotes && printingNotes.length) {
+        const det = document.createElement('details');
+        det.className = 'printing-notes';
+        const sum = document.createElement('summary');
+        sum.textContent = 'Printing notes';
+        det.appendChild(sum);
+        const ul = document.createElement('ul');
+        for (const n of printingNotes) {
+          const li = document.createElement('li');
+          li.textContent = n;
+          ul.appendChild(li);
+        }
+        det.appendChild(ul);
+        document.body.appendChild(det);
       }
 
       // Create canvas
@@ -359,6 +399,9 @@
         Promise.all(composite.map(p => new Promise((res, rej) =>
           new STLLoader().load(p.url, res, undefined, rej)
         ))).then((geometries) => {
+          if (viewerRotateX) {
+            for (const g of geometries) g.rotateX(-Math.PI / 2);
+          }
           const union = new THREE.Box3();
           for (const g of geometries) {
             g.computeBoundingBox();
@@ -396,6 +439,7 @@
       } else {
         const loader = new STLLoader();
         loader.load(`${stlFile}${cacheBust}`, (geometry) => {
+          if (viewerRotateX) geometry.rotateX(-Math.PI / 2);
           geometry.computeBoundingBox();
           const halfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
           geometry.center();

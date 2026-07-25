@@ -51,7 +51,7 @@ Audit of [specification.website/checklist](https://specification.website/checkli
 |------|--------|-------|
 | ARIA attributes | ✅ | project sections: role="group"/aria-label; headings: role="button"/aria-expanded; canvases: role="img"/aria-label; all interactive elements have aria-label |
 | Focus styles | ✅ | :focus-visible outlines on cards, headings, buttons, swatches, links; :focus-within for fullscreen/QR visibility |
-| Keyboard navigation | ✅ | Arrow keys between cards; F=fullscreen, D=download, C=cross-section, M=maximize, R=re-render, Escape=dismiss, Enter/Space=expand |
+| Keyboard navigation | ✅ | Arrow keys through the model tree; `/`=filter, 1/2/3=pane layout, F=fullscreen, D=download, C=cross-section, M=focus pane, R=re-render, Escape=dismiss, Enter/Space=activate |
 | prefers-reduced-motion | ❌ → ✅ | Added CSS media query in this PR (covers decorative transitions; WebGL OrbitControls are user-driven and intentionally untouched) |
 | Accessibility overlays | N/A | Correctly absent (Avoid per checklist) |
 | Alt text | ✅ | Thumbnail `<img>` elements have descriptive alt text via `displayName()` |

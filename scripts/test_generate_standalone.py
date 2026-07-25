@@ -99,7 +99,9 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
             composite_parts_js="[]",
+            viewer_rotate_x_js="false",
             source_link_html="",
+            printing_notes_html="",
         )
 
     def test_format_succeeds_and_includes_controls(self):
@@ -139,7 +141,9 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
             composite_parts_js="[]",
+            viewer_rotate_x_js="false",
             source_link_html="",
+            printing_notes_html="",
         )
         self.assertIn('&lt;script&gt;', html)
         self.assertNotIn('<script>alert(1)</script>', html)
@@ -209,6 +213,41 @@ class TestSourceLinkHtml(unittest.TestCase):
         self.assertNotIn('"', href)
         self.assertNotIn('<', href)
         self.assertNotIn('&', href)
+
+
+class TestPrintingNotesHtml(unittest.TestCase):
+    """_printing_notes_html must escape free-text notes and skip invalid entries."""
+
+    def test_escapes_html(self):
+        result = gs._printing_notes_html(['<img src=x onerror=alert(1)>'])
+        self.assertIn('&lt;img', result)
+        self.assertNotIn('<img', result)
+
+    def test_escapes_quotes_and_ampersand(self):
+        result = gs._printing_notes_html(['A & B "quoted"'])
+        self.assertIn('&amp;', result)
+        self.assertIn('&quot;', result)
+        self.assertNotIn('A & B', result)
+
+    def test_returns_empty_for_none(self):
+        self.assertEqual(gs._printing_notes_html(None), "")
+
+    def test_returns_empty_for_non_list(self):
+        self.assertEqual(gs._printing_notes_html("a string"), "")
+
+    def test_returns_empty_for_blank_entries(self):
+        self.assertEqual(gs._printing_notes_html(["", "   "]), "")
+
+    def test_skips_non_string_entries(self):
+        result = gs._printing_notes_html([123, "real note"])
+        self.assertIn('<li>real note</li>', result)
+        self.assertEqual(result.count('<li>'), 1)
+
+    def test_renders_multiple_items(self):
+        result = gs._printing_notes_html(["First note", "Second note"])
+        self.assertEqual(result.count('<li>'), 2)
+        self.assertIn('<details class="printing-notes">', result)
+        self.assertIn('<summary>Printing notes</summary>', result)
 
 
 if __name__ == "__main__":

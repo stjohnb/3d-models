@@ -345,8 +345,8 @@ three additional orthographic PNGs are rendered: `top`, `bottom`, and
 `front`. Each is 800×600, saved as `site/<model-name>_<view>.png` (e.g.,
 `site/drill_socket_top.png`), using `--projection=ortho --viewall
 --autocenter` for consistent framing, also via `scripts/capped-openscad.sh`
-with the same 4G/120s step-level cap as thumbnails. Currently only
-`power-workshop` declares `complex_interior: true`.
+with the same 4G/120s step-level cap as thumbnails. `power-workshop` and
+`drawer-organiser` declare `complex_interior: true`.
 
 Xvfb handling here uses a simpler fallback than step 10: if `xvfb-run` is
 available the render script runs under it; if Xvfb fails to start, the
@@ -400,6 +400,7 @@ A Python script reads `site/.scad-map` and produces `site/models.json`:
     "difficulty": "beginner",
     "version": "1.0.0",
     "hardware": [{"item": "M5 bolt", "quantity": 1}],
+    "printing_notes": ["Enable adaptive layer height over the arch crown"],
     "rendered_with": "OpenSCAD 2024.12.06"
   }
 }
@@ -416,8 +417,8 @@ The `parameters` field is present on a file entry when a validated
 presence tells the viewer to show the ⚙ Customize button for that model.
 Manifests in `.param-failures` are excluded — the customizer never loads an
 invalid parameter set. Metadata fields (`description`, `tags`, `difficulty`,
-`version`, `hardware`) are merged from `meta.json` if the file exists and
-passed schema validation.
+`version`, `hardware`, `assembly`, `viewer_rotate_x`, `printing_notes`) are
+merged from `meta.json` if the file exists and passed schema validation.
 The `rendered_with` field records the OpenSCAD version used to produce the
 STLs (e.g. `"OpenSCAD 2024.12.06"`), sourced from `site/openscad-version.txt`
 written by the version-check step. This field is diagnostic documentation:

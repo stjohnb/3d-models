@@ -43,13 +43,15 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_render_cache.py    # Tests for render_cache
 │   ├── test_generate_standalone.py  # Regression tests for _load_filament_colors_js HTML injection escaping
 │   ├── test_wasm_customizer.mjs  # Node.js integration test for the in-browser WASM customizer pipeline
+│   ├── test_hash_routing.mjs    # Node.js test for index.html's parseHash/formatHash URL grammar
+│   ├── test_viewer_invariants.py # Text-level checks on index.html/embed.html (build markers, slugify/PUBLIC_REPO parity, innerHTML)
 │   ├── sync_public_snapshot.py  # Builds a sanitized public snapshot for stjohnb/3d-models; not used by CI
 │   └── test_sync_public_snapshot.py  # Tests for sync_public_snapshot
 ├── README.md             # Project readme; gallery section auto-generated (see below)
 ├── README.public.md      # Hand-maintained readme text for the public snapshot (stjohnb/3d-models); see public-snapshot.md
 ├── filament-colors.json  # Shared color palette (single source of truth)
 ├── .openscad-version     # Committed expected OpenSCAD version baseline; CI warns on drift
-├── index.html            # Single-page 3D viewer (deployed to S3)
+├── index.html            # Single-page 3D viewer: tree browser + 1–3 model panes (deployed to S3)
 ├── embed.html            # Minimal single-model viewer for iframe/OEmbed embedding
 ├── openscad-worker.js    # Web Worker — runs openscad-wasm renders off the main thread
 ├── favicon.svg           # SVG site favicon — dark background cube glyph; deployed to site/
@@ -160,15 +162,17 @@ from downstream consumption (models.json, structured data).
 | `license` | `string` | SPDX identifier override (repo default implied when absent) |
 | `difficulty` | `enum` | `"beginner"`, `"intermediate"`, or `"advanced"` |
 | `hardware` | `array` of `{item, quantity, notes?}` | Bill of materials for non-printed parts |
+| `printing_notes` | `array` of `string` | Free-text printer/slicer guidance (layer height, seam, orientation, filament); surfaced in the viewer, embed, and standalone pages |
 | `relatedModels` | `array` of `string` | Directory names of related projects |
 | `mating_pairs` | `array` of 2-element `string` arrays | Pairs of STL filenames that must fit without geometric overlap (validated by `check_interference.py`) |
-| `complex_interior` | `boolean` | When `true`, CI renders three extra orthographic views (`_top`, `_bottom`, `_front`) to expose internal cavity geometry; currently only `power-workshop` uses this |
+| `complex_interior` | `boolean` | When `true`, CI renders three extra orthographic views (`_top`, `_bottom`, `_front`) to expose internal cavity geometry; used by `power-workshop` and `drawer-organiser` |
 | `assembly` | `object` `{stl, parts}` | Declares that one project STL's viewer card is a coloured multi-part composite rather than a single mesh — see "Composite Multi-Colour Assembly Previews" below; currently only `nz-ski-fields` uses this |
+| `viewer_rotate_x` | `boolean` | When `true`, the interactive viewers (`index.html`, `embed.html`, standalone) rotate the loaded mesh -90° about X before framing — a display-only Z-up -> Y-up correction for print-oriented models whose STL must stay OpenSCAD Z-up for correct slicing (so the usual source-level `rotate([-90, 0, 0])` isn't an option); used by `drawer-organiser` |
 
 Metadata is merged into `models.json` at build time. Only viewer-relevant
 fields are propagated (`description`, `tags`, `difficulty`, `version`,
-`hardware`, `assembly`). `license`, `relatedModels`, and `mating_pairs` are
-intentionally excluded from the manifest.
+`hardware`, `assembly`, `viewer_rotate_x`, `printing_notes`). `license`, `relatedModels`, and
+`mating_pairs` are intentionally excluded from the manifest.
 
 The manifest also includes a `rendered_with` field per model entry in the manifest,
 recording the OpenSCAD version used to produce the STLs in that CI run
@@ -241,8 +245,7 @@ enforcement pattern as `meta.json`; failures go into `.param-failures`
 and exclude the manifest from `models.json`.
 
 The customizer is purely additive: the default precomputed STL still
-loads instantly on page open and is what shows up in the unmaximized
-card. Clicking the **⚙ Customize** button lazy-loads
+loads instantly when the model is opened in a pane. Clicking the **⚙ Customize** button lazy-loads
 [openscad-wasm](https://github.com/openscad/openscad-wasm) (~5 MB
 non-threaded build, fetched from `site/openscad/`), pulls every `.scad`
 in the project's directory from `site/sources/<project>/` (discovered
@@ -343,19 +346,32 @@ This script is **not** used by CI and produces no build artifacts.
 ## Web Viewer (index.html)
 
 A single-page application (no build tools, no framework, ES module JS,
-Three.js from a CDN via import map) that fetches `models.json`, renders
-each STL in an interactive canvas, and provides download/source links, a
-filament color picker, cross-section and maximize views, QR codes, deep
+Three.js from a CDN via import map) that fetches `models.json` and presents
+a tree browser of every project and model alongside a stage of one to three
+viewer panes. Clicking a model loads it into the active pane; Ctrl/Cmd-click
+(or the **+ Add to scene** toggle) adds it to the pane alongside what's
+already there, laid out side by side along world X. Panes provide
+download/source links, a filament color picker, cross-section and focus
+views, QR codes, and the in-browser parametric customizer, with deep
 linking, keyboard navigation, and full accessibility support. `embed.html`
 is a minimal single-model variant for iframe/OEmbed embedding; CI also
 generates self-contained standalone HTML viewers (`site/standalone/`) and
 per-model OEmbed JSON endpoints (`site/oembed/`).
 
+The URL hash grammar separates panes with `+` and models within a pane with
+`,`. Since no slug can contain either character, every link already in the
+wild — `#project/model` from QR codes and `#project` from the README gallery
+— keeps working unchanged, and an incoming hash is never rewritten.
+`scripts/test_hash_routing.mjs` extracts `parseHash`/`formatHash` out of
+`index.html` and asserts that; `scripts/test_viewer_invariants.py` checks the
+build-time markers, the `slugify()`/`PUBLIC_REPO` copies, and the
+no-`innerHTML`-for-user-data rule.
+
 Every feature — core functionality, the XSS-safety convention, print-time
-estimates, lazy loading, filament colors, composite multi-colour assembly
-previews, 3D controls, cross-section view, maximize preview, deep links, QR
-codes, touch gesture hints, and accessibility — is documented in detail in
-[web-viewer.md](web-viewer.md).
+estimates, the tree browser, filament colors, composite multi-colour assembly
+previews, 3D controls, cross-section view, split panes and focus mode, deep
+links, QR codes, touch gesture hints, and accessibility — is documented in
+detail in [web-viewer.md](web-viewer.md).
 
 ## Slugify Convention
 
@@ -478,8 +494,7 @@ comment.
 | Analytics | Plausible script tag in `index.html` and `embed.html` | Self-hosted at `plausible.bstjohn.net`, `data-domain="bstjohn.net"`; cookieless. Standalone viewers (`site/standalone/`) deliberately omit it so they stay self-contained/offline |
 | Touch hint timeout | 5000 ms in `showTouchHint()` | Fade-out delay for gesture overlay |
 | Zip bundle threshold | 2+ STL files per project | Single-file projects don't get an STL zip; all projects get a source zip |
-| Lazy-load margin | `rootMargin: '200px'` | IntersectionObserver pre-loads 200px before viewport |
-| Deep link format | `#project-slug/model-slug` | URL hash routing for per-model links |
+| Deep link format | `#project-slug/model-slug`, panes joined by `+`, models within a pane by `,` | URL hash routing; legacy `#project/model` and `#project` links parse unchanged |
 | QR code style | `-s 8 -m 2`, `E0E0E0` on `1A1A2E` | Module size 8, margin 2, dark theme colors |
 | Print-time heuristic | 0.2mm layers, 50mm/s, 5x multiplier | Conservative defaults; volume fallback for flat models |
 | Metadata schema | `meta.schema.json` (JSON Schema draft 2020-12) | Validated in CI; `description` required, all others optional |

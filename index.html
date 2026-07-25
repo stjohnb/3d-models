@@ -39,46 +39,144 @@
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root { --header-h: 3.25rem; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: #1a1a2e;
       color: #e0e0e0;
       min-height: 100vh;
+      overflow: hidden;
     }
     header {
-      text-align: center;
-      padding: 2rem 1rem;
-    }
-    header h1 {
-      font-size: 2rem;
-      font-weight: 600;
-    }
-    .gallery {
-      padding: 0 2rem 2rem;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-    .project-header {
       display: flex;
       align-items: center;
-      gap: 1rem;
-      margin: 1.5rem 0 1rem;
+      gap: 0.75rem;
+      height: var(--header-h);
+      padding: 0 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
     }
-    .project-group h2 {
-      font-size: 1.4rem;
+    header h1 {
+      font-size: 1.25rem;
       font-weight: 600;
-      margin: 0;
-      color: #64b5f6;
+    }
+    #sidebar-toggle {
+      display: none;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: #e0e0e0;
+      border-radius: 6px;
+      width: 2rem;
+      height: 2rem;
+      align-items: center;
+      justify-content: center;
       cursor: pointer;
-      user-select: none;
+      font-size: 1rem;
+    }
+    #sidebar-toggle:focus-visible { outline: 2px solid #64b5f6; outline-offset: 2px; }
+
+    .app {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      height: calc(100vh - var(--header-h));
+    }
+    #sidebar {
+      overflow-y: auto;
+      border-right: 1px solid rgba(255,255,255,0.08);
+      padding: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      background: #1a1a2e;
+    }
+    #tree-filter {
+      width: 100%;
+      background: #16213e;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 6px;
+      color: #e0e0e0;
+      font: inherit;
+      font-size: 0.85rem;
+      padding: 0.35rem 0.5rem;
+    }
+    #tree-filter:focus-visible { outline: 2px solid #64b5f6; outline-offset: 1px; }
+    #tree-empty {
+      font-size: 0.85rem;
+      color: #888;
+      padding: 0.5rem;
+    }
+
+    /* --- Tree browser --- */
+    .tree-project[hidden] { display: none; }
+    .tree-project-label {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: #64b5f6;
+      font: inherit;
+      font-size: 0.92rem;
+      font-weight: 500;
+      text-align: left;
+      padding: 0.35rem 0.4rem;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .tree-project-label::before {
+      content: '\25B6';
+      font-size: 0.55rem;
+      flex-shrink: 0;
+      transition: transform 0.2s;
+    }
+    .tree-project[aria-expanded="true"] > .tree-project-label::before { transform: rotate(90deg); }
+    .tree-project-label:hover { background: rgba(255,255,255,0.06); }
+    .tree-project-label:focus-visible { outline: 2px solid #64b5f6; outline-offset: -2px; }
+    .tree-project[aria-expanded="false"] > [role="group"],
+    .tree-project[aria-expanded="false"] > .tree-project-actions { display: none; }
+    .tree-project-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.3rem;
+      padding: 0.15rem 0.4rem 0.4rem 1.1rem;
+    }
+    .tree-model {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      width: 100%;
+      background: transparent;
+      border: none;
+      color: #e0e0e0;
+      font: inherit;
+      font-size: 0.82rem;
+      text-align: left;
+      padding: 0.2rem 0.4rem 0.2rem 1.1rem;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .tree-model[hidden] { display: none; }
+    .tree-model:hover { background: rgba(255,255,255,0.06); }
+    .tree-model:focus-visible { outline: 2px solid #64b5f6; outline-offset: -2px; }
+    .tree-model[aria-selected="true"] {
+      background: rgba(100,181,246,0.18);
+      color: #64b5f6;
+    }
+    .tree-model img {
+      width: 40px;
+      height: 30px;
+      object-fit: cover;
+      border-radius: 3px;
+      background: #0f3460;
+      flex-shrink: 0;
     }
     .download-all-btn {
       background: transparent;
       border: 1px solid #64b5f6;
       color: #64b5f6;
-      padding: 0.25rem 0.75rem;
+      padding: 0.15rem 0.5rem;
       border-radius: 6px;
-      font-size: 0.85rem;
+      font-size: 0.75rem;
       cursor: pointer;
       white-space: nowrap;
       flex-shrink: 0;
@@ -89,69 +187,156 @@
       outline: 2px solid #64b5f6;
       outline-offset: 2px;
     }
-    .project-group h2::before {
-      content: '\25BC';
-      display: inline-block;
-      margin-right: 0.5rem;
-      font-size: 0.8rem;
-      transition: transform 0.2s;
+
+    /* --- Stage / panes --- */
+    #stage {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.5rem;
+      min-width: 0;
+      min-height: 0;
     }
-    .project-group.collapsed h2::before {
-      transform: rotate(-90deg);
+    .stage-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+      flex-shrink: 0;
     }
-    .project-group.collapsed .project-grid {
-      display: none;
+    .toolbar-label {
+      font-size: 0.78rem;
+      color: #888;
+      margin-right: 0.15rem;
     }
-    .project-grid {
+    .panes {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
-      gap: 1.5rem;
+      gap: 0.75rem;
+      flex: 1;
+      min-height: 0;
     }
-    .card {
+    .panes--1 { grid-template-columns: 1fr; }
+    .panes--2 { grid-template-columns: repeat(2, 1fr); }
+    .panes--3 { grid-template-columns: repeat(3, 1fr); }
+    .panes--focused > .pane:not(.pane--focused) { display: none; }
+    .pane--focused { grid-column: 1 / -1; grid-row: 1 / -1; }
+    .pane {
       background: #16213e;
       border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       position: relative;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+      min-width: 0;
     }
-    .fullscreen-btn {
+    .pane--active { outline: 2px solid #64b5f6; outline-offset: -2px; }
+    .pane canvas {
+      flex: 1;
+      width: 100%;
+      min-height: 0;
+      display: block;
+      cursor: grab;
+    }
+    .pane canvas:active { cursor: grabbing; }
+    .pane:fullscreen, .pane:-webkit-full-screen { background: #1a1a2e; }
+    .pane:fullscreen canvas { flex: 1; height: auto; min-height: 0; max-height: none; }
+    .pane:-webkit-full-screen canvas { flex: 1; height: auto; min-height: 0; max-height: none; }
+    .pane-empty {
       position: absolute;
-      top: 0.5rem;
-      right: 0.5rem;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #7d88a8;
+      font-size: 0.95rem;
+      pointer-events: none;
+    }
+    .pane-empty[hidden] { display: none; }
+    .pane-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+      padding: 0.4rem 6.5rem 0.4rem 0.5rem;
+      flex-shrink: 0;
+    }
+    .pane-chips[hidden] { display: none; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      padding: 0.1rem 0.45rem;
+      font-size: 0.75rem;
+      max-width: 100%;
+    }
+    .chip-dl {
+      color: #64b5f6;
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .chip-dl:hover { text-decoration: underline; }
+    .chip-dl:focus-visible { outline: 2px solid #64b5f6; outline-offset: 2px; }
+    .chip-remove {
+      background: none;
+      border: none;
+      color: #aaa;
+      cursor: pointer;
+      font-size: 0.75rem;
+      line-height: 1;
+      padding: 0;
+      font-family: inherit;
+    }
+    .chip-remove:hover { color: #fff; }
+    .chip-remove:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+    .pane-actions {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.4rem;
+      display: flex;
+      gap: 0.3rem;
+      z-index: 3;
+    }
+    .pane-btn {
       background: rgba(0,0,0,0.4);
       border: none;
       color: #e0e0e0;
-      font-size: 1.2rem;
-      width: 2rem;
-      height: 2rem;
+      font-size: 1rem;
+      width: 1.9rem;
+      height: 1.9rem;
       border-radius: 6px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      opacity: 0;
+      opacity: 0.55;
       transition: opacity 0.2s;
-      z-index: 1;
+      font-family: inherit;
     }
-    .card:hover .fullscreen-btn,
-    .card:focus-within .fullscreen-btn { opacity: 1; }
-    .fullscreen-btn:hover { background: rgba(0,0,0,0.6); }
-    .card-placeholder {
-      width: 100%;
-      height: 300px;
-      display: block;
-      object-fit: cover;
-      background: #0f3460;
+    .pane-btn[hidden] { display: none; }
+    .pane:hover .pane-btn, .pane:focus-within .pane-btn { opacity: 1; }
+    @media (hover: none) { .pane-btn { opacity: 1; } }
+    .pane-btn:hover { background: rgba(0,0,0,0.6); }
+    .pane-btn:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+      opacity: 1;
     }
-    .card canvas {
-      width: 100%;
-      height: 300px;
-      display: block;
-      cursor: grab;
+    .pane-btn[aria-pressed="true"] { background: rgba(100,181,246,0.4); opacity: 1; }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
     }
-    .card canvas:active { cursor: grabbing; }
-    .card:fullscreen .card-placeholder,
-    .card:-webkit-full-screen .card-placeholder { display: none; }
     .color-picker {
       display: flex;
       gap: 0.4rem;
@@ -159,6 +344,7 @@
       flex-wrap: wrap;
       align-items: center;
     }
+    .color-picker[hidden] { display: none; }
     .color-swatch {
       width: 20px;
       height: 20px;
@@ -174,16 +360,17 @@
     .color-swatch:hover {
       border-color: rgba(255,255,255,0.6);
     }
+    .color-swatch:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 2px;
+    }
     .card-info {
-      padding: 1rem;
+      padding: 0.6rem 1rem 0.75rem;
       display: flex;
       gap: 0.75rem;
       justify-content: space-between;
       align-items: center;
-    }
-    .card-info h2 {
-      font-size: 1.1rem;
-      font-weight: 500;
+      flex-wrap: wrap;
     }
     .card-info h3 {
       font-size: 1rem;
@@ -200,113 +387,33 @@
       font-size: 0.9rem;
     }
     .card-links a:hover { text-decoration: underline; }
+    .card-links a:focus-visible {
+      outline: 2px solid #64b5f6;
+      outline-offset: 2px;
+    }
     .print-time {
       font-size: 0.8rem;
       color: #aaa;
       white-space: nowrap;
     }
-    .card:fullscreen, .card:-webkit-full-screen {
-      background: #1a1a2e;
-      display: flex;
-      flex-direction: column;
+    .pane-desc {
+      font-size: 0.8rem;
+      color: #9aa4bf;
+      flex: 1 1 100%;
     }
-    .card:fullscreen canvas, .card:-webkit-full-screen canvas {
-      flex: 1;
-      height: auto;
-      min-height: 0;
+    .printing-notes {
+      flex: 1 1 100%;
+      margin: 0;
+      font-size: 0.8rem;
+      color: #ccc;
+      background: rgba(255,255,255,0.04);
+      border-left: 3px solid #64b5f6;
+      border-radius: 4px;
+      padding: 0.4rem 0.6rem;
     }
-    .card:focus-visible {
-      outline: 2px solid #64b5f6;
-      outline-offset: 2px;
-    }
-    h2[role="button"]:focus-visible {
-      outline: 2px solid #64b5f6;
-      outline-offset: 2px;
-    }
-    .fullscreen-btn:focus-visible {
-      outline: 2px solid #fff;
-      outline-offset: 2px;
-      opacity: 1;
-    }
-    .maximize-btn {
-      position: absolute;
-      top: 3rem;
-      right: 0.5rem;
-      background: rgba(0,0,0,0.4);
-      border: none;
-      color: #e0e0e0;
-      font-size: 1.2rem;
-      width: 2rem;
-      height: 2rem;
-      border-radius: 6px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      transition: opacity 0.2s;
-      z-index: 1;
-    }
-    .card:hover .maximize-btn,
-    .card:focus-within .maximize-btn { opacity: 1; }
-    .maximize-btn:hover { background: rgba(0,0,0,0.6); }
-    .maximize-btn:focus-visible {
-      outline: 2px solid #fff;
-      outline-offset: 2px;
-      opacity: 1;
-    }
-    .card.card--maximized .maximize-btn { opacity: 1; }
-    .maximize-backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.85);
-      z-index: 40;
-    }
-    .card.card--maximized {
-      position: fixed;
-      inset: 1rem;
-      z-index: 50;
-      display: flex;
-      flex-direction: column;
-      background: #1a1a2e;
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .card.card--maximized canvas {
-      flex: 1;
-      height: auto;
-      min-height: 0;
-    }
-    .card.card--maximized .card-placeholder { display: none; }
-    .card.card--maximized .touch-hint { height: 100%; }
-    body.has-maximized { overflow: hidden; }
-    .qr-btn {
-      position: absolute;
-      top: 0.5rem;
-      left: 0.5rem;
-      background: rgba(0,0,0,0.4);
-      border: none;
-      color: #e0e0e0;
-      font-size: 1.2rem;
-      width: 2rem;
-      height: 2rem;
-      border-radius: 6px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      transition: opacity 0.2s;
-      z-index: 1;
-    }
-    .card:hover .qr-btn,
-    .card:focus-within .qr-btn { opacity: 1; }
-    .qr-btn:hover { background: rgba(0,0,0,0.6); }
-    .qr-btn:focus-visible {
-      outline: 2px solid #fff;
-      outline-offset: 2px;
-      opacity: 1;
-    }
+    .printing-notes summary { cursor: pointer; color: #64b5f6; font-size: 0.8rem; }
+    .printing-notes ul { margin: 0.4rem 0 0 1.1rem; }
+    .printing-notes li { margin-bottom: 0.3rem; line-height: 1.4; }
     .qr-overlay {
       position: fixed;
       inset: 0;
@@ -335,14 +442,6 @@
       color: #aaa;
       word-break: break-all;
     }
-    .color-swatch:focus-visible {
-      outline: 2px solid #fff;
-      outline-offset: 2px;
-    }
-    .card-links a:focus-visible {
-      outline: 2px solid #64b5f6;
-      outline-offset: 2px;
-    }
     .loading {
       text-align: center;
       padding: 4rem;
@@ -351,10 +450,7 @@
     }
     .touch-hint {
       position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 300px;
+      inset: 0;
       background: rgba(0, 0, 0, 0.55);
       display: flex;
       align-items: center;
@@ -384,10 +480,6 @@
       color: #fff;
       white-space: nowrap;
     }
-    .card:fullscreen .touch-hint,
-    .card:-webkit-full-screen .touch-hint {
-      height: 100%;
-    }
     .cross-section-row {
       display: flex;
       align-items: center;
@@ -407,6 +499,7 @@
       font-family: inherit;
     }
     .cross-btn:hover { background: rgba(255,255,255,0.2); }
+    .cross-btn:disabled { opacity: 0.4; cursor: default; }
     .cross-btn[aria-pressed="true"] {
       background: rgba(100, 181, 246, 0.3);
       color: #64b5f6;
@@ -426,7 +519,7 @@
       padding: 4px 8px;
       flex-wrap: wrap;
     }
-    .view-btn {
+    .view-btn, .layout-btn {
       background: rgba(255,255,255,0.1);
       border: none;
       border-radius: 4px;
@@ -438,10 +531,10 @@
       white-space: nowrap;
       font-family: inherit;
     }
-    .view-btn:hover { background: rgba(255,255,255,0.2); }
-    .view-btn:focus-visible { outline: 2px solid #64b5f6; outline-offset: 2px; }
+    .view-btn:hover, .layout-btn:hover { background: rgba(255,255,255,0.2); }
+    .view-btn:focus-visible, .layout-btn:focus-visible { outline: 2px solid #64b5f6; outline-offset: 2px; }
     .view-btn:disabled { opacity: 0.4; cursor: default; }
-    .view-btn[aria-pressed="true"] { background: rgba(100,181,246,0.3); color: #64b5f6; }
+    .view-btn[aria-pressed="true"], .layout-btn[aria-pressed="true"] { background: rgba(100,181,246,0.3); color: #64b5f6; }
     .customize-btn {
       background: rgba(255,255,255,0.1);
       border: none;
@@ -470,6 +563,8 @@
       gap: 6px;
       border-top: 1px solid rgba(255,255,255,0.05);
       background: rgba(0,0,0,0.15);
+      max-height: 40%;
+      overflow-y: auto;
     }
     .customizer-panel.open { display: flex; }
     .param-row {
@@ -544,6 +639,61 @@
     .param-row.param-row--dirty label {
       color: #64b5f6;
     }
+
+    @media (max-width: 900px) {
+      #sidebar-toggle { display: flex; }
+      .app { grid-template-columns: 1fr; }
+      #sidebar {
+        position: fixed;
+        top: var(--header-h);
+        left: 0;
+        bottom: 0;
+        width: 280px;
+        z-index: 60;
+        transform: translateX(-100%);
+        transition: transform 0.2s;
+        box-shadow: 4px 0 16px rgba(0,0,0,0.4);
+      }
+      body.sidebar-open #sidebar { transform: none; }
+
+      /* Issue #307: on phones the pane chrome (chips, colours, cross-section,
+         7 view buttons, description, printing notes) no longer fits in one
+         viewport height, so `flex: 1` collapsed the canvas to a sliver and the
+         rest was clipped by `.pane { overflow: hidden }`. Below 900px the page
+         scrolls instead: the canvas takes a fixed slice of the viewport and
+         everything else flows underneath. */
+      body { overflow-x: hidden; overflow-y: auto; }
+      body.sidebar-open { overflow: hidden; }
+      header {
+        position: sticky;
+        top: 0;
+        z-index: 70;
+        background: #1a1a2e;
+      }
+      .app { height: auto; }
+      #stage { padding: 0.5rem 0.5rem 1.5rem; }
+      .panes { flex: none; }
+      .panes--1, .panes--2, .panes--3 {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+      }
+      .pane canvas {
+        flex: none;
+        height: 55vh;
+        height: 55dvh;
+        min-height: 240px;
+      }
+      .customizer-panel { max-height: 60vh; }
+      .touch-hint { gap: 1rem; flex-wrap: wrap; }
+      .view-btn, .cross-btn, .customize-btn, .layout-btn, .rerender-btn {
+        padding: 8px 12px;
+        font-size: 14px;
+        min-height: 40px;
+      }
+      .qr-popover { max-width: min(320px, calc(100vw - 2rem)); }
+      .qr-popover img { width: 100%; max-width: 256px; height: auto; }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after {
         animation-duration: 0.01ms !important;
@@ -556,10 +706,28 @@
 </head>
 <body>
   <header>
+    <button id="sidebar-toggle" type="button" aria-label="Toggle model list" aria-expanded="false" aria-controls="sidebar">&#9776;</button>
     <h1>3D Models</h1>
   </header>
-  <div id="gallery" class="gallery">
-    <div class="loading">Loading models&hellip;</div>
+  <div class="app">
+    <aside id="sidebar">
+      <input id="tree-filter" type="search" placeholder="Filter models&hellip;" aria-label="Filter models" autocomplete="off">
+      <nav id="tree" role="tree" aria-label="Model browser"></nav>
+      <p id="tree-empty" hidden>No matching models</p>
+    </aside>
+    <main id="stage">
+      <div class="stage-toolbar">
+        <span class="toolbar-label">Layout</span>
+        <button class="layout-btn" type="button" data-layout="1" aria-pressed="true" aria-label="Show one viewer pane">1</button>
+        <button class="layout-btn" type="button" data-layout="2" aria-pressed="false" aria-label="Show two viewer panes">2</button>
+        <button class="layout-btn" type="button" data-layout="3" aria-pressed="false" aria-label="Show three viewer panes">3</button>
+        <button id="add-mode" class="layout-btn" type="button" aria-pressed="false" aria-label="Add selected models to the active pane instead of replacing">&plus; Add to scene</button>
+      </div>
+      <div id="panes" class="panes panes--1">
+        <div class="loading">Loading models&hellip;</div>
+      </div>
+      <div id="sr-status" aria-live="polite" class="sr-only"></div>
+    </main>
   </div>
 
   <script type="importmap">
@@ -577,11 +745,18 @@
     import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
     import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
 
-    const gallery = document.getElementById('gallery');
+    const panesEl = document.getElementById('panes');
+    const treeEl = document.getElementById('tree');
+    const treeEmptyEl = document.getElementById('tree-empty');
+    const filterInput = document.getElementById('tree-filter');
+    const srStatus = document.getElementById('sr-status');
+    const addModeBtn = document.getElementById('add-mode');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const layoutBtns = [...document.querySelectorAll('.layout-btn[data-layout]')];
 
     // openscad-wasm renders run in a dedicated Web Worker so the CGAL/mesh
     // export work doesn't freeze the main thread. One worker is shared by
-    // every customizer card on the page — the worker processes incoming
+    // every customizer panel on the page — the worker processes incoming
     // messages sequentially, which is the right semantics anyway since the
     // non-threaded wasm build is single-threaded.
     let _wasmWorker = null;
@@ -673,13 +848,28 @@
       <circle cx="24" cy="18" r="3" fill="#fff" stroke="none"/>
       <path d="M20 26l-5 5M20 26l5 5M20 26V18"/>
     </svg>`;
+    const ICON_EXPAND = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
+  <path d="M1 1h4v1.5H3.06L5.5 4.94 4.44 6 2 3.56V5.5H.5V1H1zm12 0v4.5H11.5V3.56L9.06 6 8 4.94 10.44 2.5H8.5V1H13zm0 12h-4.5v-1.5h1.94L8 9.06 9.06 8 11.5 10.44V8.5H13V13zm-12 0V8.5H.5v1.94L2.94 8 4 9.06 1.56 11.5H3.5V13H1z"/>
+</svg>`;
+    const ICON_QR = `<svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
+      <rect x="1" y="1" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <rect x="3" y="3" width="3" height="3"/>
+      <rect x="10" y="1" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <rect x="12" y="3" width="3" height="3"/>
+      <rect x="1" y="10" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
+      <rect x="3" y="12" width="3" height="3"/>
+      <rect x="11" y="11" width="2" height="2"/>
+      <rect x="15" y="11" width="2" height="2"/>
+      <rect x="11" y="15" width="2" height="2"/>
+      <rect x="15" y="15" width="2" height="2"/>
+      <rect x="13" y="13" width="2" height="2"/>
+    </svg>`;
 
     let touchHintShown = sessionStorage.getItem('touchHintSeen') === '1';
 
-    function showTouchHint(card) {
-      const state = cardState.get(card);
-      if (!state?.hintOverlay) return;
-      const overlay = state.hintOverlay;
+    function showTouchHint(pane) {
+      if (!pane?.hintOverlay) return;
+      const overlay = pane.hintOverlay;
       overlay.style.display = 'flex';
 
       let dismissed = false;
@@ -691,11 +881,11 @@
         overlay.addEventListener('transitionend', () => {
           overlay.style.display = 'none';
         }, { once: true });
-        state.canvas.removeEventListener('touchmove', dismiss);
+        pane.canvas.removeEventListener('touchmove', dismiss);
       }
 
       const timer = setTimeout(dismiss, 5000);
-      state.canvas.addEventListener('touchmove', dismiss, { once: true, passive: true });
+      pane.canvas.addEventListener('touchmove', dismiss, { once: true, passive: true });
       sessionStorage.setItem('touchHintSeen', '1');
     }
 
@@ -717,7 +907,20 @@
       return `${PUBLIC_REPO}/blob/main/${source.split('/').map(encodeURIComponent).join('/')}`;
     }
 
-    function createViewer(canvas, stlUrl, onLoad, composite) {
+    function loadSTL(url) {
+      return new Promise((resolve, reject) => {
+        new STLLoader().load(url, resolve, undefined, reject);
+      });
+    }
+
+    // ------------------------------------------------------------------
+    // Viewer
+    // ------------------------------------------------------------------
+
+    // One viewer per pane. A pane can hold any number of models: each model
+    // (single mesh, or a multi-part coloured composite) becomes its own
+    // THREE.Group under a shared root, laid out side by side along world X.
+    function createViewer(canvas) {
       const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
       renderer.setPixelRatio(window.devicePixelRatio);
       renderer.localClippingEnabled = true;
@@ -725,7 +928,7 @@
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x0f3460);
 
-      const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 10000);
+      const camera = new THREE.PerspectiveCamera(45, (canvas.clientWidth / canvas.clientHeight) || 1, 0.1, 10000);
 
       // Controls are reassignable so the user can switch between Orbit,
       // Trackball, and Arcball at runtime (issue #230 — OrbitControls' fixed
@@ -761,47 +964,83 @@
       dirLight2.position.set(-2, -1, -1);
       scene.add(dirLight2);
 
-      const material = new THREE.MeshPhongMaterial({
-        color: 0x64b5f6,
-        specular: 0x222222,
-        shininess: 40,
-        clippingPlanes: [],
-        clipShadows: false,
-      });
+      const root = new THREE.Group();
+      scene.add(root);
 
       const handle = {
         scene,
         camera,
-        material,
-        // Materials whose clipping planes the cross-section toggles. A single
-        // model has just `material`; a composite has one per coloured part.
-        materials: [material],
-        mesh: null,
+        // Every model in the pane hangs off this shared group, so rotate90 /
+        // resetView / computeClipBBox operate on the whole scene contents.
+        root,
+        // Materials whose clipping planes the cross-section toggles.
+        materials: [],
+        // Subset the filament colour picker drives — composite parts keep
+        // their declared colours and are excluded.
+        filamentMaterials: [],
+        filamentColor: null,
         defaultCameraPos: null,
+        loadToken: 0,
       };
 
       makeControls('orbit');
 
-      // World-space Y extent of the current mesh — drives the cross-section
-      // clip plane. Recomputed after a rotation since rotating the mesh
-      // changes its axis-aligned bounding box.
+      function clearRoot() {
+        root.traverse((o) => {
+          if (o.isMesh) {
+            o.geometry.dispose();
+            o.material.dispose();
+          }
+        });
+        root.clear();
+        handle.materials = [];
+        handle.filamentMaterials = [];
+      }
+
+      function frameRoot() {
+        root.rotation.set(0, 0, 0);
+        const box = new THREE.Box3().setFromObject(root);
+        if (box.isEmpty()) return null;
+        const size = new THREE.Vector3();
+        box.getSize(size);
+        const dist = Math.max(size.x, size.y, size.z) * 1.8;
+        camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
+        handle.defaultCameraPos = camera.position.clone();
+        controls.target.set(0, 0, 0);
+        controls.update();
+        return { minY: box.min.y, maxY: box.max.y };
+      }
+
+      function makeMaterial(color) {
+        return new THREE.MeshPhongMaterial({
+          color,
+          specular: 0x222222,
+          shininess: 40,
+          clippingPlanes: [],
+          clipShadows: false,
+        });
+      }
+
+      // World-space Y extent of the current scene contents — drives the
+      // cross-section clip plane. Recomputed after a rotation since rotating
+      // changes the axis-aligned bounding box.
       function computeClipBBox() {
-        if (!handle.mesh) return null;
-        const box = new THREE.Box3().setFromObject(handle.mesh);
+        if (!root.children.length) return null;
+        const box = new THREE.Box3().setFromObject(root);
         return { minY: box.min.y, maxY: box.max.y };
       }
 
       function rotate90(axis) {
-        if (!handle.mesh) return null;
+        if (!root.children.length) return null;
         const v = axis === 'x' ? new THREE.Vector3(1, 0, 0)
           : axis === 'y' ? new THREE.Vector3(0, 1, 0)
           : new THREE.Vector3(0, 0, 1);
-        handle.mesh.rotateOnWorldAxis(v, Math.PI / 2);
+        root.rotateOnWorldAxis(v, Math.PI / 2);
         return computeClipBBox();
       }
 
       function resetView() {
-        if (handle.mesh) handle.mesh.rotation.set(0, 0, 0);
+        root.rotation.set(0, 0, 0);
         if (handle.defaultCameraPos) camera.position.copy(handle.defaultCameraPos);
         controls.target.set(0, 0, 0);
         camera.up.set(0, 1, 0);
@@ -813,102 +1052,119 @@
         makeControls(mode);
       }
 
-      function installGeometry(geometry) {
-        geometry.computeBoundingBox();
-        const halfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
-        geometry.center();
+      // Load and install every model for this pane. `token` guards against
+      // out-of-order resolution when the user clicks through the tree fast:
+      // only the newest call is allowed to touch the scene.
+      async function setModels(entries, token) {
+        handle.loadToken = token;
 
-        if (handle.mesh) {
-          scene.remove(handle.mesh);
-          handle.mesh.geometry.dispose();
+        const loaded = await Promise.all(entries.map(async (entry) => {
+          if (entry.composite && entry.composite.length) {
+            const geometries = await Promise.all(entry.composite.map(p => loadSTL(p.url)));
+            if (entry.viewerRotateX) {
+              for (const g of geometries) g.rotateX(-Math.PI / 2);
+            }
+            return geometries.map((geometry, i) => ({ geometry, color: entry.composite[i].color }));
+          }
+          const geometry = await loadSTL(entry.stlUrl);
+          // Print-oriented models keep OpenSCAD's native Z-up in the STL (so the
+          // download stays correctly oriented for slicing); when the source
+          // can't apply a Z-up -> Y-up rotate() without misprinting, meta.json's
+          // viewer_rotate_x asks for that same correction here instead, purely
+          // for display. Must happen before the bounding-box math below so the
+          // cross-section/camera framing operate on the corrected axes.
+          if (entry.viewerRotateX) geometry.rotateX(-Math.PI / 2);
+          return [{ geometry, color: null }];
+        }));
+
+        if (token !== handle.loadToken) {
+          for (const parts of loaded) for (const p of parts) p.geometry.dispose?.();
+          return null;
         }
-        const mesh = new THREE.Mesh(geometry, material);
-        scene.add(mesh);
-        handle.mesh = mesh;
 
-        const box = geometry.boundingBox;
-        const size = new THREE.Vector3();
-        box.getSize(size);
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const dist = maxDim * 1.8;
-        camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
-        handle.defaultCameraPos = camera.position.clone();
-        controls.update();
+        clearRoot();
 
-        return { minY: -halfSizeY, maxY: halfSizeY };
-      }
-
-      // Composite models render each already-co-registered part STL as its
-      // own coloured mesh in a single Group — colour that a monochrome STL
-      // export can't carry (issue #275).
-      function loadComposite(parts) {
-        Promise.all(parts.map(p => new Promise((res, rej) =>
-          new STLLoader().load(p.url, res, undefined, rej)
-        ))).then((geometries) => {
-          // A customizer render could (in principle) have raced ahead; bail if
-          // so — mirrors the single-load guard.
-          if (handle.customized) {
-            for (const g of geometries) g.dispose?.();
-            return;
+        const materials = [];
+        const filamentMaterials = [];
+        const built = loaded.map((parts) => {
+          // Centre each model on its own origin so the layout maths below only
+          // has to deal with widths, not arbitrary source-space offsets.
+          const box = new THREE.Box3();
+          for (const p of parts) {
+            p.geometry.computeBoundingBox();
+            box.union(p.geometry.boundingBox);
           }
-          // Union bounding box across all parts, then centre the whole group
-          // at the origin (matches how single models call geometry.center()).
-          const union = new THREE.Box3();
-          for (const g of geometries) {
-            g.computeBoundingBox();
-            union.union(g.boundingBox);
-          }
-          const center = new THREE.Vector3();
-          union.getCenter(center);
+          const centre = new THREE.Vector3();
+          box.getCenter(centre);
+          const size = new THREE.Vector3();
+          box.getSize(size);
 
           const group = new THREE.Group();
-          const partMaterials = [];
-          geometries.forEach((geometry, i) => {
-            geometry.translate(-center.x, -center.y, -center.z);
-            const mat = new THREE.MeshPhongMaterial({
-              color: parts[i].color,
-              specular: 0x222222,
-              shininess: 40,
-              clippingPlanes: [],
-              clipShadows: false,
-            });
-            group.add(new THREE.Mesh(geometry, mat));
-            partMaterials.push(mat);
-          });
-
-          scene.add(group);
-          handle.mesh = group;
-          handle.materials = partMaterials;
-
-          const size = new THREE.Vector3();
-          union.getSize(size);
-          const maxDim = Math.max(size.x, size.y, size.z);
-          const dist = maxDim * 1.8;
-          camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
-          handle.defaultCameraPos = camera.position.clone();
-          controls.update();
-
-          const halfSizeY = size.y / 2;
-          if (onLoad) onLoad({ minY: -halfSizeY, maxY: halfSizeY });
-        }).catch((err) => {
-          console.error('Failed to load composite parts', err);
+          for (const p of parts) {
+            p.geometry.translate(-centre.x, -centre.y, -centre.z);
+            const mat = makeMaterial(p.color !== null ? p.color : (handle.filamentColor ?? 0x64b5f6));
+            materials.push(mat);
+            if (p.color === null) filamentMaterials.push(mat);
+            group.add(new THREE.Mesh(p.geometry, mat));
+          }
+          return { group, width: size.x };
         });
+
+        // Lay the models out left-to-right with a gap proportional to the
+        // widest one, then recentre the whole row on the origin. A single
+        // model lands at x = 0, i.e. framed exactly as before.
+        const gap = 0.15 * Math.max(...built.map(b => b.width), 0);
+        let x = 0;
+        for (const b of built) {
+          b.group.position.x = x + b.width / 2;
+          x += b.width + gap;
+        }
+        const shift = (x - gap) / 2;
+        for (const b of built) {
+          b.group.position.x -= shift;
+          root.add(b.group);
+        }
+
+        handle.materials = materials;
+        handle.filamentMaterials = filamentMaterials;
+        return frameRoot();
       }
 
-      if (composite && composite.length) {
-        loadComposite(composite);
-      } else {
-        const loader = new STLLoader();
-        loader.load(stlUrl, (geometry) => {
-          // The customizer may have already replaced the mesh while this
-          // default STL was downloading — skip the install in that case.
-          if (handle.customized) {
-            geometry.dispose?.();
-            return;
-          }
-          const bbox = installGeometry(geometry);
-          if (onLoad) onLoad(bbox);
-        });
+      function clear(token) {
+        handle.loadToken = token;
+        clearRoot();
+      }
+
+      function setFilamentColor(hex) {
+        handle.filamentColor = hex;
+        for (const m of handle.filamentMaterials) m.color.setHex(hex);
+      }
+
+      // Swap in a freshly customizer-rendered mesh. Only meaningful for a
+      // single-model pane; reuses the existing material (and therefore the
+      // active filament colour and clipping planes) when there is one.
+      function replaceGeometry(geometry) {
+        geometry.center();
+        geometry.computeBoundingBox();
+        const group = root.children.length === 1 ? root.children[0] : null;
+        const mesh = group && group.children.length === 1 ? group.children[0] : null;
+        if (mesh) {
+          mesh.geometry.dispose();
+          mesh.geometry = geometry;
+          group.position.x = 0;
+        } else {
+          clearRoot();
+          const mat = makeMaterial(handle.filamentColor ?? 0x64b5f6);
+          handle.materials = [mat];
+          handle.filamentMaterials = [mat];
+          const g = new THREE.Group();
+          g.add(new THREE.Mesh(geometry, mat));
+          root.add(g);
+        }
+        // Invalidate any still-in-flight default-STL load so it can't
+        // overwrite the customized mesh when it resolves.
+        handle.loadToken += 1;
+        return frameRoot();
       }
 
       let rafId = null;
@@ -916,10 +1172,13 @@
       function resize() {
         const w = canvas.clientWidth;
         const h = canvas.clientHeight;
+        if (w === 0 || h === 0) return;
         if (canvas.width !== w || canvas.height !== h) {
           renderer.setSize(w, h, false);
           camera.aspect = w / h;
           camera.updateProjectionMatrix();
+          // TrackballControls caches the canvas rect; layout-driven resizes
+          // don't fire a window resize event, so refresh it here.
           controls.handleResize?.();
         }
       }
@@ -942,42 +1201,23 @@
         }
       }
 
+      function dispose() {
+        stop();
+        controls.dispose();
+        clearRoot();
+        renderer.dispose();
+        renderer.forceContextLoss();
+      }
+
       animate();
       Object.assign(handle, {
-        start, stop, installGeometry,
+        start, stop, dispose,
+        setModels, clear, setFilamentColor, replaceGeometry,
         rotate90, resetView, setControlMode,
         getControlMode: () => controlMode,
         getControls: () => controls,
       });
       return handle;
-    }
-
-    // Swap a card's rendered mesh with a fresh STL (e.g. from the
-    // customizer). Returns a promise that resolves once the geometry is
-    // installed. Card must already be activated.
-    async function replaceMesh(card, stlUrl) {
-      const state = cardState.get(card);
-      if (!state?.viewer) return;
-      const geometry = await new Promise((resolve, reject) => {
-        new STLLoader().load(stlUrl, resolve, undefined, reject);
-      });
-      state.viewer.customized = true;
-      const bbox = state.viewer.installGeometry(geometry);
-      state.clipBBox = bbox;
-      // Enable the cross-section controls if they're still waiting on the
-      // default STL — the customized geometry is enough to drive them.
-      const ccBtn = card.querySelector('.cross-btn');
-      if (ccBtn) ccBtn.disabled = false;
-      const ccSlider = card.querySelector('.clip-slider');
-      if (ccSlider) ccSlider.disabled = false;
-      card.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
-      // If the cross-section is active, re-anchor the clip plane to the
-      // new bounding box so the slider keeps making sense.
-      if (state.clipPlane) {
-        const slider = card.querySelector('.clip-slider');
-        const pct = slider ? (Number(slider.value) / 100) : 0.5;
-        state.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);
-      }
     }
 
     // Cache-busting hash injected at build time
@@ -1017,88 +1257,1173 @@
       document.addEventListener('keydown', onKey);
     }
 
-    // Map from card element to viewer state
-    const cardState = new Map();
-    let visibilityObserver = null;
+    // ------------------------------------------------------------------
+    // Model index
+    // ------------------------------------------------------------------
 
-    function activateCard(card) {
-      const state = cardState.get(card);
-      if (!state || state.initialized) return;
-      state.initialized = true;
-      state.placeholder.style.display = 'none';
-      state.canvas.style.display = 'block';
-      state.viewer = createViewer(state.canvas, state.stlUrl, (bbox) => {
-        state.clipBBox = bbox;
-        const slider = card.querySelector('.clip-slider');
-        if (slider) slider.disabled = false;
-        const btn = card.querySelector('.cross-btn');
-        if (btn) btn.disabled = false;
-        card.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
-      }, state.composite);
-      if (!state.composite && state.selectedColor !== 0x64b5f6) {
-        state.viewer.material.color.setHex(state.selectedColor);
+    let MODEL_INDEX = [];
+
+    function buildModelIndex(models) {
+      const index = [];
+      for (const [projectName, projectData] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
+        const projectSlug = slugify(projectName);
+        for (const model of (projectData.files || [])) {
+          // Composite descriptor: when meta.json declares this STL is a
+          // coloured multi-part assembly, load the part STLs instead (issue
+          // #275). Colours are re-validated here as defence-in-depth even
+          // though the schema already enforces #rrggbb.
+          const composite = (projectData.assembly && projectData.assembly.stl === model.stl
+              && Array.isArray(projectData.assembly.parts))
+            ? projectData.assembly.parts
+                .filter(p => typeof p.stl === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color))
+                .map(p => ({ url: `${p.stl}${cacheBust}`, color: p.color }))
+            : null;
+          const name = displayName(model.stl);
+          index.push({
+            projectName,
+            projectData,
+            model,
+            projectSlug,
+            modelSlug: slugify(model.stl),
+            name,
+            composite,
+            stlUrl: `${model.stl}${cacheBust}`,
+            viewerRotateX: !!projectData.viewer_rotate_x,
+            haystack: `${projectName} ${name} ${(projectData.tags || []).join(' ')}`.toLowerCase(),
+          });
+        }
       }
+      return index;
+    }
+
+    function resolveRef(spec) {
+      if (spec.m) {
+        return MODEL_INDEX.find(r => r.projectSlug === spec.p && r.modelSlug === spec.m) || null;
+      }
+      return MODEL_INDEX.find(r => r.projectSlug === spec.p) || null;
+    }
+
+    // ------------------------------------------------------------------
+    // Tree browser
+    // ------------------------------------------------------------------
+
+    const projectNodes = new Map();
+    const projectOrder = [];
+    const modelBtnRef = new Map();
+    let savedExpansion = null;
+
+    function setExpanded(node, expanded) {
+      node.el.setAttribute('aria-expanded', String(expanded));
+      node.labelBtn.setAttribute('aria-expanded', String(expanded));
+    }
+
+    function setRoving(el) {
+      for (const item of treeEl.querySelectorAll('.tree-project-label, .tree-model')) {
+        item.tabIndex = item === el ? 0 : -1;
+      }
+    }
+
+    function focusTreeItem(el) {
+      if (!el) return;
+      setRoving(el);
+      el.focus();
+    }
+
+    function visibleTreeItems() {
+      const out = [];
+      for (const node of projectOrder) {
+        if (node.el.hidden) continue;
+        out.push(node.labelBtn);
+        if (node.el.getAttribute('aria-expanded') === 'true') {
+          for (const btn of node.modelBtns) if (!btn.hidden) out.push(btn);
+        }
+      }
+      return out;
+    }
+
+    function isAdditive(event) {
+      return addModeBtn.getAttribute('aria-pressed') === 'true'
+        || Boolean(event && (event.ctrlKey || event.metaKey));
+    }
+
+    function buildTree(models) {
+      const byProject = new Map();
+      for (const ref of MODEL_INDEX) {
+        if (!byProject.has(ref.projectName)) byProject.set(ref.projectName, []);
+        byProject.get(ref.projectName).push(ref);
+      }
+
+      for (const [projectName, projectData] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
+        const refs = byProject.get(projectName) || [];
+        const projectSlug = slugify(projectName);
+
+        const el = document.createElement('div');
+        el.className = 'tree-project';
+        el.setAttribute('role', 'treeitem');
+        el.setAttribute('aria-expanded', 'false');
+        el.setAttribute('aria-label', projectName);
+        el.dataset.slug = projectSlug;
+
+        const labelBtn = document.createElement('button');
+        labelBtn.type = 'button';
+        labelBtn.className = 'tree-project-label';
+        labelBtn.textContent = projectName;
+        labelBtn.tabIndex = -1;
+        labelBtn.setAttribute('aria-expanded', 'false');
+        el.appendChild(labelBtn);
+
+        const actions = document.createElement('div');
+        actions.className = 'tree-project-actions';
+
+        if (projectData.zip) {
+          const zipBtn = document.createElement('a');
+          zipBtn.className = 'download-all-btn';
+          zipBtn.href = `${projectData.zip}${cacheBust}`;
+          zipBtn.download = projectData.zip;
+          zipBtn.textContent = `Download All (${refs.length} STLs)`;
+          zipBtn.setAttribute('aria-label', `Download all ${refs.length} STLs for ${projectName}`);
+          actions.appendChild(zipBtn);
+        }
+
+        if (projectData.sourceZip) {
+          const srcBtn = document.createElement('a');
+          srcBtn.className = 'download-all-btn';
+          srcBtn.href = `${projectData.sourceZip}${cacheBust}`;
+          srcBtn.download = projectData.sourceZip;
+          srcBtn.textContent = 'Download Source';
+          srcBtn.setAttribute('aria-label', `Download source files for ${projectName}`);
+          actions.appendChild(srcBtn);
+        }
+
+        if (projectData.dir) {
+          const repoBtn = document.createElement('a');
+          repoBtn.className = 'download-all-btn';
+          repoBtn.href = `${PUBLIC_REPO}/tree/main/${projectData.dir.split('/').map(encodeURIComponent).join('/')}`;
+          repoBtn.target = '_blank';
+          repoBtn.rel = 'noopener noreferrer';
+          repoBtn.textContent = 'View on GitHub';
+          repoBtn.setAttribute('aria-label', `View ${projectName} source directory on GitHub`);
+          actions.appendChild(repoBtn);
+        }
+
+        el.appendChild(actions);
+
+        const group = document.createElement('div');
+        group.setAttribute('role', 'group');
+        group.setAttribute('aria-label', `${projectName} models`);
+
+        const modelBtns = [];
+        for (const ref of refs) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'tree-model';
+          btn.setAttribute('role', 'treeitem');
+          btn.setAttribute('aria-selected', 'false');
+          btn.dataset.projectSlug = ref.projectSlug;
+          btn.dataset.modelSlug = ref.modelSlug;
+          btn.tabIndex = -1;
+
+          const thumb = document.createElement('img');
+          thumb.src = `${ref.model.stl.replace(/\.stl$/i, '.png')}${cacheBust}`;
+          thumb.loading = 'lazy';
+          thumb.decoding = 'async';
+          thumb.alt = '';
+          thumb.width = 40;
+          thumb.height = 30;
+          thumb.onerror = () => { thumb.style.display = 'none'; };
+          btn.appendChild(thumb);
+
+          const label = document.createElement('span');
+          label.textContent = ref.name;
+          btn.appendChild(label);
+
+          btn.addEventListener('click', (ev) => onTreeModelActivate(ref, isAdditive(ev)));
+          modelBtnRef.set(btn, ref);
+          modelBtns.push(btn);
+          group.appendChild(btn);
+        }
+
+        el.appendChild(group);
+        treeEl.appendChild(el);
+
+        const node = { projectName, projectSlug, el, labelBtn, modelBtns };
+        labelBtn.addEventListener('click', () => {
+          setExpanded(node, node.el.getAttribute('aria-expanded') !== 'true');
+        });
+        projectNodes.set(projectSlug, node);
+        projectOrder.push(node);
+      }
+
+      if (projectOrder.length) setRoving(projectOrder[0].labelBtn);
+    }
+
+    treeEl.addEventListener('focusin', (e) => {
+      if (e.target.matches('.tree-project-label, .tree-model')) setRoving(e.target);
+    });
+
+    treeEl.addEventListener('keydown', (e) => {
+      const active = document.activeElement;
+      if (!active || !active.matches?.('.tree-project-label, .tree-model')) return;
+      const node = projectOrder.find(n => n.labelBtn === active);
+      const parent = node ? null : projectOrder.find(n => n.modelBtns.includes(active));
+
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const items = visibleTreeItems();
+        const idx = items.indexOf(active);
+        if (idx === -1) return;
+        e.preventDefault();
+        const next = e.key === 'ArrowDown' ? idx + 1 : idx - 1;
+        if (next >= 0 && next < items.length) focusTreeItem(items[next]);
+        return;
+      }
+      if (e.key === 'Home' || e.key === 'End') {
+        const items = visibleTreeItems();
+        if (!items.length) return;
+        e.preventDefault();
+        focusTreeItem(e.key === 'Home' ? items[0] : items[items.length - 1]);
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        if (!node) return;
+        e.preventDefault();
+        if (node.el.getAttribute('aria-expanded') !== 'true') {
+          setExpanded(node, true);
+        } else {
+          focusTreeItem(node.modelBtns.find(b => !b.hidden));
+        }
+        return;
+      }
+      if (e.key === 'ArrowLeft') {
+        if (node) {
+          if (node.el.getAttribute('aria-expanded') === 'true') {
+            e.preventDefault();
+            setExpanded(node, false);
+          }
+          return;
+        }
+        if (parent) {
+          e.preventDefault();
+          focusTreeItem(parent.labelBtn);
+        }
+        return;
+      }
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (node) {
+          setExpanded(node, node.el.getAttribute('aria-expanded') !== 'true');
+        } else {
+          const ref = modelBtnRef.get(active);
+          if (ref) onTreeModelActivate(ref, isAdditive(e));
+        }
+      }
+    });
+
+    filterInput.addEventListener('input', () => {
+      const q = filterInput.value.trim().toLowerCase();
+      if (q && savedExpansion === null) {
+        savedExpansion = new Map(projectOrder.map(n => [n.projectSlug, n.el.getAttribute('aria-expanded') === 'true']));
+      }
+
+      let anyVisible = false;
+      for (const node of projectOrder) {
+        const projectMatch = node.projectName.toLowerCase().includes(q);
+        let childMatch = false;
+        for (const btn of node.modelBtns) {
+          const ref = modelBtnRef.get(btn);
+          const show = !q || projectMatch || ref.haystack.includes(q);
+          btn.hidden = !show;
+          if (show && q) childMatch = true;
+        }
+        const show = !q || projectMatch || childMatch;
+        node.el.hidden = !show;
+        if (show) anyVisible = true;
+        if (q && show) setExpanded(node, true);
+      }
+
+      if (!q && savedExpansion) {
+        for (const node of projectOrder) setExpanded(node, savedExpansion.get(node.projectSlug) === true);
+        savedExpansion = null;
+      }
+
+      treeEmptyEl.hidden = anyVisible;
+    });
+
+    function revealInTree(ref) {
+      const node = projectNodes.get(ref.projectSlug);
+      if (!node) return;
+      setExpanded(node, true);
+      const btn = node.modelBtns.find(b => modelBtnRef.get(b) === ref);
+      if (btn) btn.scrollIntoView({ block: 'nearest' });
+    }
+
+    function refreshTreeSelection() {
+      const loaded = new Set();
+      for (const pane of panes) {
+        for (const ref of pane.models) loaded.add(`${ref.projectSlug}/${ref.modelSlug}`);
+      }
+      for (const [btn, ref] of modelBtnRef) {
+        btn.setAttribute('aria-selected', String(loaded.has(`${ref.projectSlug}/${ref.modelSlug}`)));
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // Panes
+    // ------------------------------------------------------------------
+
+    const panes = [];
+    let activePane = 0;
+
+    function announce(message) {
+      srStatus.textContent = message;
+    }
+
+    function setActivePane(index) {
+      if (index < 0 || index >= panes.length) return;
+      activePane = index;
+      for (let i = 0; i < panes.length; i++) {
+        panes[i].el.classList.toggle('pane--active', i === activePane);
+      }
+    }
+
+    function toggleFocusPane(pane) {
+      const wasFocused = pane.el.classList.contains('pane--focused');
+      for (const p of panes) {
+        p.el.classList.remove('pane--focused');
+        p.focusBtn.setAttribute('aria-pressed', 'false');
+      }
+      panesEl.classList.toggle('panes--focused', !wasFocused);
+      if (!wasFocused) {
+        pane.el.classList.add('pane--focused');
+        pane.focusBtn.setAttribute('aria-pressed', 'true');
+      }
+    }
+
+    function toggleFullscreen(pane) {
+      if (document.fullscreenElement) document.exitFullscreen();
+      else pane.el.requestFullscreen();
+    }
+
+    function createPane(index) {
+      const el = document.createElement('div');
+      el.className = 'pane';
+
+      const chips = document.createElement('div');
+      chips.className = 'pane-chips';
+      el.appendChild(chips);
+
+      const actions = document.createElement('div');
+      actions.className = 'pane-actions';
+      el.appendChild(actions);
+
+      const focusBtn = document.createElement('button');
+      focusBtn.type = 'button';
+      focusBtn.className = 'pane-btn focus-btn';
+      focusBtn.setAttribute('aria-label', 'Expand this pane to fill the viewer');
+      focusBtn.setAttribute('aria-pressed', 'false');
+      focusBtn.innerHTML = ICON_EXPAND;
+      actions.appendChild(focusBtn);
+
+      const qrBtn = document.createElement('button');
+      qrBtn.type = 'button';
+      qrBtn.className = 'pane-btn qr-btn';
+      qrBtn.setAttribute('aria-label', 'Show QR code');
+      qrBtn.innerHTML = ICON_QR;
+      qrBtn.hidden = true;
+      actions.appendChild(qrBtn);
+
+      const fsBtn = document.createElement('button');
+      fsBtn.type = 'button';
+      fsBtn.className = 'pane-btn fullscreen-btn';
+      fsBtn.textContent = '⛶';
+      fsBtn.setAttribute('aria-label', 'Toggle fullscreen');
+      actions.appendChild(fsBtn);
+
+      const canvas = document.createElement('canvas');
+      canvas.setAttribute('role', 'img');
+      canvas.setAttribute('aria-label', 'Interactive 3D preview');
+      el.appendChild(canvas);
+
+      const emptyMsg = document.createElement('div');
+      emptyMsg.className = 'pane-empty';
+      emptyMsg.textContent = 'Select a model';
+      el.appendChild(emptyMsg);
+
+      // Touch gesture hint overlay (hidden until first touch on mobile)
+      const hintOverlay = document.createElement('div');
+      hintOverlay.className = 'touch-hint';
+      hintOverlay.setAttribute('aria-hidden', 'true');
+      hintOverlay.style.display = 'none';
+      hintOverlay.innerHTML = `
+        <div class="touch-hint-item">${TOUCH_ICON_ROTATE}<span>Rotate</span></div>
+        <div class="touch-hint-item">${TOUCH_ICON_ZOOM}<span>Zoom</span></div>
+        <div class="touch-hint-item">${TOUCH_ICON_PAN}<span>Pan</span></div>
+      `;
+      el.appendChild(hintOverlay);
+
+      const colorPicker = document.createElement('div');
+      colorPicker.className = 'color-picker';
+      colorPicker.setAttribute('aria-label', 'Change filament color');
+      for (const color of FILAMENT_COLORS) {
+        const swatch = document.createElement('button');
+        swatch.type = 'button';
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = `#${color.hex.toString(16).padStart(6, '0')}`;
+        swatch.title = color.name;
+        swatch.setAttribute('aria-label', color.name);
+        if (color.hex === 0x64b5f6) swatch.setAttribute('aria-pressed', 'true');
+        swatch.addEventListener('click', () => {
+          colorPicker.querySelectorAll('.color-swatch').forEach(s => s.removeAttribute('aria-pressed'));
+          swatch.setAttribute('aria-pressed', 'true');
+          state.selectedColor = color.hex;
+          state.viewer.setFilamentColor(color.hex);
+        });
+        colorPicker.appendChild(swatch);
+      }
+      el.appendChild(colorPicker);
+
+      // Cross-section controls
+      const crossRow = document.createElement('div');
+      crossRow.className = 'cross-section-row';
+
+      const crossBtn = document.createElement('button');
+      crossBtn.type = 'button';
+      crossBtn.className = 'cross-btn';
+      crossBtn.textContent = '✂ Cross Section';
+      crossBtn.setAttribute('aria-label', 'Toggle cross section');
+      crossBtn.setAttribute('aria-pressed', 'false');
+      crossBtn.disabled = true;
+
+      const clipSlider = document.createElement('input');
+      clipSlider.type = 'range';
+      clipSlider.className = 'clip-slider';
+      clipSlider.min = '0';
+      clipSlider.max = '100';
+      clipSlider.value = '50';
+      clipSlider.setAttribute('aria-label', 'Cross section depth');
+      clipSlider.disabled = true;
+      clipSlider.style.display = 'none';
+
+      crossBtn.addEventListener('click', () => {
+        const active = crossBtn.getAttribute('aria-pressed') === 'true';
+        if (active) {
+          for (const m of state.viewer.materials) m.clippingPlanes = [];
+          state.clipPlane = null;
+          clipSlider.style.display = 'none';
+          crossBtn.setAttribute('aria-pressed', 'false');
+        } else {
+          const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+          if (state.clipBBox) {
+            const { minY, maxY } = state.clipBBox;
+            plane.constant = minY + 0.5 * (maxY - minY);
+          }
+          for (const m of state.viewer.materials) m.clippingPlanes = [plane];
+          state.clipPlane = plane;
+          clipSlider.value = '50';
+          clipSlider.style.display = '';
+          crossBtn.setAttribute('aria-pressed', 'true');
+        }
+      });
+
+      clipSlider.addEventListener('input', () => {
+        if (!state.clipPlane || !state.clipBBox) return;
+        const pct = clipSlider.value / 100;
+        const { minY, maxY } = state.clipBBox;
+        state.clipPlane.constant = minY + pct * (maxY - minY);
+      });
+
+      crossRow.appendChild(crossBtn);
+      crossRow.appendChild(clipSlider);
+      el.appendChild(crossRow);
+
+      // View controls — 90° rotation per axis, reset, and a switch between
+      // Orbit / Trackball / Arcball controls (issue #230). Disabled until a
+      // mesh is loaded.
+      const viewRow = document.createElement('div');
+      viewRow.className = 'view-controls-row';
+
+      // Re-anchor the cross-section clip plane after a rotation/reset changes
+      // the model's world-space Y extent.
+      function applyClipBBox(bbox) {
+        if (!bbox) return;
+        state.clipBBox = bbox;
+        if (state.clipPlane) {
+          const pct = Number(clipSlider.value) / 100;
+          state.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);
+        }
+      }
+
+      for (const axis of ['x', 'y', 'z']) {
+        const rb = document.createElement('button');
+        rb.type = 'button';
+        rb.className = 'view-btn';
+        rb.textContent = `Rotate ${axis.toUpperCase()}`;
+        rb.setAttribute('aria-label', `Rotate model 90 degrees about the ${axis.toUpperCase()} axis`);
+        rb.disabled = true;
+        rb.addEventListener('click', () => applyClipBBox(state.viewer.rotate90(axis)));
+        viewRow.appendChild(rb);
+      }
+
+      const resetBtn = document.createElement('button');
+      resetBtn.type = 'button';
+      resetBtn.className = 'view-btn';
+      resetBtn.textContent = 'Reset';
+      resetBtn.setAttribute('aria-label', 'Reset view orientation and camera');
+      resetBtn.disabled = true;
+      resetBtn.addEventListener('click', () => applyClipBBox(state.viewer.resetView()));
+      viewRow.appendChild(resetBtn);
+
+      const modeDefs = [
+        { mode: 'orbit', label: 'Orbit' },
+        { mode: 'trackball', label: 'Trackball' },
+        { mode: 'arcball', label: 'Arcball' },
+      ];
+      const modeButtons = [];
+      for (const def of modeDefs) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'view-btn mode-btn';
+        b.textContent = def.label;
+        b.setAttribute('aria-label', `Use ${def.label} controls`);
+        b.setAttribute('aria-pressed', def.mode === 'orbit' ? 'true' : 'false');
+        b.disabled = true;
+        b.addEventListener('click', () => {
+          state.viewer.setControlMode(def.mode);
+          modeButtons.forEach(mb => mb.setAttribute('aria-pressed', mb === b ? 'true' : 'false'));
+        });
+        viewRow.appendChild(b);
+        modeButtons.push(b);
+      }
+      el.appendChild(viewRow);
+
+      const info = document.createElement('div');
+      info.className = 'card-info';
+      const title = document.createElement('h3');
+      info.appendChild(title);
+      el.appendChild(info);
+
+      panesEl.appendChild(el);
+
+      const state = {
+        index,
+        el,
+        canvas,
+        viewer: null,
+        models: [],
+        selectedColor: 0x64b5f6,
+        clipBBox: null,
+        clipPlane: null,
+        loadToken: 0,
+        hintOverlay,
+        customizerCleanup: null,
+        chips,
+        colorPicker,
+        crossRow,
+        crossBtn,
+        clipSlider,
+        viewRow,
+        info,
+        title,
+        emptyMsg,
+        focusBtn,
+        qrBtn,
+      };
+
+      focusBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleFocusPane(state); });
+      fsBtn.addEventListener('click', (e) => { e.stopPropagation(); toggleFullscreen(state); });
+
+      el.addEventListener('pointerdown', () => setActivePane(state.index), true);
+      el.addEventListener('focusin', () => setActivePane(state.index));
+
+      state.viewer = createViewer(canvas);
+      renderPaneChrome(state);
+
       // Show touch gesture hints immediately on mobile (once per session)
       if (!touchHintShown && ('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
         touchHintShown = true;
-        showTouchHint(card);
+        showTouchHint(state);
       }
-      if (visibilityObserver) visibilityObserver.observe(card);
+
+      return state;
     }
 
-    function toggleMaximize(card) {
-      if (document.fullscreenElement) return;
-      const isMaximized = card.classList.contains('card--maximized');
-      if (isMaximized) {
-        card.classList.remove('card--maximized');
-        document.body.classList.remove('has-maximized');
-        document.querySelector('.maximize-backdrop')?.remove();
-        card.querySelector('.maximize-btn')?.setAttribute('aria-label', 'Maximize model preview');
-      } else {
-        document.querySelectorAll('.card--maximized').forEach(c => {
-          c.classList.remove('card--maximized');
-          c.querySelector('.maximize-btn')?.setAttribute('aria-label', 'Maximize model preview');
+    // Rebuild everything around the canvas that depends on which models the
+    // pane currently holds.
+    function renderPaneChrome(pane) {
+      const refs = pane.models;
+      const single = refs.length === 1 ? refs[0] : null;
+
+      // Chips (one per loaded model, each a download link plus a remove ✕).
+      pane.chips.replaceChildren();
+      pane.chips.hidden = refs.length === 0;
+      for (const ref of refs) {
+        const chip = document.createElement('span');
+        chip.className = 'chip';
+        const dl = document.createElement('a');
+        dl.className = 'chip-dl';
+        dl.href = ref.stlUrl;
+        dl.setAttribute('download', '');
+        dl.setAttribute('aria-label', `Download STL for ${ref.name}`);
+        dl.textContent = ref.name;
+        chip.appendChild(dl);
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'chip-remove';
+        remove.textContent = '✕';
+        remove.setAttribute('aria-label', `Remove ${ref.name} from view`);
+        remove.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setPaneModels(pane, pane.models.filter(m => m !== ref));
         });
-        document.querySelector('.maximize-backdrop')?.remove();
-        const backdrop = document.createElement('div');
-        backdrop.className = 'maximize-backdrop';
-        backdrop.addEventListener('click', () => toggleMaximize(card));
-        document.body.appendChild(backdrop);
-        card.classList.add('card--maximized');
-        document.body.classList.add('has-maximized');
-        card.querySelector('.maximize-btn')?.setAttribute('aria-label', 'Close maximized preview');
+        chip.appendChild(remove);
+        pane.chips.appendChild(chip);
+      }
+
+      pane.canvas.setAttribute('aria-label', refs.length
+        ? `Interactive 3D preview of ${refs.map(r => r.name).join(', ')}`
+        : 'Interactive 3D preview');
+      pane.emptyMsg.hidden = refs.length > 0;
+
+      // A composite has fixed per-part colours — no filament swatch.
+      pane.colorPicker.hidden = refs.length === 0 || refs.every(r => r.composite);
+
+      pane.qrBtn.hidden = !(single && single.model.qr);
+      pane.qrBtn.onclick = single && single.model.qr
+        ? (e) => { e.stopPropagation(); showQrPopover(single.model.qr, single.name); }
+        : null;
+      if (single && single.model.qr) {
+        pane.qrBtn.setAttribute('aria-label', `Show QR code for ${single.name}`);
+      }
+
+      // Info row: name / print time / description / links. Per-model detail
+      // only makes sense when the pane holds exactly one model.
+      pane.info.replaceChildren(pane.title);
+      pane.title.textContent = refs.length === 0
+        ? 'No model selected'
+        : (single ? single.name : `${refs.length} models`);
+
+      if (single) {
+        if (single.model.estimated_minutes) {
+          const t = document.createElement('span');
+          t.className = 'print-time';
+          t.textContent = `~${formatTime(single.model.estimated_minutes)}`;
+          pane.info.appendChild(t);
+        }
+
+        const links = document.createElement('div');
+        links.className = 'card-links';
+
+        const dl = document.createElement('a');
+        dl.href = single.stlUrl;
+        dl.setAttribute('download', '');
+        dl.setAttribute('aria-label', `Download STL for ${single.name}`);
+        dl.textContent = 'Download STL';
+        links.appendChild(dl);
+
+        const sa = document.createElement('a');
+        sa.href = `standalone/${encodeURI(single.model.stl.replace(/\.stl$/i, '.html'))}${cacheBust}`;
+        sa.setAttribute('aria-label', `View standalone HTML viewer for ${single.name}`);
+        sa.textContent = 'Standalone';
+        links.appendChild(sa);
+
+        if (single.model.source) {
+          const src = document.createElement('a');
+          src.href = publicSourceUrl(single.model.source);
+          src.target = '_blank';
+          src.rel = 'noopener noreferrer';
+          src.setAttribute('aria-label', `View OpenSCAD source for ${single.name} on GitHub`);
+          src.textContent = 'Source';
+          links.appendChild(src);
+        }
+
+        pane.info.appendChild(links);
+
+        if (single.projectData.description) {
+          const desc = document.createElement('p');
+          desc.className = 'pane-desc';
+          desc.textContent = single.projectData.description;
+          pane.info.appendChild(desc);
+        }
+
+        if (Array.isArray(single.projectData.printing_notes)) {
+          const notes = single.projectData.printing_notes.filter(n => typeof n === 'string' && n.trim());
+          if (notes.length) {
+            const det = document.createElement('details');
+            det.className = 'printing-notes';
+            det.open = true;
+            const sum = document.createElement('summary');
+            sum.textContent = 'Printing notes';
+            det.appendChild(sum);
+            const ul = document.createElement('ul');
+            for (const n of notes) {
+              const li = document.createElement('li');
+              li.textContent = n;
+              ul.appendChild(li);
+            }
+            det.appendChild(ul);
+            pane.info.appendChild(det);
+          }
+        }
+      }
+
+      // In-browser parametric customizer — only present when the pane holds a
+      // single model that ships a validated parameters manifest.
+      if (single && single.model.parameters?.parameters?.length) {
+        const customizer = buildCustomizer(pane, single);
+        pane.crossRow.appendChild(customizer.button);
+        pane.el.insertBefore(customizer.panel, pane.viewRow);
+        pane.customizerCleanup = customizer.destroy;
       }
     }
 
-    function parseHash() {
-      const hash = decodeURIComponent(window.location.hash.slice(1));
-      if (!hash) return null;
-      const sep = hash.indexOf('/');
-      if (sep === -1) return { project: hash, model: null };
-      return { project: hash.slice(0, sep), model: hash.slice(sep + 1) };
-    }
+    async function setPaneModels(pane, refs) {
+      pane.models = refs.slice();
+      const token = ++pane.loadToken;
 
-    function navigateToHash() {
-      const target = parseHash();
-      if (!target) return;
+      if (pane.customizerCleanup) {
+        pane.customizerCleanup();
+        pane.customizerCleanup = null;
+      }
+      renderPaneChrome(pane);
+      refreshTreeSelection();
 
-      const section = gallery.querySelector(`.project-group[data-slug="${CSS.escape(target.project)}"]`);
-      if (!section) return;
+      pane.crossBtn.disabled = true;
+      pane.clipSlider.disabled = true;
+      pane.viewRow.querySelectorAll('.view-btn').forEach(b => { b.disabled = true; });
 
-      section.classList.remove('collapsed');
-      section.querySelector('h2')?.setAttribute('aria-expanded', 'true');
-
-      if (!target.model) {
-        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (!refs.length) {
+        pane.viewer.clear(token);
+        pane.clipBBox = null;
+        updateHash();
         return;
       }
 
-      const card = section.querySelector(`.card[data-slug="${CSS.escape(target.model)}"]`);
-      if (!card) return;
+      const names = refs.map(r => r.name).join(', ');
+      try {
+        const bbox = await pane.viewer.setModels(
+          refs.map(r => ({ stlUrl: r.stlUrl, composite: r.composite, viewerRotateX: r.viewerRotateX })), token);
+        if (bbox === null) return;
 
-      activateCard(card);
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        pane.clipBBox = bbox;
+        pane.crossBtn.disabled = false;
+        pane.clipSlider.disabled = false;
+        pane.viewRow.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
+
+        // The materials were rebuilt — re-apply the active clip plane and
+        // re-anchor it to the new bounding box.
+        if (pane.clipPlane) {
+          const pct = Number(pane.clipSlider.value) / 100;
+          pane.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);
+          for (const m of pane.viewer.materials) m.clippingPlanes = [pane.clipPlane];
+        }
+        pane.viewer.setFilamentColor(pane.selectedColor);
+        updateHash();
+        announce(`Loaded ${names} in pane ${pane.index + 1}`);
+      } catch (err) {
+        console.error('Failed to load model', err);
+        if (token === pane.loadToken) pane.title.textContent = `Failed to load ${names}`;
+      }
     }
+
+    function setLayout(n) {
+      const count = Math.min(3, Math.max(1, n));
+      while (panes.length > count) {
+        const pane = panes.pop();
+        if (pane.customizerCleanup) pane.customizerCleanup();
+        pane.viewer.dispose();
+        pane.el.remove();
+      }
+      while (panes.length < count) {
+        panes.push(createPane(panes.length));
+      }
+      panesEl.className = `panes panes--${count}`;
+      for (const pane of panes) {
+        pane.el.classList.remove('pane--focused');
+        pane.focusBtn.setAttribute('aria-pressed', 'false');
+      }
+      if (activePane >= panes.length) activePane = panes.length - 1;
+      setActivePane(activePane);
+      for (const btn of layoutBtns) {
+        btn.setAttribute('aria-pressed', String(Number(btn.dataset.layout) === count));
+      }
+      refreshTreeSelection();
+      updateHash();
+    }
+
+    function onTreeModelActivate(ref, additive) {
+      const pane = panes[activePane];
+      if (!pane) return;
+      if (additive) {
+        if (pane.models.some(m => m.stlUrl === ref.stlUrl)) return;
+        setPaneModels(pane, [...pane.models, ref]);
+      } else {
+        setPaneModels(pane, [ref]);
+      }
+      if (window.matchMedia('(max-width: 900px)').matches) {
+        setSidebarOpen(false);
+        pane.el.scrollIntoView({ block: 'nearest' });
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // Customizer
+    // ------------------------------------------------------------------
+
+    // Install a customizer-rendered STL into the pane's viewer, replacing the
+    // precomputed mesh.
+    async function applyCustomGeometry(pane, stlUrl) {
+      const geometry = await loadSTL(stlUrl);
+      const bbox = pane.viewer.replaceGeometry(geometry);
+      if (!bbox) return;
+      pane.clipBBox = bbox;
+      // Enable the cross-section/view controls if they're still waiting on the
+      // default STL — the customized geometry is enough to drive them.
+      pane.crossBtn.disabled = false;
+      pane.clipSlider.disabled = false;
+      pane.viewRow.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
+      if (pane.clipPlane) {
+        const pct = Number(pane.clipSlider.value) / 100;
+        pane.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);
+      }
+    }
+
+    function buildCustomizer(pane, ref) {
+      const { model, projectData, name: modelName } = ref;
+
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'customize-btn';
+      button.textContent = '⚙ Customize';
+      button.setAttribute('aria-label', `Customize ${modelName} parameters`);
+      button.setAttribute('aria-pressed', 'false');
+
+      const panel = document.createElement('div');
+      panel.className = 'customizer-panel';
+
+      const status = document.createElement('div');
+      status.className = 'customizer-status';
+      status.setAttribute('aria-live', 'polite');
+
+      const downloadLink = document.createElement('a');
+      downloadLink.className = 'customizer-download';
+      downloadLink.hidden = true;
+      downloadLink.download = model.stl.replace(/\.stl$/i, '') + '__custom.stl';
+      downloadLink.textContent = '⬇ Download customized STL';
+
+      // Re-render button + status share a row beneath the param list.
+      const actions = document.createElement('div');
+      actions.className = 'customizer-actions';
+      const rerenderBtn = document.createElement('button');
+      rerenderBtn.type = 'button';
+      rerenderBtn.className = 'rerender-btn';
+      rerenderBtn.textContent = '⟳ Re-render';
+      rerenderBtn.setAttribute('aria-label', `Re-render ${modelName} with current parameters`);
+      actions.appendChild(rerenderBtn);
+      actions.appendChild(status);
+
+      const paramValues = {};
+      function markDirty(row) {
+        if (row) row.classList.add('param-row--dirty');
+        rerenderBtn.classList.add('dirty');
+      }
+      function clearDirty() {
+        for (const r of panel.querySelectorAll('.param-row--dirty')) {
+          r.classList.remove('param-row--dirty');
+        }
+        rerenderBtn.classList.remove('dirty');
+      }
+
+      for (const p of model.parameters.parameters) {
+        const row = document.createElement('div');
+        row.className = 'param-row';
+        const label = document.createElement('label');
+        label.textContent = p.label;
+        // Ids must be unique across panes, otherwise a label in one pane
+        // binds to the identically-named slider in another.
+        const inputId = `param-${pane.index}-${ref.modelSlug}-${p.name}`;
+        label.htmlFor = inputId;
+        row.appendChild(label);
+        if (p.type === 'number') {
+          const input = document.createElement('input');
+          input.type = 'range';
+          input.id = inputId;
+          input.min = String(p.min);
+          input.max = String(p.max);
+          input.step = String(p.step);
+          input.value = String(p.default);
+          const display = document.createElement('span');
+          display.className = 'param-value';
+          display.textContent = String(p.default);
+          paramValues[p.name] = Number(p.default);
+          input.addEventListener('input', () => {
+            const v = Number(input.value);
+            paramValues[p.name] = v;
+            display.textContent = String(v);
+            markDirty(row);
+          });
+          row.appendChild(input);
+          row.appendChild(display);
+        } else if (p.type === 'boolean') {
+          const input = document.createElement('input');
+          input.type = 'checkbox';
+          input.id = inputId;
+          input.checked = Boolean(p.default);
+          paramValues[p.name] = Boolean(p.default);
+          input.addEventListener('change', () => {
+            paramValues[p.name] = input.checked;
+            markDirty(row);
+          });
+          row.appendChild(input);
+        }
+        panel.appendChild(row);
+      }
+      panel.appendChild(actions);
+      panel.appendChild(downloadLink);
+
+      let inFlight = false;
+
+      async function runRender(initialLabel = 'Rendering…') {
+        if (inFlight) return;
+        inFlight = true;
+        rerenderBtn.disabled = true;
+        const renderedParams = { ...paramValues };
+        status.classList.remove('error');
+        status.textContent = initialLabel;
+        const startMs = performance.now();
+        let url;
+        try {
+          const sources = await loadProjectSources(projectData.dir);
+          const entryName = model.source.split('/').pop();
+          const stlBytes = await renderInWorker({
+            sources: Array.from(sources.entries()),
+            entry: entryName,
+            params: { ...renderedParams },
+            projectDir: projectData.dir,
+          });
+          const blob = new Blob([stlBytes], { type: 'model/stl' });
+          url = URL.createObjectURL(blob);
+          await applyCustomGeometry(pane, url);
+          const prevHref = downloadLink.dataset.blobUrl;
+          if (prevHref) URL.revokeObjectURL(prevHref);
+          downloadLink.href = url;
+          downloadLink.dataset.blobUrl = url;
+          downloadLink.hidden = false;
+          const ms = Math.round(performance.now() - startMs);
+          status.textContent = `Rendered in ${(ms / 1000).toFixed(1)}s`;
+          const stillMatch = Object.keys(renderedParams).every(k => paramValues[k] === renderedParams[k]);
+          if (stillMatch) clearDirty();
+        } catch (err) {
+          if (url) URL.revokeObjectURL(url);
+          console.error('Customizer render failed:', err);
+          status.classList.add('error');
+          status.textContent = `Error: ${err.message || err}`;
+        } finally {
+          inFlight = false;
+          rerenderBtn.disabled = false;
+        }
+      }
+
+      rerenderBtn.addEventListener('click', () => runRender());
+
+      button.addEventListener('click', () => {
+        const open = panel.classList.toggle('open');
+        button.setAttribute('aria-pressed', String(open));
+        if (open && downloadLink.hidden) {
+          runRender('Loading initial preview…');
+        }
+      });
+
+      function destroy() {
+        const prevHref = downloadLink.dataset.blobUrl;
+        if (prevHref) URL.revokeObjectURL(prevHref);
+        button.remove();
+        panel.remove();
+      }
+
+      return { button, panel, destroy };
+    }
+
+    // ------------------------------------------------------------------
+    // Hash routing
+    // ------------------------------------------------------------------
+
+    // The multi-pane grammar is a strict superset of the historic
+    // `#project/model` and `#project` forms: panes are separated by `+` and
+    // models within a pane by `,`. Neither character (nor a second `/`) can
+    // appear in a slug — the CI filename charset is `[A-Za-z0-9._ -]` and
+    // slugify only maps `[_\s]+` to `-` — so every legacy link still parses
+    // to exactly one pane holding one model, and round-trips byte-identically.
+    // __HASH_ROUTING_START__
+    function parseHash(raw) {
+      if (!raw) return null;
+      const spec = raw.split('+').map((paneStr) => paneStr.split(',').map((segment) => {
+        let decoded;
+        try {
+          decoded = decodeURIComponent(segment);
+        } catch (e) {
+          decoded = segment;
+        }
+        const sep = decoded.indexOf('/');
+        if (sep === -1) return { p: decoded, m: null };
+        return { p: decoded.slice(0, sep), m: decoded.slice(sep + 1) };
+      }).filter((entry) => entry.p)).filter((models) => models.length);
+      return spec.length ? spec : null;
+    }
+
+    function formatHash(spec) {
+      return spec
+        .map((models) => models.map((entry) => (entry.m ? `${entry.p}/${entry.m}` : entry.p)).join(','))
+        .filter(Boolean)
+        .join('+');
+    }
+    // __HASH_ROUTING_END__
+
+    // Incoming URLs are never rewritten: `updateHash()` stays inert until the
+    // initial route has been fully applied, so arriving at `#toothbrush` from
+    // the README leaves the address bar (and the Plausible hash pageview)
+    // exactly as it was.
+    let applyingHash = false;
+    let lastWrittenHash = null;
+
+    function currentSpec() {
+      return panes.map(pane => pane.models.map(ref => ({ p: ref.projectSlug, m: ref.modelSlug })));
+    }
+
+    function updateHash() {
+      if (applyingHash) return;
+      const hash = formatHash(currentSpec());
+      lastWrittenHash = hash;
+      history.replaceState(null, '', hash
+        ? `#${hash}`
+        : window.location.pathname + window.location.search);
+    }
+
+    async function applyHash() {
+      const spec = parseHash(window.location.hash.slice(1));
+      if (!spec) return false;
+
+      const resolved = spec
+        .map(models => models.map(resolveRef).filter(Boolean))
+        .filter(models => models.length);
+      if (!resolved.length) {
+        console.warn('No models matched hash', window.location.hash);
+        return false;
+      }
+
+      setLayout(Math.min(resolved.length, 3));
+      const used = resolved.slice(0, panes.length);
+      await Promise.all(used.map((refs, i) => setPaneModels(panes[i], refs)));
+      revealInTree(used[0][0]);
+      return true;
+    }
+
+    // ------------------------------------------------------------------
+    // Chrome wiring
+    // ------------------------------------------------------------------
+
+    function setSidebarOpen(open) {
+      document.body.classList.toggle('sidebar-open', open);
+      sidebarToggle.setAttribute('aria-expanded', String(open));
+    }
+
+    sidebarToggle.addEventListener('click', () => {
+      setSidebarOpen(!document.body.classList.contains('sidebar-open'));
+    });
+
+    for (const btn of layoutBtns) {
+      btn.addEventListener('click', () => setLayout(Number(btn.dataset.layout)));
+    }
+
+    addModeBtn.addEventListener('click', () => {
+      const on = addModeBtn.getAttribute('aria-pressed') === 'true';
+      addModeBtn.setAttribute('aria-pressed', String(!on));
+    });
+
+    document.addEventListener('keydown', (e) => {
+      // Skip if typing in an input/textarea or if modifier keys are held
+      const tag = e.target.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+
+      if (e.key === 'Escape') {
+        if (document.fullscreenElement) return;
+        const focused = panes.find(p => p.el.classList.contains('pane--focused'));
+        if (focused) {
+          e.preventDefault();
+          toggleFocusPane(focused);
+          return;
+        }
+        if (document.body.classList.contains('sidebar-open')) {
+          e.preventDefault();
+          setSidebarOpen(false);
+        }
+        return;
+      }
+
+      if (e.key === '/') {
+        e.preventDefault();
+        setSidebarOpen(true);
+        filterInput.focus();
+        return;
+      }
+
+      if (e.key === '1' || e.key === '2' || e.key === '3') {
+        e.preventDefault();
+        setLayout(Number(e.key));
+        return;
+      }
+
+      const pane = panes[activePane];
+      if (!pane) return;
+
+      if (e.key === 'f' || e.key === 'F') {
+        e.preventDefault();
+        toggleFullscreen(pane);
+        return;
+      }
+      if (e.key === 'd' || e.key === 'D') {
+        const dl = pane.el.querySelector('.chip-dl');
+        if (dl) {
+          e.preventDefault();
+          dl.click();
+        }
+        return;
+      }
+      if (e.key === 'c' || e.key === 'C') {
+        if (pane.crossBtn.disabled) return;
+        e.preventDefault();
+        pane.crossBtn.click();
+        return;
+      }
+      if (e.key === 'm' || e.key === 'M') {
+        if (document.fullscreenElement) return;
+        e.preventDefault();
+        toggleFocusPane(pane);
+        return;
+      }
+      if (e.key === 'r' || e.key === 'R') {
+        const btn = pane.el.querySelector('.rerender-btn');
+        if (btn && !btn.disabled) {
+          e.preventDefault();
+          btn.click();
+        }
+      }
+    });
+
+    // Pause every viewer's animation loop while the tab is hidden.
+    document.addEventListener('visibilitychange', () => {
+      for (const pane of panes) {
+        if (document.hidden) pane.viewer.stop();
+        else pane.viewer.start();
+      }
+    });
+
+    window.addEventListener('hashchange', () => {
+      if (window.location.hash.slice(1) === lastWrittenHash) return;
+      applyingHash = true;
+      applyHash()
+        .catch(err => console.warn('Failed to apply hash route', err))
+        .finally(() => { applyingHash = false; });
+    });
 
     async function init() {
       let models;
@@ -1117,713 +2442,60 @@
         });
       } catch (e) {
         console.error(e);
-        gallery.innerHTML = '<div class="loading">Failed to load models</div>';
+        const failed = document.createElement('div');
+        failed.className = 'loading';
+        failed.textContent = 'Failed to load models';
+        panesEl.replaceChildren(failed);
         return;
       }
 
-      // In PR previews, changed.json lists projects with modified models
-      // Sections not in that list are collapsed; on the main site it won't exist
+      // In PR previews, changed.json lists projects with modified models.
+      // On the main site it won't exist.
       let changedProjects = null;
       try {
         const changedResp = await fetch(`changed.json${cacheBust}`);
         if (changedResp.ok) changedProjects = await changedResp.json();
-      } catch (e) { /* main site — all sections collapse by default */ }
+      } catch (e) { /* main site — no preview hints */ }
 
-      gallery.innerHTML = '';
+      MODEL_INDEX = buildModelIndex(models);
+      buildTree(models);
+      panesEl.replaceChildren();
 
-      for (const [project, projectData] of Object.entries(models).sort(([a], [b]) => a.localeCompare(b))) {
-        const files = projectData.files;
-        const section = document.createElement('div');
-        section.className = 'project-group';
-        section.setAttribute('role', 'group');
-        section.setAttribute('aria-label', project);
-        section.dataset.slug = slugify(project);
-        const isCollapsed = changedProjects ? !changedProjects.includes(project) : true;
-        if (isCollapsed) {
-          section.classList.add('collapsed');
+      // Hold hash writes until the initial route has settled so an incoming
+      // URL survives verbatim.
+      applyingHash = true;
+      setLayout(1);
+      let routed = false;
+      if (window.location.hash.slice(1)) {
+        try {
+          routed = await applyHash();
+        } catch (err) {
+          console.warn('Failed to apply hash route', err);
         }
+      }
+      applyingHash = false;
 
-        const heading = document.createElement('h2');
-        heading.textContent = project;
-        heading.setAttribute('role', 'button');
-        heading.setAttribute('tabindex', '0');
-        heading.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
-
-        function toggleSection() {
-          section.classList.toggle('collapsed');
-          const expanded = !section.classList.contains('collapsed');
-          heading.setAttribute('aria-expanded', String(expanded));
-          // When expanding, check for uninitialized visible cards
-          if (expanded) {
-            for (const card of section.querySelectorAll('.card')) {
-              const state = cardState.get(card);
-              if (state && !state.initialized) {
-                const rect = card.getBoundingClientRect();
-                if (rect.bottom > 0 && rect.top < window.innerHeight) {
-                  activateCard(card);
-                }
-              }
-            }
-          }
-        }
-
-        heading.addEventListener('click', toggleSection);
-        heading.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            toggleSection();
-          }
-        });
-
-        const header = document.createElement('div');
-        header.className = 'project-header';
-        header.appendChild(heading);
-
-        if (projectData.zip) {
-          const zipBtn = document.createElement('a');
-          zipBtn.className = 'download-all-btn';
-          zipBtn.href = `${projectData.zip}${cacheBust}`;
-          zipBtn.download = projectData.zip;
-          zipBtn.textContent = `Download All (${files.length} STLs)`;
-          zipBtn.setAttribute('aria-label', `Download all ${files.length} STLs for ${project}`);
-          header.appendChild(zipBtn);
-        }
-
-        if (projectData.sourceZip) {
-          const srcBtn = document.createElement('a');
-          srcBtn.className = 'download-all-btn';
-          srcBtn.href = `${projectData.sourceZip}${cacheBust}`;
-          srcBtn.download = projectData.sourceZip;
-          srcBtn.textContent = 'Download Source';
-          srcBtn.setAttribute('aria-label', `Download source files for ${project}`);
-          header.appendChild(srcBtn);
-        }
-
-        if (projectData.dir) {
-          const repoBtn = document.createElement('a');
-          repoBtn.className = 'download-all-btn';
-          repoBtn.href = `${PUBLIC_REPO}/tree/main/${projectData.dir.split('/').map(encodeURIComponent).join('/')}`;
-          repoBtn.target = '_blank';
-          repoBtn.rel = 'noopener noreferrer';
-          repoBtn.textContent = 'View on GitHub';
-          repoBtn.setAttribute('aria-label', `View ${project} source directory on GitHub`);
-          header.appendChild(repoBtn);
-        }
-
-        section.appendChild(header);
-
-        const grid = document.createElement('div');
-        grid.className = 'project-grid';
-
-        for (const model of files) {
-          const card = document.createElement('div');
-          card.className = 'card';
-          card.setAttribute('tabindex', '0');
-          card.dataset.slug = slugify(model.stl);
-
-          const stlUrl = `${model.stl}${cacheBust}`;
-          const pngUrl = `${model.stl.replace(/\.stl$/i, '.png')}${cacheBust}`;
-
-          // Composite descriptor: when meta.json declares this STL's card is a
-          // coloured multi-part assembly, load the part STLs instead (issue
-          // #275). Colours are re-validated here as defence-in-depth even
-          // though the schema already enforces #rrggbb.
-          const composite = (projectData.assembly && projectData.assembly.stl === model.stl
-              && Array.isArray(projectData.assembly.parts))
-            ? projectData.assembly.parts
-                .filter(p => typeof p.stl === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color))
-                .map(p => ({ url: `${p.stl}${cacheBust}`, color: p.color }))
-            : null;
-
-          // PNG placeholder shown until viewer activates
-          const placeholder = document.createElement('img');
-          placeholder.className = 'card-placeholder';
-          placeholder.src = pngUrl;
-          placeholder.alt = displayName(model.stl);
-          placeholder.loading = 'lazy';
-          placeholder.decoding = 'async';
-          card.appendChild(placeholder);
-
-          const modelName = displayName(model.stl);
-
-          // Canvas hidden until viewer activates
-          const canvas = document.createElement('canvas');
-          canvas.style.display = 'none';
-          canvas.setAttribute('role', 'img');
-          canvas.setAttribute('aria-label', `Interactive 3D preview of ${modelName}`);
-          card.appendChild(canvas);
-
-          // Fallback if PNG doesn't exist: show canvas immediately
-          placeholder.onerror = () => {
-            placeholder.style.display = 'none';
-            activateCard(card);
-          };
-
-          // Touch gesture hint overlay (hidden until first touch on mobile)
-          const hintOverlay = document.createElement('div');
-          hintOverlay.className = 'touch-hint';
-          hintOverlay.setAttribute('aria-hidden', 'true');
-          hintOverlay.style.display = 'none';
-          hintOverlay.innerHTML = `
-            <div class="touch-hint-item">${TOUCH_ICON_ROTATE}<span>Rotate</span></div>
-            <div class="touch-hint-item">${TOUCH_ICON_ZOOM}<span>Zoom</span></div>
-            <div class="touch-hint-item">${TOUCH_ICON_PAN}<span>Pan</span></div>
-          `;
-          card.appendChild(hintOverlay);
-
-          cardState.set(card, {
-            canvas,
-            placeholder,
-            stlUrl,
-            composite,
-            hintOverlay,
-            initialized: false,
-            viewer: null,
-            selectedColor: 0x64b5f6,
-            clipBBox: null,
-            clipPlane: null,
-          });
-
-          const fsBtn = document.createElement('button');
-          fsBtn.className = 'fullscreen-btn';
-          fsBtn.textContent = '\u26F6';
-          fsBtn.setAttribute('aria-label', 'Toggle fullscreen');
-          fsBtn.addEventListener('click', () => {
-            activateCard(card);
-            window.history.replaceState(null, '', `#${section.dataset.slug}/${card.dataset.slug}`);
-            if (document.fullscreenElement) {
-              document.exitFullscreen();
-            } else {
-              if (card.classList.contains('card--maximized')) toggleMaximize(card);
-              card.requestFullscreen();
-            }
-          });
-          card.appendChild(fsBtn);
-
-          const maxBtn = document.createElement('button');
-          maxBtn.className = 'maximize-btn';
-          maxBtn.setAttribute('aria-label', 'Maximize model preview');
-          maxBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor">
-  <path d="M1 1h4v1.5H3.06L5.5 4.94 4.44 6 2 3.56V5.5H.5V1H1zm12 0v4.5H11.5V3.56L9.06 6 8 4.94 10.44 2.5H8.5V1H13zm0 12h-4.5v-1.5h1.94L8 9.06 9.06 8 11.5 10.44V8.5H13V13zm-12 0V8.5H.5v1.94L2.94 8 4 9.06 1.56 11.5H3.5V13H1z"/>
-</svg>`;
-          maxBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            activateCard(card);
-            toggleMaximize(card);
-          });
-          card.appendChild(maxBtn);
-
-          if (model.qr) {
-            const qrBtn = document.createElement('button');
-            qrBtn.className = 'qr-btn';
-            qrBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 18 18" fill="currentColor">
-              <rect x="1" y="1" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="3" y="3" width="3" height="3"/>
-              <rect x="10" y="1" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="12" y="3" width="3" height="3"/>
-              <rect x="1" y="10" width="7" height="7" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/>
-              <rect x="3" y="12" width="3" height="3"/>
-              <rect x="11" y="11" width="2" height="2"/>
-              <rect x="15" y="11" width="2" height="2"/>
-              <rect x="11" y="15" width="2" height="2"/>
-              <rect x="15" y="15" width="2" height="2"/>
-              <rect x="13" y="13" width="2" height="2"/>
-            </svg>`;
-            qrBtn.setAttribute('aria-label', `Show QR code for ${modelName}`);
-            qrBtn.addEventListener('click', (e) => {
-              e.stopPropagation();
-              showQrPopover(model.qr, modelName);
-            });
-            card.appendChild(qrBtn);
-          }
-
-          // A composite has fixed per-part colours — no filament swatch.
-          if (!composite) {
-            const colorPicker = document.createElement('div');
-            colorPicker.className = 'color-picker';
-            colorPicker.setAttribute('aria-label', 'Change filament color');
-            for (const color of FILAMENT_COLORS) {
-              const swatch = document.createElement('button');
-              swatch.className = 'color-swatch';
-              swatch.style.backgroundColor = `#${color.hex.toString(16).padStart(6, '0')}`;
-              swatch.title = color.name;
-              swatch.setAttribute('aria-label', color.name);
-              if (color.hex === 0x64b5f6) swatch.setAttribute('aria-pressed', 'true');
-              swatch.addEventListener('click', () => {
-                colorPicker.querySelectorAll('.color-swatch').forEach(s => s.removeAttribute('aria-pressed'));
-                swatch.setAttribute('aria-pressed', 'true');
-                const state = cardState.get(card);
-                if (state) {
-                  state.selectedColor = color.hex;
-                  if (state.viewer) state.viewer.material.color.setHex(color.hex);
-                }
-              });
-              colorPicker.appendChild(swatch);
-            }
-            card.appendChild(colorPicker);
-          }
-
-          // Cross-section controls
-          const crossRow = document.createElement('div');
-          crossRow.className = 'cross-section-row';
-
-          const crossBtn = document.createElement('button');
-          crossBtn.className = 'cross-btn';
-          crossBtn.textContent = '✂ Cross Section';
-          crossBtn.setAttribute('aria-label', 'Toggle cross section');
-          crossBtn.setAttribute('aria-pressed', 'false');
-          crossBtn.disabled = true;
-
-          const clipSlider = document.createElement('input');
-          clipSlider.type = 'range';
-          clipSlider.className = 'clip-slider';
-          clipSlider.min = '0';
-          clipSlider.max = '100';
-          clipSlider.value = '50';
-          clipSlider.setAttribute('aria-label', 'Cross section depth');
-          clipSlider.disabled = true;
-          clipSlider.style.display = 'none';
-
-          crossBtn.addEventListener('click', () => {
-            const state = cardState.get(card);
-            if (!state?.viewer) return;
-            const active = crossBtn.getAttribute('aria-pressed') === 'true';
-            if (active) {
-              for (const m of state.viewer.materials) m.clippingPlanes = [];
-              state.clipPlane = null;
-              clipSlider.style.display = 'none';
-              crossBtn.setAttribute('aria-pressed', 'false');
-            } else {
-              const plane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
-              if (state.clipBBox) {
-                const { minY, maxY } = state.clipBBox;
-                plane.constant = minY + 0.5 * (maxY - minY);
-              }
-              for (const m of state.viewer.materials) m.clippingPlanes = [plane];
-              state.clipPlane = plane;
-              clipSlider.value = '50';
-              clipSlider.style.display = '';
-              crossBtn.setAttribute('aria-pressed', 'true');
-            }
-          });
-
-          clipSlider.addEventListener('input', () => {
-            const state = cardState.get(card);
-            if (!state?.clipPlane || !state.clipBBox) return;
-            const pct = clipSlider.value / 100;
-            const { minY, maxY } = state.clipBBox;
-            state.clipPlane.constant = minY + pct * (maxY - minY);
-          });
-
-          crossRow.appendChild(crossBtn);
-          crossRow.appendChild(clipSlider);
-
-          // View controls — 90° rotation per axis, reset, and a switch between
-          // Orbit / Trackball / Arcball controls (issue #230). Disabled until a
-          // mesh is loaded; enabled by the same hook as the cross-section row.
-          const viewRow = document.createElement('div');
-          viewRow.className = 'view-controls-row';
-
-          // Re-anchor the cross-section clip plane after a rotation/reset
-          // changes the model's world-space Y extent.
-          function applyClipBBox(bbox) {
-            if (!bbox) return;
-            const state = cardState.get(card);
-            if (!state) return;
-            state.clipBBox = bbox;
-            if (state.clipPlane) {
-              const pct = Number(clipSlider.value) / 100;
-              state.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);
-            }
-          }
-
-          for (const axis of ['x', 'y', 'z']) {
-            const rb = document.createElement('button');
-            rb.className = 'view-btn';
-            rb.textContent = `Rotate ${axis.toUpperCase()}`;
-            rb.setAttribute('aria-label', `Rotate model 90 degrees about the ${axis.toUpperCase()} axis`);
-            rb.disabled = true;
-            rb.addEventListener('click', () => {
-              const state = cardState.get(card);
-              if (!state?.viewer) return;
-              applyClipBBox(state.viewer.rotate90(axis));
-            });
-            viewRow.appendChild(rb);
-          }
-
-          const resetBtn = document.createElement('button');
-          resetBtn.className = 'view-btn';
-          resetBtn.textContent = 'Reset';
-          resetBtn.setAttribute('aria-label', 'Reset view orientation and camera');
-          resetBtn.disabled = true;
-          resetBtn.addEventListener('click', () => {
-            const state = cardState.get(card);
-            if (!state?.viewer) return;
-            applyClipBBox(state.viewer.resetView());
-          });
-          viewRow.appendChild(resetBtn);
-
-          const modeDefs = [
-            { mode: 'orbit', label: 'Orbit' },
-            { mode: 'trackball', label: 'Trackball' },
-            { mode: 'arcball', label: 'Arcball' },
-          ];
-          const modeButtons = [];
-          for (const def of modeDefs) {
-            const b = document.createElement('button');
-            b.className = 'view-btn mode-btn';
-            b.textContent = def.label;
-            b.setAttribute('aria-label', `Use ${def.label} controls`);
-            b.setAttribute('aria-pressed', def.mode === 'orbit' ? 'true' : 'false');
-            b.disabled = true;
-            b.addEventListener('click', () => {
-              const state = cardState.get(card);
-              if (!state?.viewer) return;
-              state.viewer.setControlMode(def.mode);
-              modeButtons.forEach(mb => mb.setAttribute('aria-pressed',
-                mb === b ? 'true' : 'false'));
-            });
-            viewRow.appendChild(b);
-            modeButtons.push(b);
-          }
-
-          // In-browser parametric customizer — only present when the model
-          // ships a validated parameters manifest. Lazy-loads openscad-wasm
-          // on first click; failures degrade silently (default STL stays).
-          if (model.parameters?.parameters?.length) {
-            const customizeBtn = document.createElement('button');
-            customizeBtn.className = 'customize-btn';
-            customizeBtn.textContent = '⚙ Customize';
-            customizeBtn.setAttribute('aria-label', `Customize ${modelName} parameters`);
-            customizeBtn.setAttribute('aria-pressed', 'false');
-            crossRow.appendChild(customizeBtn);
-
-            const panel = document.createElement('div');
-            panel.className = 'customizer-panel';
-
-            const status = document.createElement('div');
-            status.className = 'customizer-status';
-            status.setAttribute('aria-live', 'polite');
-
-            const downloadLink = document.createElement('a');
-            downloadLink.className = 'customizer-download';
-            downloadLink.hidden = true;
-            downloadLink.download = model.stl.replace(/\.stl$/i, '') + '__custom.stl';
-            downloadLink.textContent = '⬇ Download customized STL';
-
-            // Re-render button + status share a row beneath the param list.
-            const actions = document.createElement('div');
-            actions.className = 'customizer-actions';
-            const rerenderBtn = document.createElement('button');
-            rerenderBtn.type = 'button';
-            rerenderBtn.className = 'rerender-btn';
-            rerenderBtn.textContent = '⟳ Re-render';
-            rerenderBtn.setAttribute('aria-label', `Re-render ${modelName} with current parameters`);
-            actions.appendChild(rerenderBtn);
-            actions.appendChild(status);
-
-            const paramRows = [];
-            const paramValues = {};
-            function markDirty(row) {
-              if (row) row.classList.add('param-row--dirty');
-              rerenderBtn.classList.add('dirty');
-            }
-            function clearDirty() {
-              for (const r of panel.querySelectorAll('.param-row--dirty')) {
-                r.classList.remove('param-row--dirty');
-              }
-              rerenderBtn.classList.remove('dirty');
-            }
-
-            for (const p of model.parameters.parameters) {
-              const row = document.createElement('div');
-              row.className = 'param-row';
-              const label = document.createElement('label');
-              label.textContent = p.label;
-              const inputId = `param-${card.dataset.slug}-${p.name}`;
-              label.htmlFor = inputId;
-              row.appendChild(label);
-              if (p.type === 'number') {
-                const input = document.createElement('input');
-                input.type = 'range';
-                input.id = inputId;
-                input.min = String(p.min);
-                input.max = String(p.max);
-                input.step = String(p.step);
-                input.value = String(p.default);
-                const display = document.createElement('span');
-                display.className = 'param-value';
-                display.textContent = String(p.default);
-                paramValues[p.name] = Number(p.default);
-                input.addEventListener('input', () => {
-                  const v = Number(input.value);
-                  paramValues[p.name] = v;
-                  display.textContent = String(v);
-                  markDirty(row);
-                });
-                row.appendChild(input);
-                row.appendChild(display);
-                paramRows.push({ p, input, display, row });
-              } else if (p.type === 'boolean') {
-                const input = document.createElement('input');
-                input.type = 'checkbox';
-                input.id = inputId;
-                input.checked = Boolean(p.default);
-                paramValues[p.name] = Boolean(p.default);
-                input.addEventListener('change', () => {
-                  paramValues[p.name] = input.checked;
-                  markDirty(row);
-                });
-                row.appendChild(input);
-                paramRows.push({ p, input, row });
-              }
-              panel.appendChild(row);
-            }
-            panel.appendChild(actions);
-            panel.appendChild(downloadLink);
-
-            let inFlight = false;
-
-            async function runRender(initialLabel = 'Rendering…') {
-              if (inFlight) return;
-              inFlight = true;
-              rerenderBtn.disabled = true;
-              const renderedParams = { ...paramValues };
-              status.classList.remove('error');
-              status.textContent = initialLabel;
-              const startMs = performance.now();
-              let url;
-              try {
-                const sources = await loadProjectSources(projectData.dir);
-                const entryName = model.source.split('/').pop();
-                const stlBytes = await renderInWorker({
-                  sources: Array.from(sources.entries()),
-                  entry: entryName,
-                  params: { ...renderedParams },
-                  projectDir: projectData.dir,
-                });
-                const blob = new Blob([stlBytes], { type: 'model/stl' });
-                url = URL.createObjectURL(blob);
-                await replaceMesh(card, url);
-                const prevHref = downloadLink.dataset.blobUrl;
-                if (prevHref) URL.revokeObjectURL(prevHref);
-                downloadLink.href = url;
-                downloadLink.dataset.blobUrl = url;
-                downloadLink.hidden = false;
-                const ms = Math.round(performance.now() - startMs);
-                status.textContent = `Rendered in ${(ms / 1000).toFixed(1)}s`;
-                const stillMatch = Object.keys(renderedParams).every(k => paramValues[k] === renderedParams[k]);
-                if (stillMatch) clearDirty();
-              } catch (err) {
-                if (url) URL.revokeObjectURL(url);
-                console.error('Customizer render failed:', err);
-                status.classList.add('error');
-                status.textContent = `Error: ${err.message || err}`;
-              } finally {
-                inFlight = false;
-                rerenderBtn.disabled = false;
-              }
-            }
-
-            rerenderBtn.addEventListener('click', () => runRender());
-
-            customizeBtn.addEventListener('click', () => {
-              const open = panel.classList.toggle('open');
-              customizeBtn.setAttribute('aria-pressed', String(open));
-              if (open) {
-                activateCard(card);
-                if (downloadLink.hidden) {
-                  runRender('Loading initial preview…');
-                }
-              }
-            });
-
-            card.appendChild(crossRow);
-            card.appendChild(panel);
-            card.appendChild(viewRow);
-          } else {
-            card.appendChild(crossRow);
-            card.appendChild(viewRow);
-          }
-
-          card.addEventListener('click', (e) => {
-            if (e.target.closest('button, a, input, .color-picker')) return;
-            window.history.replaceState(null, '', `#${section.dataset.slug}/${card.dataset.slug}`);
-          });
-
-          const standaloneUrl = `standalone/${encodeURI(model.stl.replace(/\.stl$/i, '.html'))}`;
-          const info = document.createElement('div');
-          info.className = 'card-info';
-          const h3 = document.createElement('h3');
-          h3.textContent = modelName;
-          info.appendChild(h3);
-
-          if (model.estimated_minutes) {
-            const t = document.createElement('span');
-            t.className = 'print-time';
-            t.textContent = `~${formatTime(model.estimated_minutes)}`;
-            info.appendChild(t);
-          }
-
-          const links = document.createElement('div');
-          links.className = 'card-links';
-
-          const dl = document.createElement('a');
-          dl.href = model.stl + cacheBust;
-          dl.setAttribute('download', '');
-          dl.setAttribute('aria-label', `Download STL for ${modelName}`);
-          dl.textContent = 'Download STL';
-          links.appendChild(dl);
-
-          const sa = document.createElement('a');
-          sa.href = standaloneUrl + cacheBust;
-          sa.setAttribute('aria-label', `View standalone HTML viewer for ${modelName}`);
-          sa.textContent = 'Standalone';
-          links.appendChild(sa);
-
-          if (model.source) {
-            const src = document.createElement('a');
-            src.href = publicSourceUrl(model.source);
-            src.target = '_blank';
-            src.rel = 'noopener noreferrer';
-            src.setAttribute('aria-label', `View OpenSCAD source for ${modelName} on GitHub`);
-            src.textContent = 'Source';
-            links.appendChild(src);
-          }
-
-          info.appendChild(links);
-          card.appendChild(info);
-
-          grid.appendChild(card);
-        }
-
-        section.appendChild(grid);
-        gallery.appendChild(section);
+      if (routed) {
+        lastWrittenHash = window.location.hash.slice(1);
+        return;
       }
 
-      // Pause/resume animation for off-screen initialized viewers
-      visibilityObserver = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-          const state = cardState.get(entry.target);
-          if (!state?.viewer) continue;
-          if (entry.isIntersecting) {
-            state.viewer.start();
-          } else {
-            state.viewer.stop();
-          }
+      let firstRef = null;
+      if (changedProjects && changedProjects.length) {
+        for (const name of changedProjects) {
+          const node = projectNodes.get(slugify(name));
+          if (node) setExpanded(node, true);
         }
-      });
-
-      // Lazy-load: initialize viewers as cards scroll into view
-      const initObserver = new IntersectionObserver((entries) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
-          const card = entry.target;
-          const state = cardState.get(card);
-          if (!state || state.initialized) {
-            initObserver.unobserve(card);
-            continue;
-          }
-          // Skip cards in collapsed sections (expand handler will catch them)
-          if (card.closest('.project-group')?.classList.contains('collapsed')) continue;
-          activateCard(card);
-          initObserver.unobserve(card);
+        for (const name of changedProjects) {
+          const ref = MODEL_INDEX.find(r => r.projectName === name);
+          if (ref) { firstRef = ref; break; }
         }
-      }, { rootMargin: '200px' });
-
-      // Observe all cards
-      for (const card of cardState.keys()) {
-        initObserver.observe(card);
       }
-
-      // Keyboard navigation
-      function getVisibleCards() {
-        return [...document.querySelectorAll('.project-group:not(.collapsed) .card')];
+      if (!firstRef) firstRef = MODEL_INDEX[0] || null;
+      if (firstRef) {
+        revealInTree(firstRef);
+        await setPaneModels(panes[0], [firstRef]);
       }
-
-      document.addEventListener('keydown', (e) => {
-        // Skip if typing in an input/textarea or if modifier keys are held
-        const tag = e.target.tagName;
-        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-        if (e.ctrlKey || e.altKey || e.metaKey) return;
-
-        if (e.key === 'Escape') {
-          if (document.fullscreenElement) return;
-          const maximized = document.querySelector('.card--maximized');
-          if (maximized) {
-            e.preventDefault();
-            toggleMaximize(maximized);
-            return;
-          }
-        }
-
-        const card = e.target.closest('.card');
-
-        // Arrow key navigation between cards (only when a .card itself is focused)
-        if ((e.key === 'ArrowRight' || e.key === 'ArrowDown' ||
-             e.key === 'ArrowLeft' || e.key === 'ArrowUp') &&
-            e.target.classList.contains('card')) {
-          const cards = getVisibleCards();
-          const idx = cards.indexOf(e.target);
-          if (idx === -1) return;
-          const next = (e.key === 'ArrowRight' || e.key === 'ArrowDown')
-            ? idx + 1 : idx - 1;
-          if (next >= 0 && next < cards.length) {
-            e.preventDefault();
-            cards[next].focus();
-            activateCard(cards[next]);
-          }
-          return;
-        }
-
-        // Card-level shortcuts (when focus is on a card or within a card)
-        if (card) {
-          if (e.key === 'f' || e.key === 'F') {
-            e.preventDefault();
-            activateCard(card);
-            if (document.fullscreenElement) {
-              document.exitFullscreen();
-            } else {
-              if (card.classList.contains('card--maximized')) toggleMaximize(card);
-              card.requestFullscreen();
-            }
-            return;
-          }
-          if (e.key === 'd' || e.key === 'D') {
-            e.preventDefault();
-            const dl = card.querySelector('a[download]');
-            if (dl) dl.click();
-            return;
-          }
-          if (e.key === 'c' || e.key === 'C') {
-            e.preventDefault();
-            const btn = card.querySelector('.cross-btn');
-            if (btn) btn.click();
-            return;
-          }
-          if (e.key === 'm' || e.key === 'M') {
-            if (document.fullscreenElement) return;
-            e.preventDefault();
-            activateCard(card);
-            toggleMaximize(card);
-            return;
-          }
-          if (e.key === 'r' || e.key === 'R') {
-            const btn = card.querySelector('.rerender-btn');
-            if (btn && !btn.disabled) {
-              e.preventDefault();
-              btn.click();
-            }
-            return;
-          }
-        }
-      });
-
-      // Deep-link: navigate to hash target on initial load
-      navigateToHash();
-
-      // Handle hash changes (back/forward, manual URL edit)
-      window.addEventListener('hashchange', navigateToHash);
     }
 
     init();

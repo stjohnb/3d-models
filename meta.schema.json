@@ -43,6 +43,13 @@
       },
       "description": "Bill of materials for non-printed parts."
     },
+    "printing_notes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "maxLength": 500 },
+      "minItems": 1,
+      "maxItems": 20,
+      "description": "Free-text printer/slicer guidance (layer height, seam placement, orientation, filament choice). One note per array entry."
+    },
     "relatedModels": {
       "type": "array",
       "items": { "type": "string" },
@@ -62,6 +69,10 @@
     "complex_interior": {
       "type": "boolean",
       "description": "Whether this model has significant interior cavities that a single isometric thumbnail cannot adequately convey. When true, CI renders additional orthographic views (top, bottom, front) alongside the standard isometric thumbnail."
+    },
+    "viewer_rotate_x": {
+      "type": "boolean",
+      "description": "Rotate the loaded mesh -90 degrees about X in the interactive Three.js viewer only (index.html, embed.html, standalone viewers) — never in the .scad source. Use when a model's correct print orientation is OpenSCAD Z-up (so a source-level rotate([-90, 0, 0]) would misprint it) but the viewer's Y-up camera, cross-section slider, and default framing need the model's tall/open axis to read as up on screen."
     },
     "assembly": {
       "type": "object",

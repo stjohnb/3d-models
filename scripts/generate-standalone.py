@@ -130,6 +130,27 @@ def _source_link_html(source):
     )
 
 
+def _printing_notes_html(notes) -> str:
+    """Return a <details> block of printing notes, or '' when absent/invalid.
+
+    Notes come from meta.json free text, so every value is HTML-escaped
+    (quote=True) before interpolation into the template.
+    """
+    if not isinstance(notes, list):
+        return ""
+    items = "".join(
+        f"<li>{html_mod.escape(n, quote=True)}</li>"
+        for n in notes
+        if isinstance(n, str) and n.strip()
+    )
+    if not items:
+        return ""
+    return (
+        '<details class="printing-notes"><summary>Printing notes</summary>'
+        f"<ul>{items}</ul></details>"
+    )
+
+
 def strip_stl_ext(filename: str) -> str:
     """Remove .stl extension case-insensitively."""
     if filename.lower().endswith(".stl"):
@@ -309,6 +330,25 @@ HTML_TEMPLATE = """\
     .view-btn:disabled {{ opacity: 0.4; cursor: default; }}
     .view-btn:focus-visible {{ outline: 2px solid #64b5f6; outline-offset: 2px; }}
     .view-btn[aria-pressed="true"] {{ background: rgba(100,181,246,0.3); color: #64b5f6; }}
+    .printing-notes {{
+      max-width: 900px;
+      margin: 0 auto 0.5rem;
+      padding: 0 1rem;
+      font-size: 0.85rem;
+      color: #ccc;
+      text-align: left;
+      flex-shrink: 0;
+    }}
+    .printing-notes summary {{ cursor: pointer; color: #64b5f6; }}
+    .printing-notes ul {{ margin: 0.4rem 0 0 1.1rem; }}
+    .printing-notes li {{ margin-bottom: 0.3rem; line-height: 1.4; }}
+    @media (max-width: 900px) {{
+      body {{ height: auto; min-height: 100vh; min-height: 100dvh; }}
+      #viewer {{ flex: none; height: 55vh; height: 55dvh; min-height: 240px; }}
+      canvas {{ height: 100%; }}
+      .cross-section-row {{ flex-wrap: wrap; }}
+      .view-btn, .cross-btn {{ padding: 8px 12px; font-size: 14px; min-height: 40px; }}
+    }}
   </style>
 </head>
 <body>
@@ -333,6 +373,7 @@ HTML_TEMPLATE = """\
     <button class="view-btn mode-btn" id="mode-arcball" aria-label="Use Arcball controls" aria-pressed="false">Arcball</button>
   </div>
   <button class="fullscreen-btn" id="fs-btn" aria-label="Toggle fullscreen">&#x26F6;</button>
+  {printing_notes_html}
   <footer>
     <a href="https://www.bstjohn.net/3d-models/">View all models at bstjohn.net</a>
     {source_link_html}
@@ -361,6 +402,11 @@ HTML_TEMPLATE = """\
     // Non-empty only for a coloured multi-part composite (issue #275): each
     // entry is {{ stl_b64, color }}. When empty, the single STL_BASE64 loads.
     const COMPOSITE_PARTS = {composite_parts_js};
+
+    // meta.json's viewer_rotate_x: true for print-oriented models whose STL
+    // must stay OpenSCAD Z-up for slicing but need a Z-up -> Y-up correction
+    // for this Y-up viewer's camera/cross-section framing to read correctly.
+    const VIEWER_ROTATE_X = {viewer_rotate_x_js};
 
     const FILAMENT_COLORS = {filament_colors_js};
 
@@ -435,6 +481,9 @@ HTML_TEMPLATE = """\
       // Coloured multi-part composite: each already-co-registered part STL as
       // its own mesh/material in one Group (issue #275).
       const geometries = COMPOSITE_PARTS.map(p => b64ToGeometry(p.stl_b64));
+      if (VIEWER_ROTATE_X) {{
+        for (const g of geometries) g.rotateX(-Math.PI / 2);
+      }}
       const union = new THREE.Box3();
       for (const g of geometries) {{
         g.computeBoundingBox();
@@ -470,6 +519,7 @@ HTML_TEMPLATE = """\
     }} else {{
       // Decode STL from base64
       const geometry = b64ToGeometry(STL_BASE64);
+      if (VIEWER_ROTATE_X) geometry.rotateX(-Math.PI / 2);
       geometry.computeBoundingBox();
       const clipHalfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
       clipBounds = {{ minY: -clipHalfSizeY, maxY: clipHalfSizeY }};
@@ -753,6 +803,10 @@ def main():
         stl_b64 = base64.b64encode(stl_data).decode()
 
         composite_js = build_composite_js(stl)
+        project_dir = stl_to_dir.get(stl, "")
+        meta = load_meta(project_dir)
+        viewer_rotate_x_js = "true" if meta.get("viewer_rotate_x") else "false"
+        notes_html = _printing_notes_html(meta.get("printing_notes"))
 
         html = HTML_TEMPLATE.format(
             title=html_mod.escape(name),
@@ -764,7 +818,9 @@ def main():
             stl_base64=stl_b64,
             filament_colors_js=filament_colors_js,
             composite_parts_js=composite_js,
+            viewer_rotate_x_js=viewer_rotate_x_js,
             source_link_html=_source_link_html(stl_to_source.get(stl, "")),
+            printing_notes_html=notes_html,
         )
 
         with open(out_path, "w") as f:
