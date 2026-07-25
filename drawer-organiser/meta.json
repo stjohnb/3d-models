@@ -1,0 +1,19 @@
+{
+  "description": "Gridfinity-compatible drawer organiser: interlocking baseplate tiles covering a 628 × 424 × 69 mm drawer, side filler strips for the leftover width, a 5×5 storage bin, a 10×5 bin split into two bed-sized halves, and a full-drawer assembly preview showing a fitted set of containers (a full-depth left bin, a back-spanning bin, and three front bins) that flare out at the sides to follow the drawer walls.",
+  "tags": ["organizer", "storage", "gridfinity", "drawer"],
+  "version": "1.4.0",
+  "difficulty": "intermediate",
+  "complex_interior": true,
+  "viewer_rotate_x": true,
+  "mating_pairs": [
+    ["drawer_bin_5x5.stl", "drawer_baseplate_5x5.stl"],
+    ["drawer_bin_10x5_half.stl", "drawer_baseplate_5x5.stl"]
+  ],
+  "printing_notes": [
+    "Baseplate tiles and bins all print flat on the bed with no supports.",
+    "Baseplate seams: do not press tiles together in-plane. Hold the new tile above the plane and lower it onto its neighbours so the edge tabs drop into their slots.",
+    "Back row of the drawer: use drawer_baseplate_5x5_back and drawer_baseplate_4x5_back, which omit the rear tabs so the assembled grid stays 420mm deep with a flat back edge.",
+    "Side fillers: four drawer_filler strips take up the 40mm of width slack, two per side end to end. Measure your drawer and set fill_w to (width - 588) / 2 in the customizer before printing.",
+    "Split bins: print two drawer_bin_10x5_half, rotate one 180 degrees about Z, seat both on a baseplate to align them, then glue the flat faces with CA."
+  ]
+}

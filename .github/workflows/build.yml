@@ -193,7 +193,7 @@ jobs:
       - name: Run Python unit tests for build scripts
         run: |
           cd scripts
-          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_render_cache test_capped_openscad -v
+          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_render_cache test_capped_openscad test_viewer_invariants -v
 
       - name: Install OpenSCAD and dependencies
         run: |
@@ -478,7 +478,9 @@ jobs:
           node-version: '20'
 
       - name: Smoke-test WASM customizer rendering
-        run: node scripts/test_wasm_customizer.mjs
+        run: |
+          node scripts/test_wasm_customizer.mjs
+          node scripts/test_hash_routing.mjs
 
       - name: Check mating part interference
         id: interference
@@ -744,7 +746,7 @@ jobs:
                       meta = {}
                   # Only propagate viewer-relevant fields to the manifest.
                   # license, relatedModels, and mating_pairs are intentionally excluded.
-                  for field in ('description', 'tags', 'difficulty', 'version', 'hardware', 'assembly'):
+                  for field in ('description', 'tags', 'difficulty', 'version', 'hardware', 'assembly', 'viewer_rotate_x', 'printing_notes'):
                       if field in meta:
                           entry[field] = meta[field]
               if openscad_version:
