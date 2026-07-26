@@ -1,6 +1,7 @@
 // Drawer Organiser — 4x5 baseplate tile (168 x 210mm)
 // Render this file to generate drawer_baseplate_4x5.stl
-// One of these fills the last column of the front row of the drawer floor
+// The drawer floor now uses three 5x5 tiles per row, so this tile is not part
+// of that build; it is kept as an optional part for narrower grids
 // (see layout.md).
 
 include <_drawer_organiser.scad>

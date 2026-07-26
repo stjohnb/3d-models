@@ -16,6 +16,19 @@ graph TD
   drawer_baseplate_5x5["drawer_baseplate_5x5.scad"]
   drawer_bin_10x5_half["drawer_bin_10x5_half.scad"]
   drawer_bin_5x5["drawer_bin_5x5.scad"]
+  drawer_container_back_centre["drawer_container_back_centre.scad"]
+  drawer_container_back_left["drawer_container_back_left.scad"]
+  drawer_container_back_right["drawer_container_back_right.scad"]
+  drawer_container_back["drawer_container_back.scad"]
+  drawer_container_front_4x7_back["drawer_container_front_4x7_back.scad"]
+  drawer_container_front_4x7_front["drawer_container_front_4x7_front.scad"]
+  drawer_container_front_4x7["drawer_container_front_4x7.scad"]
+  drawer_container_front_right_back["drawer_container_front_right_back.scad"]
+  drawer_container_front_right_front["drawer_container_front_right_front.scad"]
+  drawer_container_front_right["drawer_container_front_right.scad"]
+  drawer_container_left_back["drawer_container_left_back.scad"]
+  drawer_container_left_front["drawer_container_left_front.scad"]
+  drawer_container_left["drawer_container_left.scad"]
   drawer_filler["drawer_filler.scad"]
   _drawer_organiser(["_drawer_organiser.scad"])
   drawer_assembly -->|include| _drawer_organiser
@@ -25,5 +38,18 @@ graph TD
   drawer_baseplate_5x5 -->|include| _drawer_organiser
   drawer_bin_10x5_half -->|include| _drawer_organiser
   drawer_bin_5x5 -->|include| _drawer_organiser
+  drawer_container_back_centre -->|include| _drawer_organiser
+  drawer_container_back_left -->|include| _drawer_organiser
+  drawer_container_back_right -->|include| _drawer_organiser
+  drawer_container_back -->|include| _drawer_organiser
+  drawer_container_front_4x7_back -->|include| _drawer_organiser
+  drawer_container_front_4x7_front -->|include| _drawer_organiser
+  drawer_container_front_4x7 -->|include| _drawer_organiser
+  drawer_container_front_right_back -->|include| _drawer_organiser
+  drawer_container_front_right_front -->|include| _drawer_organiser
+  drawer_container_front_right -->|include| _drawer_organiser
+  drawer_container_left_back -->|include| _drawer_organiser
+  drawer_container_left_front -->|include| _drawer_organiser
+  drawer_container_left -->|include| _drawer_organiser
   drawer_filler -->|include| _drawer_organiser
 ```
