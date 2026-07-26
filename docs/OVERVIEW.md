@@ -12,6 +12,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ```
 ├── adjustable-bracket/   # Two-piece adjustable bracket with bolt slot
 ├── blast-gate/           # Inline sliding blast gate for 51mm PVC vacuum lines
+├── drawer-organiser/     # Gridfinity-compatible drawer organiser: interlocking baseplate tiles, bins, and full-drawer container layout
 ├── esp32-display-case/   # Two-part snap-fit case for the ESP32-2432S028R display board, w/ stylus holder
 ├── hex-connector/        # Single-piece hexagonal male-female connector
 ├── macbook-pro-laptop-stand/  # Parametric vertical laptop dock with swept arch frame
@@ -96,6 +97,7 @@ generated artifacts produced by CI.
 |---|---|
 | `adjustable-bracket/` | Two interlocking pieces (M5 bolt through adjustment slot), span ~125–155mm |
 | `blast-gate/` | Sliding blast gate for 51mm OD PVC vacuum lines; related to `vacuum-hose` |
+| `drawer-organiser/` | Gridfinity-compatible drawer organiser: a 15×10 grid of interlocking 5×5 baseplate tiles covering a 630×424×69mm drawer, plus storage bins, a full-drawer assembly preview, and downloadable bed-splittable container parts |
 | `esp32-display-case/` | Two-part snap-fit case for the ESP32-2432S028R ("Cheap Yellow Display") board, with an integrated snap-in stylus holder |
 | `hex-connector/` | Single-piece hex male/female connector, 30mm tall, loose press fit |
 | `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons and a slot the laptop slides into |
@@ -227,6 +229,49 @@ on clip pieces. Clips slide onto the backplate from the top and are stopped by
 a block at the rail bottom. A `dt_clearance` parameter (0.15 mm) controls
 print fit tolerance.
 
+### Bed-Splitting Pattern for Oversized Parts (nz-ski-fields, drawer-organiser)
+
+When a printable part's footprint exceeds a target print bed, the module that
+builds it takes a `split_parts`/`part_index`-style pair of parameters and
+returns one re-centred slice via `intersection()` with a keep-box, rather than
+shipping the oversized geometry as-is. `drawer-organiser` is the fullest
+example: `bin_part()` splits a bin into equal pieces at cell boundaries (`gx`
+must be evenly divisible by `parts`), while `container_part()` splits a
+container using `floor(i*n/parts)`, so an odd cell count splits unevenly at a
+real boundary instead of through the middle of a base pad; both run the outer
+bound of the first/last slice well past the nominal edge to avoid a coincident
+CGAL face at an unflared wall. The default STL for each renderable is the
+whole, unsplit part (`split_parts = 1`); printing an oversized one means
+opening the in-browser customizer, setting `split_parts`, rendering each
+`part_index` in turn, and gluing the flat faces (CA glue) with the baseplate
+itself used as the alignment jig, since the mating pads/sockets hold the
+pieces in register. Full detail, including the print/glue instructions per
+part, lives in [model-projects.md](model-projects.md#drawer-organiser) and
+`drawer-organiser/layout.md`.
+
+### Interlocking Tile Seams (drawer-organiser)
+
+Baseplate tiles that must butt together into a larger continuous floor use a
+genderless barbed-tab seam: every tile carries tabs on its +X/+Y edges and the
+matching notches on -X/-Y, so any tile mates with any other tile of the same
+edge length — no separate male/female variants to track. Tabs sit at the
+**centre of each cell** along an edge, not on the cell-junction corners; an
+earlier version (issue #309) put them on the junctions because that looked
+like the thickest run of material, but that material is only a thin rib and
+also the sole thing joining the tile's perimeter rail to its body, so a notch
+sized to hold the tab severed the rail and printed tiles fell apart. At a cell
+centre the rail is backed by material running the full edge length, so a notch
+there only removes a slot without detaching anything. The barb's shoulder is
+perpendicular to the seam (not a dovetail or round jigsaw head, which either
+cam out under load or leave almost no undercut in the ~2mm of available rail
+depth), which also means tiles cannot be pressed together in-plane — a new
+tile must be lowered vertically onto its already-placed neighbours so its tabs
+drop straight into their slots. Clearance is applied to the tab/notch
+**features only**, never to the tile's outer outline, because shrinking the
+outline would drift the 42mm Gridfinity pitch across every seam past the
+0.25mm pad-to-socket clearance and stop a seam-spanning bin from seating. Full
+derivation and measured tolerances in `drawer-organiser/layout.md`.
+
 ### Parametric Design Convention
 
 All dimensions are declared as named variables at the top of each file with
@@ -281,6 +326,11 @@ degradation is automatic.
 
 Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
 `blast-gate` (`gate_body`, `gate_blade`),
+`drawer-organiser` (`drawer_baseplate_5x5`, `drawer_baseplate_5x5_back`,
+`drawer_baseplate_4x5`, `drawer_baseplate_4x5_back`, `drawer_bin_5x5`,
+`drawer_bin_10x5_half`, `drawer_filler`, `drawer_container_left`,
+`drawer_container_back`, `drawer_container_front_4x7`,
+`drawer_container_front_right`),
 `esp32-display-case` (`case_back`, `case_front`), `hex-connector` (`hex_connector`),
 `macbook-pro-laptop-stand` (`laptop_stand`),
 `nz-ski-fields` (`lake`, `terrain`, `snow`),

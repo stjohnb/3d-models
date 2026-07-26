@@ -6,7 +6,8 @@
 // Included by the renderable files in this directory.
 //
 // Drawer this was sized for (see layout.md):
-//   628mm wide at the bottom, flaring to 665mm at the top
+//   630mm wide at the bottom (measured 628; three 210mm tiles were confirmed
+//     to fit — issue #315), flaring to 665mm at the top
 //   424mm deep, 69mm tall
 //
 // All rounded rectangles in this project share the same corner-arc *centres*;
@@ -208,7 +209,8 @@ module tile_outline_2d(gx, gy, rear_tabs = true) {
 // protruding tabs; on the -X side, where the baseplate presents notches of its
 // own, the two notched edges simply butt. Doing it this way makes the strip
 // symmetric — there is no way to fit it back to front — and keeps the assembled
-// width exactly 588 + 2*w, with nothing protruding towards the drawer wall.
+// width exactly the grid width + 2*w, with nothing protruding towards the
+// drawer wall.
 // A tab on the outer edge would add its 1.8mm to the overall width.
 module filler_outline_2d(gy, w) {
     hx = w / 2;
@@ -298,9 +300,9 @@ module baseplate(gx, gy, interlock = false, rear_tabs = true) {
 }
 
 // A side filler strip, w wide by gy cells long, the same thickness as a
-// baseplate tile so the drawer floor finishes flush. The 14 x 10 grid covers
-// 588 x 420mm of a 628 x 424mm drawer floor, so a pair of these takes up the
-// 40mm of width slack and stops the assembled baseplate sliding about
+// baseplate tile so the drawer floor finishes flush. The 15 x 10 grid covers
+// 630 x 420mm of this drawer's floor edge to edge, so these strips are
+// OPTIONAL — they only apply to a narrower grid or a wider drawer
 // (see layout.md).
 //
 // w must stay above 8mm: the outline is an r=4 rounded rectangle, and below
@@ -313,7 +315,7 @@ module filler(gy, w) {
 // === Flared display container (assembly preview only) ===
 // A Gridfinity-footed tub used by drawer_assembly.scad to show the drawer
 // filled. Unlike bin(), a container can flare one or more of its outer walls
-// OUTWARD with height, to follow the drawer's sides — the drawer is 628mm wide
+// OUTWARD with height, to follow the drawer's sides — the drawer is 630mm wide
 // at the floor but flares to 665mm at the top over its 69mm height, so a
 // container standing against a side wall can lean out and reclaim that volume.
 //
@@ -370,7 +372,7 @@ module container(gx, gy, z_units, wall_t, floor_t,
             container_shell(ox, oy, pad_r_top, pad_height, H,
                             fnx, fpx, fny, fpy, pad_height, H);
         }
-        container_shell(ox - wall_t, oy - wall_t, pad_r_top - wall_t,
+        container_shell(ox, oy, pad_r_top - wall_t,
                         floor_z, H + eps, fnx, fpx, fny, fpy, pad_height, H);
     }
 }
@@ -444,4 +446,96 @@ module bin_part(gx, gy, z_units, wall_t, floor_t, lip, parts, index) {
         translate([cx, 0, H / 2])
             cube([pw, gy * cell_pitch + 20, H + 20], center = true);
     }
+}
+
+// === Drawer geometry (see layout.md) ===
+// The drawer the organiser is sized for. Kept here rather than in
+// drawer_assembly.scad so the assembly preview and the individual container
+// files derive the same flare from one source.
+drawer_bottom_w = 630;   // effective drawer width at the floor (mm)
+drawer_top_w    = 665;   // drawer width at the top (mm)
+drawer_height   = 69;    // floor to top (mm)
+drawer_grid_x   = 15;    // baseplate cells across the drawer floor
+drawer_grid_y   = 10;    // baseplate cells deep
+container_wall_clear = 1.5;   // gap kept between a flared rim and the drawer wall (mm)
+
+// Half-width of the drawer at height z.
+function drawer_half_w(z) =
+    drawer_bottom_w / 2 + (drawer_top_w - drawer_bottom_w) / 2 * z / drawer_height;
+
+// Outward top offset for a container standing against a drawer side wall. The
+// 15 x 10 grid fills the floor edge to edge, so the outer face already sits at
+// drawer_grid_x*cell_pitch/2 - 4 + pad_r_top = 314.75mm from centre, only
+// 0.25mm inside the drawer wall's position at the floor; all the reclaimable
+// volume is higher up. The wall is aimed straight at the drawer wall's
+// position at the container's rim and stopped container_wall_clear short of
+// it.
+// At z_units = 8 this is 12.9529mm (14.2 degrees from vertical).
+function side_flare(z_units) =
+    drawer_half_w(z_units * height_unit) - container_wall_clear
+    - (drawer_grid_x * cell_pitch / 2 - 4 + pad_r_top);
+
+// One slice of a container, cells [c0, c1) along the split axis (X, or Y when
+// split_y), re-centred on the origin for printing. Used directly by the
+// per-piece drawer_container_* files, whose slice boundaries are deliberately
+// offset from the 5x5 baseplate tile seams underneath the container so a
+// solid piece straddles each grid join and the cut faces meet mid-tile
+// (issue #322) — except the left container, whose 10-cell depth only splits
+// into two <=5-cell pieces, which lands back on the seam itself.
+// Glue as for bin_part: seat the pieces on a baseplate first — the pads and
+// sockets are the alignment jig — then CA the flat faces.
+module container_slice(gx, gy, z_units, wall_t, floor_t,
+                       fnx = 0, fpx = 0, fny = 0, fpy = 0,
+                       split_y = false, c0 = 0, c1 = undef) {
+    n  = split_y ? gy : gx;
+    b1 = is_undef(c1) ? n : c1;
+    assert(c0 >= 0 && b1 <= n && b1 > c0,
+           "container_slice: need 0 <= c0 < c1 <= split-axis cell count");
+    if (c0 == 0 && b1 == n) {
+        container(gx, gy, z_units, wall_t, floor_t, fnx, fpx, fny, fpy);
+    } else {
+        L    = n * cell_pitch;
+        big  = 500;
+        lo   = -L / 2 + c0 * cell_pitch;
+        hi   = -L / 2 + b1 * cell_pitch;
+        // The first and last slices are cut on ONE side only. An unflared outer
+        // wall lands exactly on the nominal footprint (ox + pad_r_top =
+        // gx*cell_pitch/2), so a keep-box ending there would leave a coincident
+        // face for CGAL to trip over; a flared wall reaches past it and would be
+        // shaved off. Both are avoided by running the outer bound well clear.
+        klo  = (c0 == 0) ? lo - big : lo;
+        khi  = (b1 == n) ? hi + big : hi;
+        kmid = (klo + khi) / 2;
+        kw   = khi - klo;
+        mid  = (lo + hi) / 2;              // nominal piece centre, for re-centring
+        H    = z_units * height_unit;
+        other = (split_y ? gx : gy) * cell_pitch + 2 * big;
+
+        translate(split_y ? [0, -mid, 0] : [-mid, 0, 0])
+        intersection() {
+            container(gx, gy, z_units, wall_t, floor_t, fnx, fpx, fny, fpy);
+            translate(split_y ? [0, kmid, H / 2] : [kmid, 0, H / 2])
+                cube(split_y ? [other, kw, H + 20] : [kw, other, H + 20],
+                     center = true);
+        }
+    }
+}
+
+// One piece of a container too large for the print bed. The container is split
+// along X (split_y = false) or Y (split_y = true) into `parts` slices at cell
+// boundaries and piece `index` is returned, re-centred on the origin for
+// printing. Boundaries use floor(i*n/parts), so an odd cell count splits
+// unevenly at a real boundary (7 rows into 2 -> 3 + 4) rather than cutting
+// through the middle of a base pad. parts = 1 returns the whole container.
+module container_part(gx, gy, z_units, wall_t, floor_t,
+                      fnx = 0, fpx = 0, fny = 0, fpy = 0,
+                      split_y = false, parts = 1, index = 0) {
+    assert(parts >= 1, "container_part: parts must be at least 1");
+    assert(index >= 0 && index < parts, "container_part: index out of range");
+    n = split_y ? gy : gx;
+    assert(parts <= n, "container_part: parts must not exceed the split-axis cell count");
+    container_slice(gx, gy, z_units, wall_t, floor_t, fnx, fpx, fny, fpy,
+                    split_y = split_y,
+                    c0 = floor(index * n / parts),
+                    c1 = floor((index + 1) * n / parts));
 }

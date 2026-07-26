@@ -1,6 +1,6 @@
 // Drawer Organiser — 5x5 baseplate tile (210 x 210mm)
 // Render this file to generate drawer_baseplate_5x5.stl
-// Two of these plus one 4x5 tile make the front row of the drawer floor;
+// Three of these make the front row of the drawer floor;
 // the back row uses the _back variants (see layout.md).
 
 include <_drawer_organiser.scad>

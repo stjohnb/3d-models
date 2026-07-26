@@ -313,6 +313,22 @@ QR images use the site's dark theme colors (`foreground: #E0E0E0`, `background:
 The `qr` field in `models.json` is only present when the QR file exists,
 so the button degrades gracefully.
 
+### Mobile Responsive Layout
+
+Below a 900px viewport width, the app shell switches from "fill exactly one
+viewport, no scrolling" to a normally-scrolling page: the sidebar becomes a
+fixed off-canvas drawer (toggled by a `#sidebar-toggle` button and a
+`body.sidebar-open` class) instead of a permanent column, pane canvases take a
+fixed `55vh`/`55dvh` slice of the viewport instead of flexing to fill
+remaining space, and the rest of a pane's chrome (chips, colour picker,
+cross-section controls, view buttons, description, printing notes) flows
+below the canvas rather than being clipped. Fullscreen mode overrides the
+fixed canvas height back to `flex: 1` so a phone in fullscreen still gets the
+full screen. `scripts/generate-standalone.py` applies the same fixed-height
+media query to standalone viewers. This replaced an earlier fixed-height,
+non-scrolling shell where a phone-width pane's chrome could exceed one
+viewport height and get silently clipped with no way to scroll (issue #307).
+
 ### Touch Gesture Hints (Mobile)
 
 On the first touch interaction on a mobile device, a semi-transparent overlay

@@ -55,6 +55,56 @@ at `z = ±slot_h/2` spanning the full body depth in X. Socket stubs extend at
 - `catch_notch_depth = 0.8`, `catch_notch_width = 3.0` — small recesses cut into inner Y-walls at the fully-closed blade position; keeps ≥1 mm of wall remaining (`y_rail = 2mm` per side)
 - `catch_bump_h = catch_notch_depth - 0.1` — matching protrusions on the blade leading edge; 0.1 mm clearance at the notch far wall so the blade snaps in and resists vibration-driven opening
 
+### drawer-organiser/
+
+Gridfinity-compatible drawer organiser sized for a 630×424×69mm drawer
+(effective floor width; see `layout.md`'s note on the original 628mm
+measurement). The floor is a 15×10 grid (630×420mm, 42mm cell pitch) tiled as
+3 columns × 2 rows of 5×5 tiles, plus bins, a full-drawer assembly preview,
+and a printable, bed-splittable STL for every container in that preview.
+`complex_interior: true` (extra orthographic views) and `viewer_rotate_x:
+true` (viewer-only Z-up→Y-up rotation, since the STLs must stay Z-up for
+correct slicing) are both set in `meta.json`. Full geometry derivation,
+measured tolerances, print/glue order, and the print list live in
+[`drawer-organiser/layout.md`](../drawer-organiser/layout.md) — this section
+is a summary.
+
+| File | Role |
+|------|------|
+| `_drawer_organiser.scad` | Shared library — all parameters (Gridfinity profile constants, seam geometry, drawer dimensions) and modules (`rrect`, `cell_grid`, `bin_base_pad`, `plate_socket`, `baseplate`, `bin`, `bin_part`, `container`, `container_shell`, `container_part`, `side_flare`); no top-level geometry |
+| `drawer_baseplate_5x5.scad` / `drawer_baseplate_5x5_back.scad` | Renderable — 5×5 (210×210mm) baseplate tile; `_back` omits the +Y tabs so the rear row's outer edge stays flat against the drawer wall (×3 each for the 15×10 floor) |
+| `drawer_baseplate_4x5.scad` / `drawer_baseplate_4x5_back.scad` | Renderable — 4×5 (168×210mm) tile; not part of the canonical 15×10 floor (superseded by the all-5×5 layout in issue #315) but kept as optional parts for narrower drawers |
+| `drawer_bin_5x5.scad` | Renderable — 5×5×8-unit (210×210×56mm) storage bin, the largest that fits an A1's 250mm bed |
+| `drawer_bin_10x5_half.scad` | Renderable — half of a 10×5 (420×210×56mm) bin, via `bin_part()`; each half is 209.75×209.5mm; the two halves are the *same part* (X/Y symmetric) — print two, rotate one 180° about Z, glue |
+| `drawer_filler.scad` | Renderable — 19.5×210×4.65mm edge-filler strip (optional; the 15×10 grid has no width slack for a 630mm drawer, so this is for wider drawers via the customizer's `fill_w`) |
+| `drawer_container_left.scad` | Renderable — the assembly's 3×10-cell left container, split in two along Y via `container_part()` (mirror-image halves, not interchangeable) |
+| `drawer_container_back.scad` | Renderable — the assembly's 12×3-cell back container, split in three along X |
+| `drawer_container_front_4x7.scad` | Renderable — 4×7-cell unflared front tub; printed twice (front-left and front-centre positions are the identical part), split in two along Y |
+| `drawer_container_front_right.scad` | Renderable — 4×7-cell front-right container (flared on its outer/+X wall), split in two along Y |
+| `drawer_assembly.scad` | Renderable — full-drawer preview: the whole 15×10 baseplate floor plus five seated, coloured containers (three of which flare outward to follow the drawer's 628→665mm taper); a **viewing aid, not a printable part** — not tiled for the print bed; renders at `$fn = 32` like `nz-ski-fields/assembly.scad` |
+| `<basename>.parameters.json` | In-browser customizer manifests for every renderable above |
+| `meta.json` | Project metadata: `complex_interior`, `viewer_rotate_x`, `mating_pairs` (bin↔baseplate pairs), extensive `printing_notes` (seam assembly, split/glue instructions per part) |
+| `dependency-graph.md` | Auto-generated `include` dependency graph — every renderable includes `_drawer_organiser.scad` |
+| `layout.md` | Full design reference: grid arithmetic, Gridfinity profile constants, interlocking-seam derivation and history (issues #304/#305/#309/#310), edge fillers, container layout and flare math, bed-splitting tables, print list |
+
+**Key parameters** (all in `_drawer_organiser.scad`): `cell_pitch = 42`
+(Gridfinity pitch); Gridfinity profile constants for the bin base pad and
+baseplate socket rings (four-ring hull stacks per cell, see "Beveled
+Transitions" convention below); `plate_height = 4.65`, `height_unit = 7`;
+seam constants `seam_tab_neck_w = 1.6`, `seam_tab_neck_len = 0.6`,
+`seam_tab_head_w = 3.6`, `seam_tab_depth = 2.0`, `seam_tab_root`,
+`seam_tab_fillet`, `seam_clearance = 0.4` (barbed-tab profile, see
+[OVERVIEW.md](OVERVIEW.md#interlocking-tile-seams-drawer-organiser)); drawer
+constants `drawer_bottom_w = 630`, `drawer_top_w = 665`, `drawer_height = 69`,
+`drawer_grid_x = 15`, `drawer_grid_y = 10`, `container_wall_clear = 1.5`.
+
+**Bed-splitting**: see
+[OVERVIEW.md](OVERVIEW.md#bed-splitting-pattern-for-oversized-parts-nz-ski-fields-drawer-organiser)
+for the general pattern shared with `nz-ski-fields`. `bin_part()` splits a bin
+along one axis at cell boundaries; `container_part()` does the same for the
+five assembly-preview containers, all of which exceed a 250mm print bed
+(126×420mm to 504×126mm assembled).
+
 ### esp32-display-case/
 
 Two-part snap-fit enclosure for the ESP32-2432S028R 2.8" 240×320 resistive-touch
