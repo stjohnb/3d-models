@@ -1,6 +1,0 @@
-{
-  "parameters": [
-    { "name": "z_units", "label": "Height units (7mm each)", "type": "number", "min": 2, "max": 9, "step": 1, "default": 8 },
-    { "name": "wall_t", "label": "Wall thickness (mm)", "type": "number", "min": 1.2, "max": 3.0, "step": 0.2, "default": 1.6 }
-  ]
-}

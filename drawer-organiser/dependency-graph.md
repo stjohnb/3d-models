@@ -16,16 +16,16 @@ graph TD
   drawer_baseplate_5x5["drawer_baseplate_5x5.scad"]
   drawer_bin_10x5_half["drawer_bin_10x5_half.scad"]
   drawer_bin_5x5["drawer_bin_5x5.scad"]
-  drawer_container_back_centre["drawer_container_back_centre.scad"]
-  drawer_container_back_left["drawer_container_back_left.scad"]
-  drawer_container_back_right["drawer_container_back_right.scad"]
-  drawer_container_back["drawer_container_back.scad"]
-  drawer_container_front_4x7_back["drawer_container_front_4x7_back.scad"]
-  drawer_container_front_4x7_front["drawer_container_front_4x7_front.scad"]
-  drawer_container_front_4x7["drawer_container_front_4x7.scad"]
-  drawer_container_front_right_back["drawer_container_front_right_back.scad"]
-  drawer_container_front_right_front["drawer_container_front_right_front.scad"]
-  drawer_container_front_right["drawer_container_front_right.scad"]
+  drawer_container_back_4x6_half["drawer_container_back_4x6_half.scad"]
+  drawer_container_back_4x6_right_back["drawer_container_back_4x6_right_back.scad"]
+  drawer_container_back_4x6_right_front["drawer_container_back_4x6_right_front.scad"]
+  drawer_container_back_4x6_right["drawer_container_back_4x6_right.scad"]
+  drawer_container_back_4x6["drawer_container_back_4x6.scad"]
+  drawer_container_front_1x1["drawer_container_front_1x1.scad"]
+  drawer_container_front_1x3["drawer_container_front_1x3.scad"]
+  drawer_container_front_3x4["drawer_container_front_3x4.scad"]
+  drawer_container_front_8x4_half["drawer_container_front_8x4_half.scad"]
+  drawer_container_front_8x4["drawer_container_front_8x4.scad"]
   drawer_container_left_back["drawer_container_left_back.scad"]
   drawer_container_left_front["drawer_container_left_front.scad"]
   drawer_container_left["drawer_container_left.scad"]
@@ -38,16 +38,16 @@ graph TD
   drawer_baseplate_5x5 -->|include| _drawer_organiser
   drawer_bin_10x5_half -->|include| _drawer_organiser
   drawer_bin_5x5 -->|include| _drawer_organiser
-  drawer_container_back_centre -->|include| _drawer_organiser
-  drawer_container_back_left -->|include| _drawer_organiser
-  drawer_container_back_right -->|include| _drawer_organiser
-  drawer_container_back -->|include| _drawer_organiser
-  drawer_container_front_4x7_back -->|include| _drawer_organiser
-  drawer_container_front_4x7_front -->|include| _drawer_organiser
-  drawer_container_front_4x7 -->|include| _drawer_organiser
-  drawer_container_front_right_back -->|include| _drawer_organiser
-  drawer_container_front_right_front -->|include| _drawer_organiser
-  drawer_container_front_right -->|include| _drawer_organiser
+  drawer_container_back_4x6_half -->|include| _drawer_organiser
+  drawer_container_back_4x6_right_back -->|include| _drawer_organiser
+  drawer_container_back_4x6_right_front -->|include| _drawer_organiser
+  drawer_container_back_4x6_right -->|include| _drawer_organiser
+  drawer_container_back_4x6 -->|include| _drawer_organiser
+  drawer_container_front_1x1 -->|include| _drawer_organiser
+  drawer_container_front_1x3 -->|include| _drawer_organiser
+  drawer_container_front_3x4 -->|include| _drawer_organiser
+  drawer_container_front_8x4_half -->|include| _drawer_organiser
+  drawer_container_front_8x4 -->|include| _drawer_organiser
   drawer_container_left_back -->|include| _drawer_organiser
   drawer_container_left_front -->|include| _drawer_organiser
   drawer_container_left -->|include| _drawer_organiser

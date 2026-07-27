@@ -7,7 +7,7 @@
 //
 // Drawer this was sized for (see layout.md):
 //   630mm wide at the bottom (measured 628; three 210mm tiles were confirmed
-//     to fit — issue #315), flaring to 665mm at the top
+//     to fit — issue #315), flaring to 670mm at the top (measured 669-670 — issue #326)
 //   424mm deep, 69mm tall
 //
 // All rounded rectangles in this project share the same corner-arc *centres*;
@@ -316,7 +316,7 @@ module filler(gy, w) {
 // A Gridfinity-footed tub used by drawer_assembly.scad to show the drawer
 // filled. Unlike bin(), a container can flare one or more of its outer walls
 // OUTWARD with height, to follow the drawer's sides — the drawer is 630mm wide
-// at the floor but flares to 665mm at the top over its 69mm height, so a
+// at the floor but flares to 670mm at the top over its 69mm height, so a
 // container standing against a side wall can lean out and reclaim that volume.
 //
 // Pass the outward top offset in mm for each side in fnx/fpx/fny/fpy (negative-X,
@@ -354,15 +354,15 @@ module container_shell(bx, by, r, z0, z1, fnx, fpx, fny, fpy, ref0, ref1) {
     }
 }
 
-// A display container of gx by gy cells, z_units tall, with per-side outward
+// A display container of gx by gy cells, h mm tall, with per-side outward
 // flare. Both shells flare against the same pad_height..H reference span, so a
 // flared face keeps a constant wall_t of material between cavity and outside
 // (measured horizontally) instead of thickening towards the floor. The cavity
 // runs from floor_z (pad_height + floor_t) out through the top face, leaving an
 // open tub.
-module container(gx, gy, z_units, wall_t, floor_t,
+module container(gx, gy, h, wall_t, floor_t,
                  fnx = 0, fpx = 0, fny = 0, fpy = 0) {
-    H  = z_units * height_unit;
+    H  = h;
     ox = gx * cell_pitch / 2 - 4;
     oy = gy * cell_pitch / 2 - 4;
     floor_z = pad_height + floor_t;
@@ -453,7 +453,7 @@ module bin_part(gx, gy, z_units, wall_t, floor_t, lip, parts, index) {
 // drawer_assembly.scad so the assembly preview and the individual container
 // files derive the same flare from one source.
 drawer_bottom_w = 630;   // effective drawer width at the floor (mm)
-drawer_top_w    = 665;   // drawer width at the top (mm)
+drawer_top_w    = 670;   // drawer width at the top (mm) — measured 669-670, issue #326; 670 so the flare reaches the far end of the range, container_wall_clear covers the rest
 drawer_height   = 69;    // floor to top (mm)
 drawer_grid_x   = 15;    // baseplate cells across the drawer floor
 drawer_grid_y   = 10;    // baseplate cells deep
@@ -470,9 +470,14 @@ function drawer_half_w(z) =
 // volume is higher up. The wall is aimed straight at the drawer wall's
 // position at the container's rim and stopped container_wall_clear short of
 // it.
-// At z_units = 8 this is 12.9529mm (14.2 degrees from vertical).
-function side_flare(z_units) =
-    drawer_half_w(z_units * height_unit) - container_wall_clear
+// h is the container's overall height in mm — its rim height above the
+// drawer floor, since a seated pad rests on the floor through the socket. At
+// the full drawer height (h = 69) this is 18.75mm, a 16.3-degree lean from
+// vertical. The drawer's real walls curve away faster than the straight
+// taper near the floor (issue #326), so a straight flared wall aimed at the
+// top edge cannot touch them mid-height.
+function side_flare(h) =
+    drawer_half_w(h) - container_wall_clear
     - (drawer_grid_x * cell_pitch / 2 - 4 + pad_r_top);
 
 // One slice of a container, cells [c0, c1) along the split axis (X, or Y when
@@ -484,7 +489,7 @@ function side_flare(z_units) =
 // into two <=5-cell pieces, which lands back on the seam itself.
 // Glue as for bin_part: seat the pieces on a baseplate first — the pads and
 // sockets are the alignment jig — then CA the flat faces.
-module container_slice(gx, gy, z_units, wall_t, floor_t,
+module container_slice(gx, gy, h, wall_t, floor_t,
                        fnx = 0, fpx = 0, fny = 0, fpy = 0,
                        split_y = false, c0 = 0, c1 = undef) {
     n  = split_y ? gy : gx;
@@ -492,7 +497,7 @@ module container_slice(gx, gy, z_units, wall_t, floor_t,
     assert(c0 >= 0 && b1 <= n && b1 > c0,
            "container_slice: need 0 <= c0 < c1 <= split-axis cell count");
     if (c0 == 0 && b1 == n) {
-        container(gx, gy, z_units, wall_t, floor_t, fnx, fpx, fny, fpy);
+        container(gx, gy, h, wall_t, floor_t, fnx, fpx, fny, fpy);
     } else {
         L    = n * cell_pitch;
         big  = 500;
@@ -508,12 +513,12 @@ module container_slice(gx, gy, z_units, wall_t, floor_t,
         kmid = (klo + khi) / 2;
         kw   = khi - klo;
         mid  = (lo + hi) / 2;              // nominal piece centre, for re-centring
-        H    = z_units * height_unit;
+        H    = h;
         other = (split_y ? gx : gy) * cell_pitch + 2 * big;
 
         translate(split_y ? [0, -mid, 0] : [-mid, 0, 0])
         intersection() {
-            container(gx, gy, z_units, wall_t, floor_t, fnx, fpx, fny, fpy);
+            container(gx, gy, h, wall_t, floor_t, fnx, fpx, fny, fpy);
             translate(split_y ? [0, kmid, H / 2] : [kmid, 0, H / 2])
                 cube(split_y ? [other, kw, H + 20] : [kw, other, H + 20],
                      center = true);
@@ -527,14 +532,14 @@ module container_slice(gx, gy, z_units, wall_t, floor_t,
 // printing. Boundaries use floor(i*n/parts), so an odd cell count splits
 // unevenly at a real boundary (7 rows into 2 -> 3 + 4) rather than cutting
 // through the middle of a base pad. parts = 1 returns the whole container.
-module container_part(gx, gy, z_units, wall_t, floor_t,
+module container_part(gx, gy, h, wall_t, floor_t,
                       fnx = 0, fpx = 0, fny = 0, fpy = 0,
                       split_y = false, parts = 1, index = 0) {
     assert(parts >= 1, "container_part: parts must be at least 1");
     assert(index >= 0 && index < parts, "container_part: index out of range");
     n = split_y ? gy : gx;
     assert(parts <= n, "container_part: parts must not exceed the split-axis cell count");
-    container_slice(gx, gy, z_units, wall_t, floor_t, fnx, fpx, fny, fpy,
+    container_slice(gx, gy, h, wall_t, floor_t, fnx, fpx, fny, fpy,
                     split_y = split_y,
                     c0 = floor(index * n / parts),
                     c1 = floor((index + 1) * n / parts));
