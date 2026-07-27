@@ -240,13 +240,30 @@ must be evenly divisible by `parts`), while `container_part()` splits a
 container using `floor(i*n/parts)`, so an odd cell count splits unevenly at a
 real boundary instead of through the middle of a base pad; both run the outer
 bound of the first/last slice well past the nominal edge to avoid a coincident
-CGAL face at an unflared wall. The default STL for each renderable is the
-whole, unsplit part (`split_parts = 1`); printing an oversized one means
-opening the in-browser customizer, setting `split_parts`, rendering each
-`part_index` in turn, and gluing the flat faces (CA glue) with the baseplate
+CGAL face at an unflared wall. Every whole-container renderable keeps
+`split_parts`/`part_index` in its customizer manifest for arbitrary bed sizes,
+and its default STL download is still the whole, unsplit shape.
+
+For the container sizes that actually exceed the A1's 250mm bed, though, the
+project ships **dedicated piece renderables** (e.g.
+`drawer_container_left_front.scad` / `_back.scad`) rather than relying on
+end users to run the customizer. These call the lower-level
+`container_slice(gx, gy, h, wall_t, floor_t, ..., c0, c1)` — added in issue
+#319 by factoring it out of `container_part()`, which now just computes
+`floor(i*n/parts)` boundaries and delegates to it — with an explicit cell
+range instead of an even split. The boundaries are hand-picked to land
+**offset from the baseplate tile seams underneath**, so a solid piece
+straddles every grid join (stiffening the assembled floor) and the cut faces
+of adjacent pieces meet over the middle of a single tile, keeping them flush
+even unglued (issue #322); the left container is the sole exception, since
+its 10-cell depth only yields two ≤5-cell pieces by cutting at the seam
+itself, and two pieces were preferred over introducing a third cut. Printing
+an oversized container means printing these named piece files directly (no
+customizer needed) and gluing the cut faces (CA glue) with the baseplate
 itself used as the alignment jig, since the mating pads/sockets hold the
 pieces in register. Full detail, including the print/glue instructions per
-part, lives in [model-projects.md](model-projects.md#drawer-organiser) and
+part and the seam-offset cell tables, lives in
+[model-projects.md](model-projects.md#drawer-organiser) and
 `drawer-organiser/layout.md`.
 
 ### Interlocking Tile Seams (drawer-organiser)
@@ -329,8 +346,9 @@ Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
 `drawer-organiser` (`drawer_baseplate_5x5`, `drawer_baseplate_5x5_back`,
 `drawer_baseplate_4x5`, `drawer_baseplate_4x5_back`, `drawer_bin_5x5`,
 `drawer_bin_10x5_half`, `drawer_filler`, `drawer_container_left`,
-`drawer_container_back`, `drawer_container_front_4x7`,
-`drawer_container_front_right`),
+`drawer_container_back_4x6`, `drawer_container_back_4x6_right`,
+`drawer_container_front_8x4`, `drawer_container_front_3x4`,
+`drawer_container_front_1x3`, `drawer_container_front_1x1`),
 `esp32-display-case` (`case_back`, `case_front`), `hex-connector` (`hex_connector`),
 `macbook-pro-laptop-stand` (`laptop_stand`),
 `nz-ski-fields` (`lake`, `terrain`, `snow`),

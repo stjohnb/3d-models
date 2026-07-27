@@ -5,7 +5,7 @@
 | Dimension | Value |
 |---|---|
 | Width at the bottom | 628 mm |
-| Width at the top | 665 mm (the sides flare outward) |
+| Width at the top | 669–670 mm (the sides flare outward; remeasured in issue #326 — an earlier 665 mm reading was low). The model uses 670 mm. |
 | Depth | 424 mm |
 | Height (bottom to top) | 69 mm |
 
@@ -14,7 +14,7 @@ Three 210 mm tiles (630 mm) were confirmed to fit the drawer floor in issue
 figure above was a conservative measurement.
 
 The organiser is sized against the **bottom** width, because the baseplate sits
-on the drawer floor. The flare to 665 mm at the top only adds clearance above
+on the drawer floor. The flare to ~670 mm at the top only adds clearance above
 the plate, so it does not constrain anything.
 
 ## Grid
@@ -172,47 +172,70 @@ tiled for the print bed — but each container is now also available
 individually as a printable part (see "Printing the containers" below). The
 containers remain plain tapered tubs with no stacking lip.
 
+The containers are **69 mm tall, the full drawer height** (issue #326); unlike
+the bins they have no stacking lip and are not Gridfinity-stackable, so their
+height is not quantized to the 7 mm unit.
+
 Looking down, with −Y as the drawer front and +Y the back, the 15 × 10 grid is
-divided into five containers:
+divided into eight containers (the layout sketched in issue #324):
 
 | Container | Cells | Grid region | Flare | Source file |
 |---|---|---|---|---|
 | Left | 3 × 10 | cols 1–3, full depth | outer wall out to −X | `drawer_container_left` |
-| Back | 12 × 3 | cols 4–15, back 3 rows | outer end out to +X | `drawer_container_back` |
-| Front-left | 4 × 7 | cols 4–7, front 7 rows | — | `drawer_container_front_4x7` (×2) |
-| Front-centre | 4 × 7 | cols 8–11, front 7 rows | — | `drawer_container_front_4x7` (×2) |
-| Front-right | 4 × 7 | cols 12–15, front 7 rows | outer wall out to +X | `drawer_container_front_right` |
+| Back-left | 4 × 6 | cols 4–7, rows 5–10 | — | `drawer_container_back_4x6` (×2) |
+| Back-centre | 4 × 6 | cols 8–11, rows 5–10 | — | `drawer_container_back_4x6` (×2) |
+| Back-right | 4 × 6 | cols 12–15, rows 5–10 | outer wall out to +X | `drawer_container_back_4x6_right` |
+| Front wide | 8 × 4 | cols 4–11, rows 1–4 | — | `drawer_container_front_8x4` |
+| Front middle | 3 × 4 | cols 12–14, rows 1–4 | — | `drawer_container_front_3x4` |
+| Front narrow | 1 × 3 | col 15, rows 1–3 | outer wall out to +X | `drawer_container_front_1x3` |
+| Front corner | 1 × 1 | col 15, row 4 | outer wall out to +X | `drawer_container_front_1x1` |
 
-The left bin runs the full depth of the drawer; the back bin fills the rest of
-the rear; and the remaining front block (12 × 7 cells) is split into three
-equal areas of 4 cells across (28 cells each).
+The left bin runs the full depth of the drawer. The remaining 12 × 10 block is
+split front-to-back at rows 4|5: the back six rows carry three equal 4-wide
+tubs, and the front four rows carry an 8-wide tub, a 3-wide one, and then the
+last column on its own — a 1 × 3 with the single 1 × 1 cell behind it. The
+eight containers tile the grid exactly: 30 + 3 × 24 + 32 + 12 + 3 + 1 = 150
+cells.
+
+### The "3x3" in issue #324 → 3 × 4
+
+Issue #324's text lists the front row as "8x4, 3x3 and then 1x3 and 1x1". The
+middle container is implemented here as **3 × 4**, not 3 × 3, for two reasons:
+the sketch draws its back edge on the same line as the 8 × 4's, i.e. the full
+4-row front depth; and 3 × 3 would leave an unclaimed 3 × 1 hole between it and
+the back row, where 3 × 4 tiles the grid exactly. If 3 × 3 was meant literally,
+setting `grid_y = 3` in `drawer_container_front_3x4`'s customizer gives it,
+and the hole can be filled with a 3 × 1 tub.
 
 ### Why the side containers flare
 
-The drawer is 630 mm wide at the floor but flares to **665 mm at the top** over
+The drawer is 630 mm wide at the floor but flares to **~670 mm at the top** over
 its 69 mm height (see the measurements table above). A flaring container's
 outer face starts at 314.75 mm from centre (`grid_x*cell_pitch/2 - 4 + pad_r_top`),
 just 0.25 mm inboard of the drawer wall's 315 mm at the floor — the 15 × 10 grid
 fills the floor edge to edge, so there is nothing left to reclaim down there.
 All of the reclaimable volume is higher up, where the wall has flared out.
 
-So the three containers whose outer wall faces a drawer side — Left, Back and
-Front-right — aim that wall straight at the drawer wall: it leans out
-**≈ 13.0 mm** over the container's 4.75 → 56 mm shell, landing 1.5 mm short of
-the drawer wall (which is at 329.2 mm at that height). That is a 14.2° lean from
-vertical, well inside the usual 45° overhang rule, though these tubs remain a
-viewing aid rather than a printable part. Resulting preview widths: floor
-≈ 630 mm, rim ≈ 655 mm — so the preview reads wider at the top, as the drawer
-is.
+So the four containers whose outer wall faces a drawer side — Left on the −X
+side, and Back-right, Front narrow and Front corner on the +X side — aim that
+wall straight at the drawer wall: it leans out **18.75 mm** over the
+container's 4.75 → 69 mm shell, landing 1.5 mm short of the drawer wall at its
+top edge (335 mm from centre). That is a 16.3° lean from vertical, well inside
+the usual 45° overhang rule, though these tubs remain a viewing aid rather
+than a printable part. Resulting preview widths: floor ≈ 630 mm, rim
+≈ 667 mm — so the preview reads wider at the top, as the drawer is.
 
 The inner cavity flares against the same `pad_height`…`H` reference span, so the
 wall stays a true 1.6 mm horizontally (1.34 mm measured perpendicular to the
 leaning face). The `container()` module in `_drawer_organiser.scad` takes a
 per-side outward offset (`fnx`/`fpx`/`fny`/`fpy`); the other three walls of each
-bin, and both front bins entirely, stay vertical.
+flaring bin, and the four interior bins entirely, stay vertical.
 
-Note the drawer is measured as *curving* out; the model treats it as a straight
-taper, and the 1.5 mm rim clearance absorbs the difference.
+The drawer's walls *curve* rather than taper straight: they curve away rapidly
+just above the floor (confirmed on the first printed part, issue #326), so the
+real wall sits outside the straight taper at every mid-height and a straight
+flared wall aimed at the top edge cannot touch it. The 1.5 mm clearance
+(container_wall_clear) applies at the top edge, where the two meet.
 
 The containers still stand on Gridfinity base pads, so in the preview they
 register on the baseplate sockets exactly like a real bin (the 0.25 mm
@@ -221,47 +244,70 @@ merged preview nothing).
 
 ### Printing the containers
 
-Every container in the layout is longer than the A1's 250 mm bed. Each ships
-pre-split into printable pieces (issue #319) with seams offset from the
-baseplate tile seams underneath (issue #322) so a solid piece bridges each
+Four of the eight containers are longer than the A1's 250 mm bed, and each of
+those ships pre-split into printable pieces (issue #319) with seams offset from
+the baseplate tile seams underneath (issue #322) so a solid piece bridges each
 grid join — stiffening the floor assembly — and cut faces meet over the
 middle of a single tile, which keeps them flush even without glue. The left
 container is the exception: its 10-cell depth only splits into two ≤5-cell
 pieces at cell 5, which is the tile seam itself — two pieces were preferred
 over introducing a third cut. No piece spans more than 5 cells along its
-split axis. The four whole-container files —
-`drawer_container_left`, `drawer_container_back`,
-`drawer_container_front_4x7`, `drawer_container_front_right` — remain in the
-project for preview and customization; their default STL download is still
-the whole assembled shape (`split_parts = 1`), built on `container_part()` in
-`_drawer_organiser.scad`. The piece files call the lower-level
-`container_slice()`, which takes an explicit cell range instead of an even
-split.
+split axis.
+
+The other four — `drawer_container_front_3x4` (125.5 × 167.5 mm),
+`drawer_container_front_1x3` (≈ 60.25 × 125.5 mm at the rim) and
+`drawer_container_front_1x1` (≈ 60.25 × 41.5 mm) — **fit the bed whole**, so the
+whole-container file *is* the printable part and there are no piece files for
+them. The 4 × 6 back containers only miss by 1.5 mm (251.5 mm deep against a
+250 mm bed), but they do miss.
+
+All seven whole-container files remain in the project for preview and
+customization; their default STL download is the whole assembled shape
+(`split_parts = 1`), built on `container_part()` in `_drawer_organiser.scad`.
+`drawer_container_front_1x1` is the one exception — a single cell cannot be
+split on either axis, so it calls `container()` directly and exposes no
+`split_parts`. The piece files call the lower-level `container_slice()`, which
+takes an explicit cell range instead of an even split.
 
 Seat the pieces on the assembled baseplate first — the pads and sockets are
 the alignment jig — then glue the cut faces with CA.
 
 | File | Parent container | Cells | Footprint |
 |---|---|---|---|
-| `drawer_container_left_front` | left | 5 (of 10, Y) | 138.45 × 209.75 mm |
-| `drawer_container_left_back` | left | 5 (of 10, Y) | 138.45 × 209.75 mm |
-| `drawer_container_back_left` | back | 4 (of 12, X) | 167.75 × 125.5 mm |
-| `drawer_container_back_centre` | back | 5 (of 12, X) | 210.0 × 125.5 mm |
-| `drawer_container_back_right` | back | 3 (of 12, X) | 138.7 × 125.5 mm |
-| `drawer_container_front_4x7_front` | front-left / front-centre | 3 (of 7, Y) | 167.5 × 125.75 mm |
-| `drawer_container_front_4x7_back` | front-left / front-centre | 4 (of 7, Y) | 167.5 × 167.75 mm |
-| `drawer_container_front_right_front` | front-right | 3 (of 7, Y) | 180.45 × 125.75 mm |
-| `drawer_container_front_right_back` | front-right | 4 (of 7, Y) | 180.45 × 167.75 mm |
+| `drawer_container_left_front` | left | 5 (of 10, Y) | 144.25 × 209.75 mm |
+| `drawer_container_left_back` | left | 5 (of 10, Y) | 144.25 × 209.75 mm |
+| `drawer_container_back_4x6_half` | back-left / back-centre | 3 (of 6, Y) | 167.5 × 125.75 mm |
+| `drawer_container_back_4x6_right_front` | back-right | 3 (of 6, Y) | 186.25 × 125.75 mm |
+| `drawer_container_back_4x6_right_back` | back-right | 3 (of 6, Y) | 186.25 × 125.75 mm |
+| `drawer_container_front_8x4_half` | front wide | 4 (of 8, X) | 167.75 × 167.5 mm |
 
-The flared pieces (left, back-right, front-right) are wider than their
-nominal footprint because the outer wall leans out ≈ 13 mm at the rim (see
-"Why the side containers flare" above); `back_left` and `back_centre` are cut
-from the same flared parent but do not themselves reach the flared end, so
-they print unflared. The left container's two pieces are mirror images, not
-the same part — print `drawer_container_left_front` and
-`drawer_container_left_back`, one each. `drawer_container_front_4x7_front`
-and `_back` serve both the front-left and front-centre container, so print
-two of each.
+Where the cuts fall, against the 5 × 5 tile grid underneath (1-based drawer
+columns and rows):
+
+- The **4 × 6** back containers split 3 + 3 in Y, cutting at rows 7|8 — over
+  the middle of the back tile row — while the front half straddles the tile
+  seam at rows 5|6.
+- The **8 × 4** front container splits 4 + 4 in X, cutting at columns 7|8 —
+  over the middle of the centre tile column — with the −X half straddling the
+  seam at columns 5|6 and the +X half the seam at columns 10|11.
+
+The flared pieces (left, back-right) are wider than their nominal footprint
+because the outer wall leans out ≈ 18.75 mm at the rim (see "Why the side
+containers flare" above).
+
+Two of the piece files are the **same part twice over**, because an unflared
+container is unchanged by a 180° rotation about Z:
+
+- `drawer_container_back_4x6_half` is both halves of both unflared back
+  containers — print **four**, rotating one of each pair 180° about Z.
+- `drawer_container_front_8x4_half` is both halves of the 8 × 4 — print
+  **two**, rotating one 180° about Z.
+
+The flared containers do not get that: rotating a flared half puts the leaning
+wall on the wrong side, so the left container's two pieces are mirror images
+(print `drawer_container_left_front` and `drawer_container_left_back`, one
+each), and so are the back-right container's (`_right_front` and
+`_right_back`, one each).
 
 ## Bins longer than the print bed
 
@@ -314,19 +360,20 @@ tile onto it (the seams do not press together in-plane — see above).
 ### Containers (optional)
 
 The full-drawer layout previewed by `drawer_assembly.scad` needs the
-following pre-split pieces (see "Printing the containers" above):
+following parts (see "Printing the containers" above — the last three are
+whole containers, the rest are pre-split pieces):
 
 | Part | Qty |
 |---|---|
 | `drawer_container_left_front` | 1 |
 | `drawer_container_left_back` | 1 |
-| `drawer_container_back_left` | 1 |
-| `drawer_container_back_centre` | 1 |
-| `drawer_container_back_right` | 1 |
-| `drawer_container_front_4x7_front` | 2 |
-| `drawer_container_front_4x7_back` | 2 |
-| `drawer_container_front_right_front` | 1 |
-| `drawer_container_front_right_back` | 1 |
+| `drawer_container_back_4x6_half` | 4 |
+| `drawer_container_back_4x6_right_front` | 1 |
+| `drawer_container_back_4x6_right_back` | 1 |
+| `drawer_container_front_8x4_half` | 2 |
+| `drawer_container_front_3x4` | 1 |
+| `drawer_container_front_1x3` | 1 |
+| `drawer_container_front_1x1` | 1 |
 
 ## Possible follow-ups
 
