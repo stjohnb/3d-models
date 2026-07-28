@@ -81,7 +81,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
     ├── ci-pipeline.md          # Detailed CI/CD pipeline step-by-step documentation
     ├── OPENSCAD_LIBRARIES.md   # Catalogue of available third-party OpenSCAD libraries
     ├── claws-automation.md     # How the Claws automation service manages issues, PRs, and docs (auto-maintained)
-    ├── intent-log.md           # Chronological record of the owner's stated requirements and rationale (human-authored issue/PR content)
+    ├── requirements.md         # Cross-cutting process/workflow requirements with no single owning subsystem doc
     ├── blog-post.md            # Draft blog post about the project
     ├── website-checklist-audit.md  # specification.website checklist audit
     └── public-snapshot.md      # Policy and usage guide for sync_public_snapshot.py
@@ -164,7 +164,7 @@ from downstream consumption (models.json, structured data).
 | `license` | `string` | SPDX identifier override (repo default implied when absent) |
 | `difficulty` | `enum` | `"beginner"`, `"intermediate"`, or `"advanced"` |
 | `hardware` | `array` of `{item, quantity, notes?}` | Bill of materials for non-printed parts |
-| `printing_notes` | `array` of `string` | Free-text printer/slicer guidance (layer height, seam, orientation, filament); surfaced in the viewer, embed, and standalone pages |
+| `printing_notes` | `array` of `string` | Free-text printer/slicer guidance (layer height, seam, orientation, filament); surfaced in the viewer, embed, and standalone pages. Deliberately free-text rather than structured fields (orientation enums, support-needed flags): issue #301 proposed exactly that structured shape and explicitly backed off it, citing `ideas/rejected.md`'s prior decline of a "print orientation indicator" as the reason to stay prose-only — don't re-propose structured printing metadata on the strength of this field alone |
 | `relatedModels` | `array` of `string` | Directory names of related projects |
 | `mating_pairs` | `array` of 2-element `string` arrays | Pairs of STL filenames that must fit without geometric overlap (validated by `check_interference.py`) |
 | `complex_interior` | `boolean` | When `true`, CI renders three extra orthographic views (`_top`, `_bottom`, `_front`) to expose internal cavity geometry; used by `power-workshop` and `drawer-organiser` |
@@ -175,6 +175,17 @@ Metadata is merged into `models.json` at build time. Only viewer-relevant
 fields are propagated (`description`, `tags`, `difficulty`, `version`,
 `hardware`, `assembly`, `viewer_rotate_x`, `printing_notes`). `license`, `relatedModels`, and
 `mating_pairs` are intentionally excluded from the manifest.
+
+**Directory structure, not metadata, drives UI grouping.** When the two
+`vacuum-hose` models needed to appear together in the viewer, the owner's own
+follow-up rejected adding a `group` field to `meta.schema.json` once moving
+both files into one directory already produced the grouping in the UI:
+"moving them to the same directory had the required effect... is [a group
+field] used for anything at all?" (#196). Directory placement is the sole,
+canonical grouping signal — don't add a metadata field to solve a grouping
+problem that a directory move already solves. `relatedModels` is a separate,
+narrower thing (an informational cross-reference list, not a display
+grouping mechanism) and stays excluded from `models.json` for that reason.
 
 The manifest also includes a `rendered_with` field per model entry in the manifest,
 recording the OpenSCAD version used to produce the STLs in that CI run
@@ -387,6 +398,14 @@ it — they are oriented peg-down
 ## Iterative Design Helpers
 
 Utilities for use during active design work — not part of the CI pipeline.
+`render_view.py` exists specifically as an *agent-facing* tool, not a
+persisted-artifact one: analyzing an external tool's approach of storing
+committed multi-angle renders as build artifacts, the owner's own reframing
+was "I think where this would be most useful is for Claude itself when
+iterating on a design, it should be able to render any angle it needs to
+verify its designs, they don't particularly need to be stored as build
+artifacts" (#202) — this is why the script produces no build artifacts and is
+excluded from CI (see also CLAUDE.md's "Local dev tool (not CI)" note).
 
 ### Rendering arbitrary views
 
@@ -480,12 +499,15 @@ for user data, hand-edit generated artifacts, etc.).
 documentation for this repo using the subagents below. See
 [claws-automation.md](claws-automation.md) for details.
 
-**Intent log** — [intent-log.md](intent-log.md) is a chronological record of
-the repo owner's stated requirements, rationale, and rejections, distilled
-from human-authored (non-bot) issue and PR content across the repo's history.
-It captures the *why* behind conventions this doc only states as *what* —
-consult it when a design decision seems arbitrary or when planning a change
-that touches an area with prior back-and-forth.
+**Cross-cutting requirements** — [requirements.md](requirements.md) holds
+process/workflow requirements the owner has stated that don't belong to any
+single subsystem doc (e.g. how to handle CI flakiness, how research issues
+should land, how specced-up-front vs. iteratively-corrected issues are
+expected to work here). Subsystem-specific requirements are recorded as
+constraints-with-rationale directly in the doc that owns that subsystem
+(this file, [model-projects.md](model-projects.md),
+[web-viewer.md](web-viewer.md), [ci-pipeline.md](ci-pipeline.md),
+[public-snapshot.md](public-snapshot.md)) rather than in a separate log.
 
 Three subagent definitions live in `.claude/agents/`:
 
