@@ -215,6 +215,15 @@ After rendering, each STL is validated using [ADMesh](https://github.com/admesh/
 - **No degenerate triangles**: Zero degenerate facets
 - **Positive volume**: Ensures the mesh encloses real space
 
+**No minimum wall-thickness check.** A wall-thickness validation from STL
+cross-sections was accepted and tried (#117) alongside mesh validation, but
+the owner found it noisy and low-signal in practice: "these warnings aren't
+useful. Lots of 0mm or 0.01mm but all the pieces have been printed and are
+working well" (#169). It is not part of the current pipeline — do not
+re-add a generic wall-thickness gate on the strength of "thin walls are
+theoretically risky" alone; a real print failure is the bar for adding a new
+mesh-level check here, not a static geometric threshold.
+
 Additionally, the step extracts **bounding-box dimensions** (Min/Max X/Y/Z)
 from ADMesh output and computes a **rough print-time estimate**
 (`estimated_minutes`) using a heuristic based on layer count (height / 0.2mm)
@@ -655,7 +664,13 @@ multiple fail, all errors are visible.
   internal cavity geometry that the default isometric thumbnail obscures. These
   are supplementary; build failures do not propagate from this step. The flag
   lives in `meta.json` so no CI code change is needed when adding a new
-  complex-interior model.
+  complex-interior model. This scope is a deliberate cost/benefit call: an
+  external tool (vibe-modeling) renders an unconditional ~17 views per part,
+  but the owner reasoned that "S3 storage and CI time scale with the
+  collection... most parts don't benefit" from that (#202) — three views,
+  opt-in per project, was chosen instead of matching vibe-modeling's
+  unconditional approach. Don't widen this to render extra views for every
+  model on the strength of "more views could help" alone.
 - **Stable OG image URL**: The `og-hero.png` URL is not cache-busted (unlike
   other assets). Social media crawlers cache by URL, so a stable path ensures
   previews update when the image content changes rather than producing stale
