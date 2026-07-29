@@ -5,7 +5,7 @@
 // files. The customizer split_parts/part_index are retained for smaller beds.
 //
 // Issue #324's text calls this container "3x3", but the sketch draws it the
-// full 4 rows deep, level with the 8 x 4 beside it, and only 3 x 4 tiles the
+// full 4 rows deep, level with the 5 x 4 beside it, and only 3 x 4 tiles the
 // 15 x 10 grid exactly (3 x 3 would leave a 3 x 1 hole). Implemented as 3 x 4
 // — see layout.md, "Container layout".
 //

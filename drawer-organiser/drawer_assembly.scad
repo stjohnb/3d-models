@@ -6,7 +6,7 @@
 // on top, so the finished drawer reads at a glance. Each container is now also
 // individually downloadable and bed-splittable as its own renderable —
 // drawer_container_left, drawer_container_back_4x6,
-// drawer_container_back_4x6_right, drawer_container_front_8x4,
+// drawer_container_back_4x6_right, drawer_container_front_5x4,
 // drawer_container_front_3x4, drawer_container_front_1x3 and
 // drawer_container_front_1x1 — this file just arranges container() tubs over
 // baseplate() to preview the layout described in layout.md ("Container
@@ -16,9 +16,11 @@
 // the maintainer's sketch in issue #324:
 //   * a 3-wide container down the whole left side, full drawer depth;
 //   * a back row (rows 5..10) of three 4 x 6 containers across the remaining
-//     12 columns;
-//   * a front row (rows 1..4) of an 8 x 4, a 3 x 4, and then a 1 x 3 with a
-//     1 x 1 behind it in the last column.
+//     12 columns, the centre one's front half fitted with the divided piece
+//     drawer_container_back_4x6_half_divided (issue #332);
+//   * a front row (rows 1..4) of a 5 x 4, two 3 x 4s, and then a 1 x 3 with a
+//     1 x 1 behind it in the last column. (issue #334 split the former 8 x 4
+//     wide front container into a 5 x 4 and a 3 x 4.)
 // The four containers standing against a side wall (the left one, the
 // back-right one, and the front 1 x 3 and 1 x 1) flare their outer wall outward
 // with height to follow the drawer, which widens from 630mm at the floor to
@@ -26,7 +28,7 @@
 //
 // The 3 x 4 implements the sketch's middle front container, which issue #324's
 // text calls "3x3": the sketch draws it the full 4 rows deep, level with the
-// 8 x 4 beside it, and 3 x 4 is what tiles the grid exactly. See layout.md.
+// 5 x 4 beside it, and 3 x 4 is what tiles the grid exactly. See layout.md.
 //
 // No rotate() here: the project sets viewer_rotate_x in meta.json, so the
 // interactive viewer already tips the Z-up geometry upright. Adding a source
@@ -62,7 +64,7 @@ function span_r(a, b) = (cy(a) + cy(b)) / 2;            // centre y of rows a..b
 // Colours are for the gallery thumbnail and the complex-interior orthographic
 // views, which CI renders straight from this .scad. STL export is monochrome, so
 // the interactive viewer shows this file as a single user-recolourable model:
-// the eight containers read as one shape there, which is accepted here — they are
+// the nine containers read as one shape there, which is accepted here — they are
 // separated by geometry (walls and gaps), and the coloured thumbnail plus the
 // table in layout.md carry the layout. The alternative is meta.json's `assembly`
 // composite (docs/web-viewer.md), which keeps colours in the viewer but needs
@@ -92,24 +94,41 @@ color("#43a047")                            // Green (filament palette "Green")
 color("#e53935")                            // Red (filament palette "Red")
     translate([span_c(7, 10), span_r(4, 9), 0])
         container(4, 6, height, wall_t, floor_t);
+// The back-centre container's FRONT half is the divided variant,
+// drawer_container_back_4x6_half_divided (issue #332): five upright plates
+// across its interior width, seated with its open cut/glue face towards the
+// drawer back (+Y), so the dividers stand in cells [0,3) of the container's
+// 6-cell depth. The tub is still drawn whole above, as every container here is;
+// only the divider bank is added. container_dividers() emits geometry in the
+// slice's re-centred PRINTING frame, so it translates to the piece's own
+// footprint centre span_r(4, 6), not the container's span_r(4, 9).
+color("#e53935")                            // Red (filament palette "Red")
+    translate([span_c(7, 10), span_r(4, 6), 0])
+        container_dividers(4, 6, height, wall_t, floor_t,
+                           split_y = true, c0 = 0, c1 = 3,
+                           count = 5, h_frac = 0.75, len_frac = 0.5);
 color("#fdd835")                            // Yellow (filament palette "Yellow")
     translate([span_c(11, 14), span_r(4, 9), 0])
         container(4, 6, height, wall_t, floor_t, fpx = flare);
 
-// Front row: columns 4..15 x rows 1..4. An 8-wide tub, then a 3-wide one, then
-// the last column carries a 1 x 3 with a 1 x 1 behind it — both against the
-// drawer wall, so both flare out to the right (+X).
+// Front row: columns 4..15 x rows 1..4. A 5-wide tub, then two 3-wide ones,
+// then the last column carries a 1 x 3 with a 1 x 1 behind it — both against
+// the drawer wall, so both flare out to the right (+X).
 color("#fb8c00")                            // Orange (filament palette "Orange")
-    translate([span_c(3, 10), span_r(0, 3), 0])
-        container(8, 4, height, wall_t, floor_t);
+    translate([span_c(3, 7), span_r(0, 3), 0])
+        container(5, 4, height, wall_t, floor_t);
+color("#64b5f6")                            // Blue (filament palette "Blue")
+    translate([span_c(8, 10), span_r(0, 3), 0])
+        container(3, 4, height, wall_t, floor_t);
 color("#f5f5f5")                            // White (filament palette "White")
     translate([span_c(11, 13), span_r(0, 3), 0])
         container(3, 4, height, wall_t, floor_t);
 color("#2a2a2a")                            // Black (filament palette "Black")
     translate([cx(14), span_r(0, 2), 0])
         container(1, 3, height, wall_t, floor_t, fpx = flare);
-// Eight containers, seven non-grey filament colours: Green comes round again
-// here, on the one tub that touches no other green.
+// Nine containers, seven non-grey filament colours: Blue and Green both come
+// round again here — Blue on the front 3 x 4 (the only other Blue tub is the
+// left container, nowhere near columns 9..11), Green on the 1 x 1 as before.
 color("#43a047")                            // Green (filament palette "Green")
     translate([cx(14), cy(3), 0])
         container(1, 1, height, wall_t, floor_t, fpx = flare);
