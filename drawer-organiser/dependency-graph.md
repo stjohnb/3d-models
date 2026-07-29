@@ -16,6 +16,7 @@ graph TD
   drawer_baseplate_5x5["drawer_baseplate_5x5.scad"]
   drawer_bin_10x5_half["drawer_bin_10x5_half.scad"]
   drawer_bin_5x5["drawer_bin_5x5.scad"]
+  drawer_container_back_4x6_half_divided["drawer_container_back_4x6_half_divided.scad"]
   drawer_container_back_4x6_half["drawer_container_back_4x6_half.scad"]
   drawer_container_back_4x6_right_back["drawer_container_back_4x6_right_back.scad"]
   drawer_container_back_4x6_right_front["drawer_container_back_4x6_right_front.scad"]
@@ -24,8 +25,7 @@ graph TD
   drawer_container_front_1x1["drawer_container_front_1x1.scad"]
   drawer_container_front_1x3["drawer_container_front_1x3.scad"]
   drawer_container_front_3x4["drawer_container_front_3x4.scad"]
-  drawer_container_front_8x4_half["drawer_container_front_8x4_half.scad"]
-  drawer_container_front_8x4["drawer_container_front_8x4.scad"]
+  drawer_container_front_5x4["drawer_container_front_5x4.scad"]
   drawer_container_left_back["drawer_container_left_back.scad"]
   drawer_container_left_front["drawer_container_left_front.scad"]
   drawer_container_left["drawer_container_left.scad"]
@@ -38,6 +38,7 @@ graph TD
   drawer_baseplate_5x5 -->|include| _drawer_organiser
   drawer_bin_10x5_half -->|include| _drawer_organiser
   drawer_bin_5x5 -->|include| _drawer_organiser
+  drawer_container_back_4x6_half_divided -->|include| _drawer_organiser
   drawer_container_back_4x6_half -->|include| _drawer_organiser
   drawer_container_back_4x6_right_back -->|include| _drawer_organiser
   drawer_container_back_4x6_right_front -->|include| _drawer_organiser
@@ -46,8 +47,7 @@ graph TD
   drawer_container_front_1x1 -->|include| _drawer_organiser
   drawer_container_front_1x3 -->|include| _drawer_organiser
   drawer_container_front_3x4 -->|include| _drawer_organiser
-  drawer_container_front_8x4_half -->|include| _drawer_organiser
-  drawer_container_front_8x4 -->|include| _drawer_organiser
+  drawer_container_front_5x4 -->|include| _drawer_organiser
   drawer_container_left_back -->|include| _drawer_organiser
   drawer_container_left_front -->|include| _drawer_organiser
   drawer_container_left -->|include| _drawer_organiser

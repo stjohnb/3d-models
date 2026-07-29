@@ -526,6 +526,53 @@ module container_slice(gx, gy, h, wall_t, floor_t,
     }
 }
 
+// Upright dividers for one container slice: `count` plates `t` thick standing
+// on the piece's floor, splitting its interior across the axis it was NOT cut
+// on into count + 1 equally wide clear segments. Each plate runs `len_frac` of
+// the piece's interior length along the cut axis, centred, and rises to
+// `h_frac` of the container height. The plates touch nothing but the floor —
+// they stop clear of every wall — so nothing here changes the piece's
+// footprint, its rim, or how it seats on a baseplate. Union this with the
+// matching container_slice() call; the same gx/gy/h/wall_t/split_y/c0/c1 must
+// be passed to both.
+// Plate positions come from the un-flared base footprint, so on a flared
+// container they simply sit further from the leaning wall higher up.
+// The plates start at pad_height, i.e. buried in the floor slab rather than
+// resting on its top face, so the union has no coincident face to trip CGAL.
+module container_dividers(gx, gy, h, wall_t, floor_t,
+                          split_y = false, c0 = 0, c1 = undef,
+                          count = 5, t = undef, h_frac = 0.75, len_frac = 0.5) {
+    n  = split_y ? gy : gx;
+    b1 = is_undef(c1) ? n : c1;
+    dt = is_undef(t) ? wall_t : t;
+    assert(count >= 0, "container_dividers: count must be >= 0");
+    assert(h_frac > 0 && h_frac <= 1, "container_dividers: h_frac must be in (0,1]");
+    assert(len_frac > 0 && len_frac <= 1, "container_dividers: len_frac must be in (0,1]");
+
+    L  = n * cell_pitch;
+    mid = -L / 2 + (c0 + b1) * cell_pitch / 2;          // container_slice's re-centring
+    si = L / 2 - 4 + pad_r_top - wall_t;                // interior half-extent, cut axis
+    io = (split_y ? gx : gy) * cell_pitch / 2 - 4 + pad_r_top - wall_t;
+
+    s_lo  = ((c0 == 0) ? -si : -L / 2 + c0 * cell_pitch) - mid;
+    s_hi  = ((b1 == n) ?  si : -L / 2 + b1 * cell_pitch) - mid;
+    s_c   = (s_lo + s_hi) / 2;
+    s_len = (s_hi - s_lo) * len_frac;
+
+    clear = (2 * io - count * dt) / (count + 1);        // equal clear segment width
+    z0 = pad_height;
+    z1 = h * h_frac;
+
+    if (count > 0 && clear > 0 && z1 > z0)
+        for (i = [1 : count]) {
+            oc = -io + i * clear + (i - 0.5) * dt;      // plate centre, divided axis
+            translate(split_y ? [oc, s_c, (z0 + z1) / 2]
+                              : [s_c, oc, (z0 + z1) / 2])
+                cube(split_y ? [dt, s_len, z1 - z0]
+                             : [s_len, dt, z1 - z0], center = true);
+        }
+}
+
 // One piece of a container too large for the print bed. The container is split
 // along X (split_y = false) or Y (split_y = true) into `parts` slices at cell
 // boundaries and piece `index` is returned, re-centred on the origin for

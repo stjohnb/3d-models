@@ -71,7 +71,7 @@ is a summary.
 
 | File | Role |
 |------|------|
-| `_drawer_organiser.scad` | Shared library — all parameters (Gridfinity profile constants, seam geometry, drawer dimensions) and modules (`rrect`, `cell_grid`, `bin_base_pad`, `plate_socket`, `baseplate`, `bin`, `bin_part`, `container`, `container_shell`, `container_part`, `side_flare`); no top-level geometry |
+| `_drawer_organiser.scad` | Shared library — all parameters (Gridfinity profile constants, seam geometry, drawer dimensions) and modules (`rrect`, `cell_grid`, `bin_base_pad`, `plate_socket`, `baseplate`, `bin`, `bin_part`, `container`, `container_shell`, `container_part`, `container_dividers`, `side_flare`); no top-level geometry |
 | `drawer_baseplate_5x5.scad` / `drawer_baseplate_5x5_back.scad` | Renderable — 5×5 (210×210mm) baseplate tile; `_back` omits the +Y tabs so the rear row's outer edge stays flat against the drawer wall (×3 each for the 15×10 floor) |
 | `drawer_baseplate_4x5.scad` / `drawer_baseplate_4x5_back.scad` | Renderable — 4×5 (168×210mm) tile; not part of the canonical 15×10 floor (superseded by the all-5×5 layout in issue #315) but kept as optional parts for narrower drawers |
 | `drawer_bin_5x5.scad` | Renderable — 5×5×8-unit (210×210×56mm) storage bin, the largest that fits an A1's 250mm bed |
@@ -81,14 +81,14 @@ is a summary.
 | `drawer_container_left_front.scad` / `drawer_container_left_back.scad` | Renderable — the left container's two printable pieces, split 5+5 cells along Y at the baseplate tile seam itself (144.25×209.75mm each); mirror images, not interchangeable, since the outer wall flares |
 | `drawer_container_back_4x6.scad` | Renderable — whole unflared 4×6-cell back-row container (168×252×69mm assembled, 167.5×251.5mm actual, 1.5mm over the bed); this one file *is* both the back-left and back-centre container (neither flares); ships pre-split as `drawer_container_back_4x6_half` |
 | `drawer_container_back_4x6_half.scad` | Renderable — one printable piece of the unflared back-row container, split 3+3 along Y offset from the baseplate tile seam (167.5×125.75mm); 180°-symmetric, so this one file is both halves — print four (two per container, one of each pair rotated 180° about Z) |
+| `drawer_container_back_4x6_half_divided.scad` | Renderable — the same back-row half piece with five upright dividers across its width (six equal segments), 3/4 of the container height and half its interior depth, centred; identical footprint and baseplate fit to `_half` |
 | `drawer_container_back_4x6_right.scad` | Renderable — whole 4×6-cell back-right container (flared on its outer/+X wall, 186.25mm at the rim); ships pre-split as `drawer_container_back_4x6_right_front`/`_back` |
 | `drawer_container_back_4x6_right_front.scad` / `_back.scad` | Renderable — the back-right container's two printable pieces, split 3+3 along Y offset from the tile seam (186.25×125.75mm each); mirror images because the flare breaks the rotational symmetry that lets `_half` serve both sides |
-| `drawer_container_front_8x4.scad` | Renderable — whole unflared 8×4-cell wide front container (336×168×69mm assembled, far over the bed); ships pre-split as `drawer_container_front_8x4_half` |
-| `drawer_container_front_8x4_half.scad` | Renderable — one printable piece of the wide front container, split 4+4 along X offset from the baseplate tile seams (167.75×167.5mm); 180°-symmetric, so this one file is both halves — print two, rotate one 180° about Z |
-| `drawer_container_front_3x4.scad` | Renderable — 3×4-cell unflared middle front container; fits the bed whole, so no piece files (issue #324's "3x3" — see `layout.md`) |
+| `drawer_container_front_5x4.scad` | Renderable — 5×4-cell unflared wide front container (210×168mm assembled, 209.5×167.5mm actual); fits the bed whole, so no piece files (issue #334 split the former 8×4 into this and a 3×4) |
+| `drawer_container_front_3x4.scad` | Renderable — 3×4-cell unflared front container; fits the bed whole, so no piece files (issue #324's "3x3" — see `layout.md`); serves both front 3×4 positions (columns 9–11 and 12–14) — print two |
 | `drawer_container_front_1x3.scad` | Renderable — 1×3-cell front container in the drawer's last column (flared on its outer/+X wall); fits the bed whole |
 | `drawer_container_front_1x1.scad` | Renderable — single-cell container behind the 1×3 (flared on its outer/+X wall); fits the bed whole, and a 1-cell axis cannot split, so it calls `container()` directly with no `split_parts` |
-| `drawer_assembly.scad` | Renderable — full-drawer preview: the whole 15×10 baseplate floor plus eight seated, coloured containers (four of which flare outward to follow the drawer's 630→670mm flare); a **viewing aid, not a printable part** — not tiled for the print bed; renders at `$fn = 32` like `nz-ski-fields/assembly.scad` |
+| `drawer_assembly.scad` | Renderable — full-drawer preview: the whole 15×10 baseplate floor plus nine seated, coloured containers (four of which flare outward to follow the drawer's 630→670mm flare); the back-centre container's front half carries the five-plate divider bank of `drawer_container_back_4x6_half_divided`; a **viewing aid, not a printable part** — not tiled for the print bed; renders at `$fn = 32` like `nz-ski-fields/assembly.scad` |
 | `<basename>.parameters.json` | In-browser customizer manifests for every renderable above |
 | `meta.json` | Project metadata: `complex_interior`, `viewer_rotate_x`, `mating_pairs` (bin↔baseplate pairs), extensive `printing_notes` (seam assembly, split/glue instructions per part) |
 | `dependency-graph.md` | Auto-generated `include` dependency graph — every renderable includes `_drawer_organiser.scad` |
@@ -109,10 +109,10 @@ constants `drawer_bottom_w = 630`, `drawer_top_w = 670`, `drawer_height = 69`,
 [OVERVIEW.md](OVERVIEW.md#bed-splitting-pattern-for-oversized-parts-nz-ski-fields-drawer-organiser)
 for the general pattern shared with `nz-ski-fields`. `bin_part()` splits a bin
 along one axis at cell boundaries; `container_part()` does the same for the
-assembly-preview containers. Four of the eight exceed a 250mm print bed and
-ship pre-split (the largest is the 8×4 at 336×168mm assembled; the 4×6 back
-containers miss by only 1.5mm at 251.5mm deep); the 3×4, 1×3 and 1×1 fit the
-bed whole and have no piece files.
+assembly-preview containers. Four of the nine seated containers — left, the
+back-left and back-centre 4×6s, and back-right — exceed a 250mm print bed and
+ship pre-split (the 4×6 back containers miss by only 1.5mm at 251.5mm deep);
+the 5×4, 3×4, 1×3 and 1×1 fit the bed whole and have no piece files.
 
 ### esp32-display-case/
 

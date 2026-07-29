@@ -1,6 +1,0 @@
-{
-  "parameters": [
-    { "name": "height", "label": "Overall height (mm)", "type": "number", "min": 14, "max": 69, "step": 1, "default": 69 },
-    { "name": "wall_t", "label": "Wall thickness (mm)", "type": "number", "min": 1.2, "max": 3.0, "step": 0.2, "default": 1.6 }
-  ]
-}
