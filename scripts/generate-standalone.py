@@ -33,14 +33,6 @@ THREEJS_ASSETS = {
         "url": f"https://cdn.jsdelivr.net/npm/three@{THREEJS_VERSION}/examples/jsm/controls/OrbitControls.js",
         "sha256": "80efaadea4f8a636a65fb0bd08bfef62f3d93a0bb94e2e7500f23176c5c07f4e",
     },
-    "TrackballControls": {
-        "url": f"https://cdn.jsdelivr.net/npm/three@{THREEJS_VERSION}/examples/jsm/controls/TrackballControls.js",
-        "sha256": "5ec947668c3744d7852d06519c34270acb588a4b2bf56a0bf01cedae7ce0e931",
-    },
-    "ArcballControls": {
-        "url": f"https://cdn.jsdelivr.net/npm/three@{THREEJS_VERSION}/examples/jsm/controls/ArcballControls.js",
-        "sha256": "819adb7b1f41e5fea6114a5d87e8dfd01525acb229a797f7be0b32c0af9a21d0",
-    },
 }
 
 FILAMENT_COLORS_JSON = "filament-colors.json"
@@ -277,14 +269,6 @@ HTML_TEMPLATE = """\
       font-size: 1.2rem;
       color: #888;
     }}
-    .cross-section-row {{
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      justify-content: center;
-      margin-top: 4px;
-      flex-wrap: nowrap;
-    }}
     .cross-btn {{
       background: rgba(255,255,255,0.1);
       border: none;
@@ -303,8 +287,7 @@ HTML_TEMPLATE = """\
       color: #64b5f6;
     }}
     .clip-slider {{
-      flex: 1;
-      max-width: 200px;
+      flex: 0 1 200px;
       accent-color: #64b5f6;
     }}
     .view-controls-row {{
@@ -346,7 +329,6 @@ HTML_TEMPLATE = """\
       body {{ height: auto; min-height: 100vh; min-height: 100dvh; }}
       #viewer {{ flex: none; height: 55vh; height: 55dvh; min-height: 240px; }}
       canvas {{ height: 100%; }}
-      .cross-section-row {{ flex-wrap: wrap; }}
       .view-btn, .cross-btn {{ padding: 8px 12px; font-size: 14px; min-height: 40px; }}
     }}
   </style>
@@ -359,18 +341,13 @@ HTML_TEMPLATE = """\
     </noscript>
   </div>
   <div class="controls" id="colors"></div>
-  <div class="cross-section-row">
-    <button class="cross-btn" id="cross-btn" aria-label="Toggle cross section" aria-pressed="false">&#x2702; Cross Section</button>
-    <input type="range" class="clip-slider" id="clip-slider" min="0" max="100" value="50" style="display:none;" aria-label="Cross section depth">
-  </div>
   <div class="view-controls-row">
+    <button class="cross-btn" id="cross-btn" aria-label="Toggle cross section" aria-pressed="false">&#x2702; Cross Section</button>
     <button class="view-btn" id="rot-x" aria-label="Rotate model 90 degrees about the X axis">Rotate X</button>
     <button class="view-btn" id="rot-y" aria-label="Rotate model 90 degrees about the Y axis">Rotate Y</button>
     <button class="view-btn" id="rot-z" aria-label="Rotate model 90 degrees about the Z axis">Rotate Z</button>
     <button class="view-btn" id="reset-view" aria-label="Reset view orientation and camera">Reset</button>
-    <button class="view-btn mode-btn" id="mode-orbit" aria-label="Use Orbit controls" aria-pressed="true">Orbit</button>
-    <button class="view-btn mode-btn" id="mode-trackball" aria-label="Use Trackball controls" aria-pressed="false">Trackball</button>
-    <button class="view-btn mode-btn" id="mode-arcball" aria-label="Use Arcball controls" aria-pressed="false">Arcball</button>
+    <input type="range" class="clip-slider" id="clip-slider" min="0" max="100" value="50" style="display:none;" aria-label="Cross section depth">
   </div>
   <button class="fullscreen-btn" id="fs-btn" aria-label="Toggle fullscreen">&#x26F6;</button>
   {printing_notes_html}
@@ -384,9 +361,7 @@ HTML_TEMPLATE = """\
     "imports": {{
       "three": "{three_uri}",
       "three/addons/loaders/STLLoader.js": "{stlloader_uri}",
-      "three/addons/controls/OrbitControls.js": "{orbitcontrols_uri}",
-      "three/addons/controls/TrackballControls.js": "{trackballcontrols_uri}",
-      "three/addons/controls/ArcballControls.js": "{arcballcontrols_uri}"
+      "three/addons/controls/OrbitControls.js": "{orbitcontrols_uri}"
     }}
   }}
   </script>
@@ -394,8 +369,6 @@ HTML_TEMPLATE = """\
     import * as THREE from 'three';
     import {{ STLLoader }} from 'three/addons/loaders/STLLoader.js';
     import {{ OrbitControls }} from 'three/addons/controls/OrbitControls.js';
-    import {{ TrackballControls }} from 'three/addons/controls/TrackballControls.js';
-    import {{ ArcballControls }} from 'three/addons/controls/ArcballControls.js';
 
     const STL_BASE64 = "{stl_base64}";
 
@@ -423,28 +396,18 @@ HTML_TEMPLATE = """\
 
     const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 10000);
 
-    // Reassignable so the user can switch between Orbit / Trackball /
-    // Arcball at runtime (issue #230). Preserve target across switches.
+    // Rebuilt (not just reset) by the Reset button so OrbitControls' internal
+    // spherical state is discarded along with the camera position.
     let controls = null;
-    let controlMode = 'orbit';
-    function makeControls(mode) {{
+    function makeControls() {{
       const saved = controls ? controls.target.clone() : new THREE.Vector3();
       if (controls) controls.dispose();
-      if (mode === 'trackball') {{
-        controls = new TrackballControls(camera, canvas);
-        controls.handleResize();
-      }} else if (mode === 'arcball') {{
-        controls = new ArcballControls(camera, canvas, scene);
-        controls.setGizmosVisible(false);
-      }} else {{
-        controls = new OrbitControls(camera, canvas);
-        controls.enableDamping = true;
-      }}
+      controls = new OrbitControls(camera, canvas);
+      controls.enableDamping = true;
       controls.target.copy(saved);
       controls.update();
-      controlMode = mode;
     }}
-    makeControls('orbit');
+    makeControls();
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.6));
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -546,7 +509,6 @@ HTML_TEMPLATE = """\
         renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
-        controls.handleResize?.();
       }}
     }}
 
@@ -652,21 +614,8 @@ HTML_TEMPLATE = """\
       camera.position.copy(defaultCamPos);
       controls.target.set(0, 0, 0);
       camera.up.set(0, 1, 0);
-      makeControls(controlMode);
+      makeControls();
       recomputeClip();
-    }});
-
-    const modeBtns = {{
-      orbit: document.getElementById('mode-orbit'),
-      trackball: document.getElementById('mode-trackball'),
-      arcball: document.getElementById('mode-arcball'),
-    }};
-    Object.entries(modeBtns).forEach(([mode, btn]) => {{
-      btn.addEventListener('click', () => {{
-        makeControls(mode);
-        Object.entries(modeBtns).forEach(([m, b]) =>
-          b.setAttribute('aria-pressed', String(m === mode)));
-      }});
     }});
   </script>
 </body>
@@ -813,8 +762,6 @@ def main():
             three_uri=js_uris["three"],
             stlloader_uri=js_uris["STLLoader"],
             orbitcontrols_uri=js_uris["OrbitControls"],
-            trackballcontrols_uri=js_uris["TrackballControls"],
-            arcballcontrols_uri=js_uris["ArcballControls"],
             stl_base64=stl_b64,
             filament_colors_js=filament_colors_js,
             composite_parts_js=composite_js,

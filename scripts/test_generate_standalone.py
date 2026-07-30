@@ -94,8 +94,6 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             three_uri="data:text/javascript;base64,AAAA",
             stlloader_uri="data:text/javascript;base64,BBBB",
             orbitcontrols_uri="data:text/javascript;base64,CCCC",
-            trackballcontrols_uri="data:text/javascript;base64,DDDD",
-            arcballcontrols_uri="data:text/javascript;base64,EEEE",
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
             composite_parts_js="[]",
@@ -106,25 +104,24 @@ class TestHtmlTemplateFormat(unittest.TestCase):
 
     def test_format_succeeds_and_includes_controls(self):
         html = self._render()
-        # Control-mode buttons and rotate buttons are present
-        self.assertIn('id="mode-orbit"', html)
-        self.assertIn('id="mode-trackball"', html)
-        self.assertIn('id="mode-arcball"', html)
+        # Rotate/reset/cross-section controls are present
         self.assertIn('id="rot-x"', html)
         self.assertIn('id="rot-y"', html)
         self.assertIn('id="rot-z"', html)
         self.assertIn('id="reset-view"', html)
-        # Only orbit starts pressed
-        self.assertIn('id="mode-orbit" aria-label="Use Orbit controls" aria-pressed="true"', html)
-        self.assertIn('id="mode-trackball" aria-label="Use Trackball controls" aria-pressed="false"', html)
-        self.assertIn('id="mode-arcball" aria-label="Use Arcball controls" aria-pressed="false"', html)
-        # The new control libraries are wired into the importmap and imports
-        self.assertIn('TrackballControls.js', html)
-        self.assertIn('ArcballControls.js', html)
+        self.assertIn('id="cross-btn"', html)
+        self.assertIn('id="clip-slider"', html)
+        # Issue #337: the Orbit/Trackball/Arcball switcher is gone — controls
+        # are always OrbitControls, so those modules aren't embedded either.
+        self.assertNotIn('id="mode-orbit"', html)
+        self.assertNotIn('id="mode-trackball"', html)
+        self.assertNotIn('id="mode-arcball"', html)
+        self.assertNotIn('TrackballControls.js', html)
+        self.assertNotIn('ArcballControls.js', html)
+        # Issue #337: cross-section and view buttons share one row
+        self.assertNotIn('cross-section-row', html)
         # Placeholders were substituted, not left literal
         self.assertNotIn('{three_uri}', html)
-        self.assertIn('data:text/javascript;base64,DDDD', html)
-        self.assertIn('data:text/javascript;base64,EEEE', html)
         # Key JS functions survive template formatting
         self.assertIn('function makeControls(', html)
         self.assertIn('function rotateMesh(', html)
@@ -136,8 +133,6 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             three_uri="data:text/javascript;base64,AAAA",
             stlloader_uri="data:text/javascript;base64,BBBB",
             orbitcontrols_uri="data:text/javascript;base64,CCCC",
-            trackballcontrols_uri="data:text/javascript;base64,DDDD",
-            arcballcontrols_uri="data:text/javascript;base64,EEEE",
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
             composite_parts_js="[]",

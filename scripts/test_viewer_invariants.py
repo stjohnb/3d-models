@@ -111,5 +111,26 @@ class XssConventionTests(unittest.TestCase):
                     )
 
 
+class ViewerChromeTests(unittest.TestCase):
+    """Issue #337: one controls row, Orbit-only, collapsed disclosures."""
+
+    def test_no_control_mode_switcher(self):
+        for path in VIEWERS:
+            html = read(path)
+            for token in ("TrackballControls", "ArcballControls",
+                          'id="mode-orbit"', "mode-btn"):
+                self.assertNotIn(token, html, f"{path.name} still references {token}")
+
+    def test_index_has_single_controls_row(self):
+        html = read(INDEX_HTML)
+        self.assertIn("pane-controls-row", html)
+        self.assertNotIn("cross-section-row", html)
+        self.assertNotIn("view-controls-row", html)
+
+    def test_index_disclosures_start_closed(self):
+        html = read(INDEX_HTML)
+        self.assertNotIn("det.open = true", html)
+
+
 if __name__ == "__main__":
     unittest.main()

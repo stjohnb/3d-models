@@ -400,7 +400,10 @@
       font-size: 0.8rem;
       color: #9aa4bf;
       flex: 1 1 100%;
+      margin: 0;
     }
+    .pane-desc summary { cursor: pointer; color: #64b5f6; }
+    .pane-desc p { margin: 0.4rem 0 0; }
     .printing-notes {
       flex: 1 1 100%;
       margin: 0;
@@ -480,11 +483,12 @@
       color: #fff;
       white-space: nowrap;
     }
-    .cross-section-row {
+    .pane-controls-row {
       display: flex;
       align-items: center;
       gap: 6px;
       padding: 4px 8px;
+      flex-wrap: wrap;
     }
     .cross-btn {
       background: rgba(255,255,255,0.1);
@@ -509,15 +513,9 @@
       outline-offset: 2px;
     }
     .clip-slider {
-      flex: 1;
+      flex: 1 1 120px;
+      min-width: 80px;
       accent-color: #64b5f6;
-    }
-    .view-controls-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 8px;
-      flex-wrap: wrap;
     }
     .view-btn, .layout-btn {
       background: rgba(255,255,255,0.1);
@@ -656,8 +654,8 @@
       }
       body.sidebar-open #sidebar { transform: none; }
 
-      /* Issue #307: on phones the pane chrome (chips, colours, cross-section,
-         7 view buttons, description, printing notes) no longer fits in one
+      /* Issue #307: on phones the pane chrome (chips, colours, one controls
+         row, collapsed description and printing notes) no longer fits in one
          viewport height, so `flex: 1` collapsed the canvas to a sliver and the
          rest was clipped by `.pane { overflow: hidden }`. Below 900px the page
          scrolls instead: the canvas takes a fixed slice of the viewport and
@@ -742,8 +740,6 @@
     import * as THREE from 'three';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
-    import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
 
     const panesEl = document.getElementById('panes');
     const treeEl = document.getElementById('tree');
@@ -930,29 +926,16 @@
 
       const camera = new THREE.PerspectiveCamera(45, (canvas.clientWidth / canvas.clientHeight) || 1, 0.1, 10000);
 
-      // Controls are reassignable so the user can switch between Orbit,
-      // Trackball, and Arcball at runtime (issue #230 — OrbitControls' fixed
-      // world-up Y makes models authored in the XZ/YZ plane awkward to spin;
-      // Trackball/Arcball are gimbal-lock-free). makeControls preserves the
-      // current target so switching doesn't jump the view.
+      // Rebuilt (not just reset) by resetView() so OrbitControls' internal
+      // spherical state is discarded along with the camera position.
       let controls = null;
-      let controlMode = 'orbit';
-      function makeControls(mode) {
+      function makeControls() {
         const saved = controls ? controls.target.clone() : new THREE.Vector3();
         if (controls) controls.dispose();
-        if (mode === 'trackball') {
-          controls = new TrackballControls(camera, canvas);
-          controls.handleResize();
-        } else if (mode === 'arcball') {
-          controls = new ArcballControls(camera, canvas, scene);
-          controls.setGizmosVisible(false);
-        } else {
-          controls = new OrbitControls(camera, canvas);
-          controls.enableDamping = true;
-        }
+        controls = new OrbitControls(camera, canvas);
+        controls.enableDamping = true;
         controls.target.copy(saved);
         controls.update();
-        controlMode = mode;
       }
 
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -983,7 +966,7 @@
         loadToken: 0,
       };
 
-      makeControls('orbit');
+      makeControls();
 
       function clearRoot() {
         root.traverse((o) => {
@@ -1044,12 +1027,8 @@
         if (handle.defaultCameraPos) camera.position.copy(handle.defaultCameraPos);
         controls.target.set(0, 0, 0);
         camera.up.set(0, 1, 0);
-        makeControls(controlMode);
+        makeControls();
         return computeClipBBox();
-      }
-
-      function setControlMode(mode) {
-        makeControls(mode);
       }
 
       // Load and install every model for this pane. `token` guards against
@@ -1177,9 +1156,6 @@
           renderer.setSize(w, h, false);
           camera.aspect = w / h;
           camera.updateProjectionMatrix();
-          // TrackballControls caches the canvas rect; layout-driven resizes
-          // don't fire a window resize event, so refresh it here.
-          controls.handleResize?.();
         }
       }
 
@@ -1213,8 +1189,7 @@
       Object.assign(handle, {
         start, stop, dispose,
         setModels, clear, setFilamentColor, replaceGeometry,
-        rotate90, resetView, setControlMode,
-        getControlMode: () => controlMode,
+        rotate90, resetView,
         getControls: () => controls,
       });
       return handle;
@@ -1681,9 +1656,11 @@
       }
       el.appendChild(colorPicker);
 
-      // Cross-section controls
-      const crossRow = document.createElement('div');
-      crossRow.className = 'cross-section-row';
+      // Pane controls — cross-section toggle, 90° rotation per axis, reset,
+      // and the cross-section depth slider, all on one row (issue #337).
+      // Disabled until a mesh is loaded.
+      const controlsRow = document.createElement('div');
+      controlsRow.className = 'pane-controls-row';
 
       const crossBtn = document.createElement('button');
       crossBtn.type = 'button';
@@ -1731,15 +1708,7 @@
         state.clipPlane.constant = minY + pct * (maxY - minY);
       });
 
-      crossRow.appendChild(crossBtn);
-      crossRow.appendChild(clipSlider);
-      el.appendChild(crossRow);
-
-      // View controls — 90° rotation per axis, reset, and a switch between
-      // Orbit / Trackball / Arcball controls (issue #230). Disabled until a
-      // mesh is loaded.
-      const viewRow = document.createElement('div');
-      viewRow.className = 'view-controls-row';
+      controlsRow.appendChild(crossBtn);
 
       // Re-anchor the cross-section clip plane after a rotation/reset changes
       // the model's world-space Y extent.
@@ -1760,7 +1729,7 @@
         rb.setAttribute('aria-label', `Rotate model 90 degrees about the ${axis.toUpperCase()} axis`);
         rb.disabled = true;
         rb.addEventListener('click', () => applyClipBBox(state.viewer.rotate90(axis)));
-        viewRow.appendChild(rb);
+        controlsRow.appendChild(rb);
       }
 
       const resetBtn = document.createElement('button');
@@ -1770,30 +1739,12 @@
       resetBtn.setAttribute('aria-label', 'Reset view orientation and camera');
       resetBtn.disabled = true;
       resetBtn.addEventListener('click', () => applyClipBBox(state.viewer.resetView()));
-      viewRow.appendChild(resetBtn);
+      controlsRow.appendChild(resetBtn);
 
-      const modeDefs = [
-        { mode: 'orbit', label: 'Orbit' },
-        { mode: 'trackball', label: 'Trackball' },
-        { mode: 'arcball', label: 'Arcball' },
-      ];
-      const modeButtons = [];
-      for (const def of modeDefs) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'view-btn mode-btn';
-        b.textContent = def.label;
-        b.setAttribute('aria-label', `Use ${def.label} controls`);
-        b.setAttribute('aria-pressed', def.mode === 'orbit' ? 'true' : 'false');
-        b.disabled = true;
-        b.addEventListener('click', () => {
-          state.viewer.setControlMode(def.mode);
-          modeButtons.forEach(mb => mb.setAttribute('aria-pressed', mb === b ? 'true' : 'false'));
-        });
-        viewRow.appendChild(b);
-        modeButtons.push(b);
-      }
-      el.appendChild(viewRow);
+      // Slider last so it takes the row's leftover width, and so the
+      // customizer button can be inserted before it.
+      controlsRow.appendChild(clipSlider);
+      el.appendChild(controlsRow);
 
       const info = document.createElement('div');
       info.className = 'card-info';
@@ -1817,10 +1768,9 @@
         customizerCleanup: null,
         chips,
         colorPicker,
-        crossRow,
+        controlsRow,
         crossBtn,
         clipSlider,
-        viewRow,
         info,
         title,
         emptyMsg,
@@ -1938,10 +1888,15 @@
         pane.info.appendChild(links);
 
         if (single.projectData.description) {
-          const desc = document.createElement('p');
-          desc.className = 'pane-desc';
-          desc.textContent = single.projectData.description;
-          pane.info.appendChild(desc);
+          const det = document.createElement('details');
+          det.className = 'pane-desc';
+          const sum = document.createElement('summary');
+          sum.textContent = 'Description';
+          det.appendChild(sum);
+          const p = document.createElement('p');
+          p.textContent = single.projectData.description;
+          det.appendChild(p);
+          pane.info.appendChild(det);
         }
 
         if (Array.isArray(single.projectData.printing_notes)) {
@@ -1949,7 +1904,6 @@
           if (notes.length) {
             const det = document.createElement('details');
             det.className = 'printing-notes';
-            det.open = true;
             const sum = document.createElement('summary');
             sum.textContent = 'Printing notes';
             det.appendChild(sum);
@@ -1969,8 +1923,8 @@
       // single model that ships a validated parameters manifest.
       if (single && single.model.parameters?.parameters?.length) {
         const customizer = buildCustomizer(pane, single);
-        pane.crossRow.appendChild(customizer.button);
-        pane.el.insertBefore(customizer.panel, pane.viewRow);
+        pane.controlsRow.insertBefore(customizer.button, pane.clipSlider);
+        pane.controlsRow.insertAdjacentElement('afterend', customizer.panel);
         pane.customizerCleanup = customizer.destroy;
       }
     }
@@ -1988,7 +1942,7 @@
 
       pane.crossBtn.disabled = true;
       pane.clipSlider.disabled = true;
-      pane.viewRow.querySelectorAll('.view-btn').forEach(b => { b.disabled = true; });
+      pane.controlsRow.querySelectorAll('.view-btn').forEach(b => { b.disabled = true; });
 
       if (!refs.length) {
         pane.viewer.clear(token);
@@ -2006,7 +1960,7 @@
         pane.clipBBox = bbox;
         pane.crossBtn.disabled = false;
         pane.clipSlider.disabled = false;
-        pane.viewRow.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
+        pane.controlsRow.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
 
         // The materials were rebuilt — re-apply the active clip plane and
         // re-anchor it to the new bounding box.
@@ -2079,7 +2033,7 @@
       // default STL — the customized geometry is enough to drive them.
       pane.crossBtn.disabled = false;
       pane.clipSlider.disabled = false;
-      pane.viewRow.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
+      pane.controlsRow.querySelectorAll('.view-btn').forEach(b => { b.disabled = false; });
       if (pane.clipPlane) {
         const pct = Number(pane.clipSlider.value) / 100;
         pane.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);

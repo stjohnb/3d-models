@@ -152,9 +152,6 @@
     <button class="view-btn" id="rot-y" aria-label="Rotate model 90 degrees about the Y axis" disabled>Rotate Y</button>
     <button class="view-btn" id="rot-z" aria-label="Rotate model 90 degrees about the Z axis" disabled>Rotate Z</button>
     <button class="view-btn" id="reset-view" aria-label="Reset view orientation and camera" disabled>Reset</button>
-    <button class="view-btn mode-btn" id="mode-orbit" aria-label="Use Orbit controls" aria-pressed="true" disabled>Orbit</button>
-    <button class="view-btn mode-btn" id="mode-trackball" aria-label="Use Trackball controls" aria-pressed="false" disabled>Trackball</button>
-    <button class="view-btn mode-btn" id="mode-arcball" aria-label="Use Arcball controls" aria-pressed="false" disabled>Arcball</button>
   </div>
   <script type="importmap">
   {
@@ -179,8 +176,6 @@
     import * as THREE from 'three';
     import { STLLoader } from 'three/addons/loaders/STLLoader.js';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-    import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
-    import { ArcballControls } from 'three/addons/controls/ArcballControls.js';
 
     const BUILD_HASH = '__BUILD_HASH__';
     const cacheBust = BUILD_HASH.startsWith('__') ? '' : `?v=${BUILD_HASH}`;
@@ -328,28 +323,18 @@
 
       const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
 
-      // Reassignable so the user can switch between Orbit / Trackball /
-      // Arcball at runtime (issue #230). Preserve target across switches.
+      // Rebuilt (not just reset) by the Reset button so OrbitControls'
+      // internal spherical state is discarded along with the camera position.
       let controls = null;
-      let controlMode = 'orbit';
-      function makeControls(mode) {
+      function makeControls() {
         const saved = controls ? controls.target.clone() : new THREE.Vector3();
         if (controls) controls.dispose();
-        if (mode === 'trackball') {
-          controls = new TrackballControls(camera, canvas);
-          controls.handleResize();
-        } else if (mode === 'arcball') {
-          controls = new ArcballControls(camera, canvas, scene);
-          controls.setGizmosVisible(false);
-        } else {
-          controls = new OrbitControls(camera, canvas);
-          controls.enableDamping = true;
-        }
+        controls = new OrbitControls(camera, canvas);
+        controls.enableDamping = true;
         controls.target.copy(saved);
         controls.update();
-        controlMode = mode;
       }
-      makeControls('orbit');
+      makeControls();
 
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
       scene.add(ambientLight);
@@ -468,7 +453,6 @@
           renderer.setSize(w, h, false);
           camera.aspect = w / h;
           camera.updateProjectionMatrix();
-          controls.handleResize?.();
         }
       }
 
@@ -550,23 +534,9 @@
         if (defaultCamPos) camera.position.copy(defaultCamPos);
         controls.target.set(0, 0, 0);
         camera.up.set(0, 1, 0);
-        makeControls(controlMode);
+        makeControls();
         recomputeClip();
       });
-
-      const modeBtns = {
-        orbit: document.getElementById('mode-orbit'),
-        trackball: document.getElementById('mode-trackball'),
-        arcball: document.getElementById('mode-arcball'),
-      };
-      for (const [mode, btn] of Object.entries(modeBtns)) {
-        btn?.addEventListener('click', () => {
-          makeControls(mode);
-          for (const [m, b] of Object.entries(modeBtns)) {
-            if (b) b.setAttribute('aria-pressed', String(m === mode));
-          }
-        });
-      }
 
       animate();
     }
