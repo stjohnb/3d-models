@@ -288,7 +288,7 @@ share a common square-peg connection that plugs into the power handle.
 | `screwdriver_handle.scad` | Renderable — manual handle with square socket (female end, via shared library) |
 | `test_male.scad` | Renderable — male connection only (shaft + collar), for test printing fit |
 | `test_female.scad` | Renderable — female socket in a short cylinder, for test printing fit (via shared library) |
-| `meta.json` | Project metadata (description, tags, difficulty) |
+| `meta.json` | Project metadata (description, tags, version 1.1.0, difficulty: intermediate, `complex_interior: true`, `mating_pairs: [[test_male.stl, test_female.stl]]`) |
 | `dependency-graph.md` | Auto-generated `include` dependency graph |
 | `images/`, `Screenshot 2026-02-22 at 18.00.38.png` | Reference photos |
 

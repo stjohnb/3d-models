@@ -77,7 +77,8 @@ step:
 ### 2.6. Run Python Unit Tests for Build Scripts
 
 Runs `python3 -m unittest test_render_view test_oembed_helpers
-test_fetch_openscad_wasm test_render_cache test_capped_openscad -v` from within the `scripts/` directory. These are
+test_fetch_openscad_wasm test_render_cache test_capped_openscad
+test_viewer_invariants -v` from within the `scripts/` directory. These are
 fast unit tests that mock external I/O (network, filesystem) and run on every
 push. They guard the helper functions used throughout the CI pipeline against
 regressions.
@@ -792,7 +793,8 @@ multiple fail, all errors are visible.
   emscripten's `exit()` call at the end of `callMain` corrupts the module's
   internal FS state. A new instance per render is more expensive but reliable.
 - **Unit tests run in CI**: `python3 -m unittest test_render_view
-  test_oembed_helpers test_fetch_openscad_wasm test_render_cache` runs on every push (step 2.6)
+  test_oembed_helpers test_fetch_openscad_wasm test_render_cache
+  test_capped_openscad test_viewer_invariants` runs on every push (step 2.6)
   before any heavy tools are invoked. These tests mock I/O and finish
   in seconds, catching regressions in build-script helpers before rendering
   begins.

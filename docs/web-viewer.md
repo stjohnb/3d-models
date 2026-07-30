@@ -79,10 +79,12 @@ badge is omitted if the estimate is unavailable (graceful degradation).
 A project's `meta.json` can declare an optional `printing_notes` array —
 free-text printer/slicer guidance (layer height, seam placement, orientation,
 filament choice) that isn't capturable as a structured field. When present,
-`index.html` renders an open `<details class="printing-notes">` block under
-the project description in a single-model pane; `embed.html` renders the same
-content in a closed `<details>` pinned to the top-right corner; standalone
-viewers render one above the footer. All three build the notes with
+`index.html` renders a closed `<details class="printing-notes">` block under a
+collapsed project-description disclosure in a single-model pane; `embed.html`
+renders the same content in a closed `<details>` pinned to the top-right
+corner; standalone viewers render one above the footer. All three start
+closed (issue #337 — the viewer canvas gets the space instead), and all three
+build the notes with
 `textContent`/`html.escape` — never `innerHTML` — since the text is arbitrary
 free-form content from `meta.json`.
 
@@ -186,26 +188,34 @@ loaded by any viewer.
 
 ### 3D Controls
 
-Each pane has a row of control buttons below the 3D canvas, enabled once the
-pane's models have loaded (disabled until then):
+Each pane has a single `.pane-controls-row` below the 3D canvas holding the
+"✂ Cross Section" toggle, Rotate X/Y/Z, Reset, and the cross-section depth
+slider (plus the ⚙ Customize button when the model ships a parameters
+manifest). The buttons are enabled once the pane's models have loaded
+(disabled until then); the slider takes the row's leftover width and wraps to
+a second line when the pane is too narrow.
 
-- **Rotate 90°** (`↺ Y` / `↺ X`): Rotates the mesh 90° around the world Y or X
-  axis. Useful for upright models where OrbitControls' fixed world-up otherwise
-  prevents free rotation. After rotation the cross-section clip bounds are
-  recomputed.
-- **Reset**: Restores the camera to its default position and re-initialises the
-  active control mode.
-- **Orbit / Trackball / Arcball**: Three toggle buttons switch the active orbit
-  style at runtime. **Orbit** (default, OrbitControls, world-Y-up), **Trackball**
-  (TrackballControls, gimbal-lock-free), **Arcball** (ArcballControls with
-  on-screen gizmo rings suppressed via `setGizmosVisible(false)`). All three
-  classes are imported from `three/addons/` at Three.js 0.170.0 with no extra
-  import-map entries.
+- **Rotate 90°** (`Rotate X` / `Rotate Y` / `Rotate Z`): Rotates the mesh 90°
+  around the corresponding world axis. Useful for upright models where
+  OrbitControls' fixed world-up otherwise prevents free rotation. After
+  rotation the cross-section clip bounds are recomputed.
+- **Reset**: Restores the camera to its default position and rebuilds the
+  controls.
 
-The `makeControls(mode)` function handles switching: it clones `controls.target`,
-calls `controls.dispose()`, instantiates the new mode (calling
-`controls.handleResize()` for TrackballControls), then restores the saved target
-and calls `controls.update()`. The `resize()` loop calls `controls.handleResize?.()` via optional chaining so the TrackballControls screen-rect cache stays current. The active mode button uses `aria-pressed="true"` to reflect state.
+Controls are always `OrbitControls` (with `enableDamping`), imported from
+`three/addons/` at Three.js 0.170.0 with no extra import-map entries.
+`makeControls()` takes no argument and exists only so `resetView()` can
+rebuild the controls — discarding OrbitControls' internal spherical state
+along with the camera position — while preserving the current target: it
+clones `controls.target`, calls `controls.dispose()`, constructs a fresh
+`OrbitControls`, restores the target, and calls `controls.update()`.
+
+The runtime Orbit/Trackball/Arcball mode switcher added in issue #230 was
+removed in issue #337: only Orbit was ever used, and the three buttons (plus
+the two unused control modules embedded in every standalone viewer) cost
+vertical space that the canvas now gets. `scripts/test_viewer_invariants.py`'s
+`ViewerChromeTests` locks this — no `TrackballControls`/`ArcballControls`
+references, one controls row, no force-opened disclosures.
 
 ### Cross-Section View
 
@@ -244,8 +254,9 @@ the pane.
 Controls that are inherently per-model are shown only when a pane holds
 exactly one: the parametric customizer, the QR button, the print-time badge,
 the Download STL / Standalone / Source links, the project description, and
-the printing notes. The filament picker, cross-section, view controls, and
-fullscreen apply to whatever the pane contains.
+the printing notes (the last two are collapsed `<details>` disclosures). The
+filament picker, cross-section, view controls, and fullscreen apply to
+whatever the pane contains.
 
 ### Focus Pane
 
@@ -258,8 +269,7 @@ toggles focus for the active pane; `Escape` restores the split layout.
 The `resize()` loop inside `createViewer` runs every animation frame checking
 `canvas.clientWidth/clientHeight`, so the renderer self-corrects when a
 layout or focus change alters a pane's dimensions with no window resize
-event. It also calls `controls.handleResize?.()`, which TrackballControls
-needs to keep its cached screen rect current.
+event.
 
 ### Deep Links (URL Hash Routing)
 
@@ -320,8 +330,8 @@ viewport, no scrolling" to a normally-scrolling page: the sidebar becomes a
 fixed off-canvas drawer (toggled by a `#sidebar-toggle` button and a
 `body.sidebar-open` class) instead of a permanent column, pane canvases take a
 fixed `55vh`/`55dvh` slice of the viewport instead of flexing to fill
-remaining space, and the rest of a pane's chrome (chips, colour picker,
-cross-section controls, view buttons, description, printing notes) flows
+remaining space, and the rest of a pane's chrome (chips, colour picker, the
+combined controls row, description, printing notes) flows
 below the canvas rather than being clipped. Fullscreen mode overrides the
 fixed canvas height back to `flex: 1` so a phone in fullscreen still gets the
 full screen. `scripts/generate-standalone.py` applies the same fixed-height
