@@ -913,18 +913,32 @@
     // Viewer
     // ------------------------------------------------------------------
 
+    // Cap the drawing-buffer resolution. Retina DPR 2 quadruples fragment cost
+    // for a barely-visible quality gain; 1.5 keeps edges clean under MSAA.
+    const MAX_PIXEL_RATIO = 1.5;
+
     // One viewer per pane. A pane can hold any number of models: each model
     // (single mesh, or a multi-part coloured composite) becomes its own
     // THREE.Group under a shared root, laid out side by side along world X.
     function createViewer(canvas) {
-      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-      renderer.setPixelRatio(window.devicePixelRatio);
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'low-power' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
       renderer.localClippingEnabled = true;
 
       const scene = new THREE.Scene();
       scene.background = new THREE.Color(0x0f3460);
 
       const camera = new THREE.PerspectiveCamera(45, (canvas.clientWidth / canvas.clientHeight) || 1, 0.1, 10000);
+
+      // Frame-scheduling state for the on-demand render loop further down.
+      // Declared up here because makeControls() attaches invalidate() as an
+      // OrbitControls listener, and OrbitControls.update() can dispatch
+      // 'change' synchronously — these must not be in their TDZ by then.
+      let rafId = null;
+      let paused = false;
+      let needsRender = true;
+      let idleFrames = 0;
+      let lastW = 0, lastH = 0;
 
       // Rebuilt (not just reset) by resetView() so OrbitControls' internal
       // spherical state is discarded along with the camera position.
@@ -934,6 +948,9 @@
         if (controls) controls.dispose();
         controls = new OrbitControls(camera, canvas);
         controls.enableDamping = true;
+        // Re-attached here (not at the call sites) because resetView() rebuilds
+        // the controls object and drops the old one's listeners.
+        controls.addEventListener('change', invalidate);
         controls.target.copy(saved);
         controls.update();
       }
@@ -1019,6 +1036,7 @@
           : axis === 'y' ? new THREE.Vector3(0, 1, 0)
           : new THREE.Vector3(0, 0, 1);
         root.rotateOnWorldAxis(v, Math.PI / 2);
+        invalidate();
         return computeClipBBox();
       }
 
@@ -1028,6 +1046,7 @@
         controls.target.set(0, 0, 0);
         camera.up.set(0, 1, 0);
         makeControls();
+        invalidate();
         return computeClipBBox();
       }
 
@@ -1106,17 +1125,21 @@
 
         handle.materials = materials;
         handle.filamentMaterials = filamentMaterials;
-        return frameRoot();
+        const framed = frameRoot();
+        invalidate();
+        return framed;
       }
 
       function clear(token) {
         handle.loadToken = token;
         clearRoot();
+        invalidate();
       }
 
       function setFilamentColor(hex) {
         handle.filamentColor = hex;
         for (const m of handle.filamentMaterials) m.color.setHex(hex);
+        invalidate();
       }
 
       // Swap in a freshly customizer-rendered mesh. Only meaningful for a
@@ -1143,34 +1166,71 @@
         // Invalidate any still-in-flight default-STL load so it can't
         // overwrite the customized mesh when it resolves.
         handle.loadToken += 1;
-        return frameRoot();
+        const framed = frameRoot();
+        invalidate();
+        return framed;
       }
 
-      let rafId = null;
+      // Frames of no camera movement and no invalidate() before the loop
+      // suspends itself. Generous (~1.5s) so OrbitControls' damping coast and
+      // any short CSS size transition always finish drawing.
+      const IDLE_FRAMES_BEFORE_SUSPEND = 90;
 
+      // Request one more drawn frame and wake the loop if it has suspended.
+      function invalidate() {
+        needsRender = true;
+        idleFrames = 0;
+        if (!paused && rafId === null) rafId = requestAnimationFrame(animate);
+      }
+
+      // Callers invalidate; a zero-size canvas (a pane hidden by focus mode)
+      // returns early without recording the size, so it re-sizes correctly
+      // when it reappears.
       function resize() {
         const w = canvas.clientWidth;
         const h = canvas.clientHeight;
         if (w === 0 || h === 0) return;
-        if (canvas.width !== w || canvas.height !== h) {
+        if (w !== lastW || h !== lastH) {
+          lastW = w; lastH = h;
           renderer.setSize(w, h, false);
           camera.aspect = w / h;
           camera.updateProjectionMatrix();
         }
       }
 
+      // The observer owns resizing — animate() must not poll clientWidth,
+      // which forces a layout flush on every frame of every pane. It fires
+      // only on a real box change, and always invalidates: leaving focus mode
+      // un-hides a pane at the CSS size it already had, so resize() finds
+      // nothing to do even though the compositor discarded the frame.
+      const resizeObserver = new ResizeObserver(() => { resize(); invalidate(); });
+      resizeObserver.observe(canvas);
+
+      canvas.addEventListener('pointerdown', invalidate);
+      canvas.addEventListener('wheel', invalidate, { passive: true });
+      canvas.addEventListener('touchstart', invalidate, { passive: true });
+
       function animate() {
         rafId = requestAnimationFrame(animate);
-        resize();
-        controls.update();
-        renderer.render(scene, camera);
+        const moved = controls.update();
+        if (needsRender || moved) {
+          needsRender = false;   // cleared before render so a change fired
+          idleFrames = 0;        // during rendering isn't swallowed
+          renderer.render(scene, camera);
+        } else if (++idleFrames > IDLE_FRAMES_BEFORE_SUSPEND) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
       }
 
       function start() {
-        if (rafId === null) animate();
+        paused = false;
+        resize();
+        invalidate();
       }
 
       function stop() {
+        paused = true;
         if (rafId !== null) {
           cancelAnimationFrame(rafId);
           rafId = null;
@@ -1179,15 +1239,20 @@
 
       function dispose() {
         stop();
+        resizeObserver.disconnect();
         controls.dispose();
         clearRoot();
         renderer.dispose();
         renderer.forceContextLoss();
       }
 
-      animate();
+      start();
       Object.assign(handle, {
         start, stop, dispose,
+        // Rendering is on-demand: any code that mutates this viewer's scene,
+        // materials, or clipping planes from outside createViewer must call
+        // invalidate() or the change won't appear until the camera next moves.
+        invalidate,
         setModels, clear, setFilamentColor, replaceGeometry,
         rotate90, resetView,
         getControls: () => controls,
@@ -1699,6 +1764,7 @@
           clipSlider.style.display = '';
           crossBtn.setAttribute('aria-pressed', 'true');
         }
+        state.viewer.invalidate();
       });
 
       clipSlider.addEventListener('input', () => {
@@ -1706,6 +1772,7 @@
         const pct = clipSlider.value / 100;
         const { minY, maxY } = state.clipBBox;
         state.clipPlane.constant = minY + pct * (maxY - minY);
+        state.viewer.invalidate();
       });
 
       controlsRow.appendChild(crossBtn);
@@ -1719,6 +1786,7 @@
           const pct = Number(clipSlider.value) / 100;
           state.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);
         }
+        state.viewer.invalidate();
       }
 
       for (const axis of ['x', 'y', 'z']) {
@@ -1968,6 +2036,7 @@
           const pct = Number(pane.clipSlider.value) / 100;
           pane.clipPlane.constant = bbox.minY + pct * (bbox.maxY - bbox.minY);
           for (const m of pane.viewer.materials) m.clippingPlanes = [pane.clipPlane];
+          pane.viewer.invalidate();
         }
         pane.viewer.setFilamentColor(pane.selectedColor);
         updateHash();

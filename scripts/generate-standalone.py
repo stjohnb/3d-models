@@ -387,14 +387,27 @@ HTML_TEMPLATE = """\
     const canvas = document.createElement('canvas');
     container.appendChild(canvas);
 
-    const renderer = new THREE.WebGLRenderer({{ canvas, antialias: true }});
-    renderer.setPixelRatio(window.devicePixelRatio);
+    // Cap the drawing-buffer resolution. Retina DPR 2 quadruples fragment cost
+    // for a barely-visible quality gain; 1.5 keeps edges clean under MSAA.
+    const MAX_PIXEL_RATIO = 1.5;
+
+    const renderer = new THREE.WebGLRenderer({{ canvas, antialias: true, powerPreference: 'low-power' }});
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
     renderer.localClippingEnabled = true;
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0f3460);
 
     const camera = new THREE.PerspectiveCamera(45, canvas.clientWidth / canvas.clientHeight, 0.1, 10000);
+
+    // Frame-scheduling state for the on-demand render loop further down.
+    // Declared before makeControls() because invalidate() is attached as an
+    // OrbitControls listener and update() can dispatch 'change' synchronously.
+    let animating = true;
+    let rafId = null;
+    let needsRender = true;
+    let idleFrames = 0;
+    let lastW = 0, lastH = 0;
 
     // Rebuilt (not just reset) by the Reset button so OrbitControls' internal
     // spherical state is discarded along with the camera position.
@@ -404,6 +417,9 @@ HTML_TEMPLATE = """\
       if (controls) controls.dispose();
       controls = new OrbitControls(camera, canvas);
       controls.enableDamping = true;
+      // Re-attached here because the Reset button rebuilds the controls object
+      // and drops the old one's listeners.
+      controls.addEventListener('change', invalidate);
       controls.target.copy(saved);
       controls.update();
     }}
@@ -502,32 +518,69 @@ HTML_TEMPLATE = """\
       controls.update();
     }}
 
+    // Frames of no camera movement and no invalidate() before the loop
+    // suspends itself. Generous (~1.5s) so OrbitControls' damping coast and any
+    // short CSS size transition always finish drawing.
+    const IDLE_FRAMES_BEFORE_SUSPEND = 90;
+
+    // Request one more drawn frame and wake the loop if it has suspended.
+    function invalidate() {{
+      needsRender = true;
+      idleFrames = 0;
+      if (animating && rafId === null) rafId = requestAnimationFrame(animate);
+    }}
+
+    // Callers invalidate; a zero-size canvas returns early without recording
+    // the size, so it re-sizes correctly when it becomes visible again.
     function resize() {{
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
-      if (canvas.width !== w || canvas.height !== h) {{
+      if (w === 0 || h === 0) return;
+      if (w !== lastW || h !== lastH) {{
+        lastW = w; lastH = h;
         renderer.setSize(w, h, false);
         camera.aspect = w / h;
         camera.updateProjectionMatrix();
       }}
     }}
 
-    let animating = true;
+    // The observer owns resizing — animate() must not poll clientWidth, which
+    // forces a layout flush on every frame. It fires only on a real box change,
+    // and always invalidates: a canvas that was hidden and re-shown at the same
+    // CSS size gives resize() nothing to do even though the compositor
+    // discarded the frame.
+    const resizeObserver = new ResizeObserver(() => {{ resize(); invalidate(); }});
+    resizeObserver.observe(canvas);
+
+    canvas.addEventListener('pointerdown', invalidate);
+    canvas.addEventListener('wheel', invalidate, {{ passive: true }});
+    canvas.addEventListener('touchstart', invalidate, {{ passive: true }});
+
     function animate() {{
-      if (!animating) return;
-      requestAnimationFrame(animate);
-      resize();
-      controls.update();
-      renderer.render(scene, camera);
+      if (!animating) {{ rafId = null; return; }}
+      rafId = requestAnimationFrame(animate);
+      const moved = controls.update();
+      if (needsRender || moved) {{
+        needsRender = false;   // cleared before render so a change fired
+        idleFrames = 0;        // during rendering isn't swallowed
+        renderer.render(scene, camera);
+      }} else if (++idleFrames > IDLE_FRAMES_BEFORE_SUSPEND) {{
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }}
     }}
-    animate();
+
+    resize();
+    invalidate();
 
     document.addEventListener('visibilitychange', () => {{
       if (document.hidden) {{
         animating = false;
+        if (rafId !== null) {{ cancelAnimationFrame(rafId); rafId = null; }}
       }} else {{
         animating = true;
-        animate();
+        resize();
+        invalidate();
       }}
     }});
 
@@ -545,6 +598,7 @@ HTML_TEMPLATE = """\
           colorContainer.querySelectorAll('.color-swatch').forEach(s => s.removeAttribute('aria-pressed'));
           swatch.setAttribute('aria-pressed', 'true');
           material.color.setHex(color.hex);
+          invalidate();
         }});
         colorContainer.appendChild(swatch);
       }}
@@ -557,6 +611,7 @@ HTML_TEMPLATE = """\
       }} else {{
         document.documentElement.requestFullscreen();
       }}
+      invalidate();
     }});
 
     // Cross-section
@@ -579,12 +634,14 @@ HTML_TEMPLATE = """\
         clipSlider.style.display = '';
         crossBtn.setAttribute('aria-pressed', 'true');
       }}
+      invalidate();
     }});
 
     clipSlider.addEventListener('input', () => {{
       if (!clipPlane) return;
       const pct = clipSlider.value / 100;
       clipPlane.constant = clipBounds.minY + pct * (clipBounds.maxY - clipBounds.minY);
+      invalidate();
     }});
 
     // View controls — rotate 90° per world axis, reset, and switch controls.
@@ -604,6 +661,7 @@ HTML_TEMPLATE = """\
         : new THREE.Vector3(0, 0, 1);
       displayObject.rotateOnWorldAxis(v, Math.PI / 2);
       recomputeClip();
+      invalidate();
     }}
 
     document.getElementById('rot-x').addEventListener('click', () => rotateMesh('x'));
@@ -616,6 +674,7 @@ HTML_TEMPLATE = """\
       camera.up.set(0, 1, 0);
       makeControls();
       recomputeClip();
+      invalidate();
     }});
   </script>
 </body>
