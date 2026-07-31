@@ -42,6 +42,55 @@ ES module JS. Pulls Three.js from a CDN via import map.
   `<meta name="color-scheme" content="dark">`, SVG favicon links, and
   `<link rel="manifest">` pointing to `site.webmanifest`
 
+### Render Budget
+
+Issue #341 — a client laptop reported the gallery page pinning its fans. All
+three viewers (`index.html`, `embed.html`, standalone) previously rendered
+continuously at full `requestAnimationFrame` rate whether or not anything had
+changed, once per open pane, at full Retina resolution, with no GPU preference
+hint. An idle page cost the same as an actively-dragged one. Four changes,
+identical across the three:
+
+- **On-demand rendering.** The loop draws a frame only when the camera moved
+  (`OrbitControls`' `change` event, re-attached inside `makeControls()` since
+  `resetView()` rebuilds the controls object) or when something called
+  `invalidate()`. After `IDLE_FRAMES_BEFORE_SUSPEND` (90 frames, ~1.5s — long
+  enough that OrbitControls' damping coast and any CSS size transition always
+  finish drawing) the rAF chain cancels itself entirely. `invalidate()` restarts
+  it; `pointerdown` / `wheel` / `touchstart` on the canvas are also wired to it
+  as belt-and-braces wake-ups.
+- **Pixel-ratio cap.** `MAX_PIXEL_RATIO = 1.5` instead of raw
+  `window.devicePixelRatio`. DPR 2 quadruples fragment cost for a
+  barely-visible gain; `antialias: true` (MSAA) is deliberately kept, so edges
+  stay clean.
+- **`powerPreference: 'low-power'`.** A hint asking the browser for the
+  integrated GPU — the single biggest thermal lever on a dual-GPU laptop.
+  Ignored on single-GPU machines and by some browsers; harmless there.
+- **`ResizeObserver`.** `resize()` used to run inside `animate()`, reading
+  `canvas.clientWidth` and forcing a layout flush every frame of every pane;
+  worse, its guard compared a device-pixel `canvas.width` against a CSS-pixel
+  `clientWidth`, so at DPR ≠ 1 it fired `setSize()` +
+  `updateProjectionMatrix()` on *every* frame. A `ResizeObserver` on the canvas
+  now owns resizing. `resize()` returns early on a zero-size canvas (a pane
+  hidden by focus mode) *without* recording the size, so the pane re-sizes
+  correctly when it reappears; the observer callback then calls `invalidate()`
+  unconditionally, because un-hiding a pane restores the CSS size it already
+  had — `resize()` finds nothing to do even though the compositor discarded
+  the drawing buffer while it was hidden.
+
+**Contract:** any code that mutates a viewer's scene, materials, or clipping
+planes from outside `createViewer` **must call `viewer.invalidate()`** — the
+change will otherwise not appear until the next camera move. In `index.html`
+that means the cross-section toggle, the clip slider, the post-load clip-plane
+re-anchor, and `applyClipBBox()`; the handle's own methods (`setModels`,
+`clear`, `setFilamentColor`, `replaceGeometry`, `rotate90`, `resetView`)
+invalidate internally. `stop()` / `start()` remain the `visibilitychange`
+pause/resume pair, and `start()` forces a fresh frame on tab return.
+
+`scripts/test_viewer_invariants.py`'s `RenderBudgetTests` locks all four
+properties across `index.html`, `embed.html`, and
+`scripts/generate-standalone.py`.
+
 ### Security Convention
 
 All dynamic content in `index.html` and `embed.html` that interpolates model
@@ -266,10 +315,10 @@ to fill the stage without using the native Fullscreen API.
 `.panes--focused` to `#panes`, which hides the other panes. Pressing `M`
 toggles focus for the active pane; `Escape` restores the split layout.
 
-The `resize()` loop inside `createViewer` runs every animation frame checking
-`canvas.clientWidth/clientHeight`, so the renderer self-corrects when a
-layout or focus change alters a pane's dimensions with no window resize
-event.
+A `ResizeObserver` on each pane's canvas drives `resize()`, so the renderer
+self-corrects when a layout or focus change alters a pane's dimensions with no
+window resize event (see [Render Budget](#render-budget) — this replaced a
+per-frame `canvas.clientWidth` poll).
 
 ### Deep Links (URL Hash Routing)
 

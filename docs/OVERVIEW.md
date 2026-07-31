@@ -575,6 +575,8 @@ comment.
 | PR preview path | `s3://…/pr-preview/pr-{N}/{SHA}/` | Per-PR, per-commit previews |
 | Source zip naming | `site/<dir>-source.zip` | Per-project zip of git-tracked source files; referenced as `sourceZip` in `models.json` |
 | Three.js version | `0.170.0` (CDN import map in `index.html`) | STLLoader + OrbitControls; also pinned in `generate-standalone.py` with SHA-256 verification |
+| Viewer max pixel ratio | `MAX_PIXEL_RATIO = 1.5` in `index.html`, `embed.html`, `generate-standalone.py` | Caps Retina drawing-buffer cost; MSAA (`antialias: true`) kept |
+| Viewer render policy | On-demand (`invalidate()` / `needsRender`); rAF loop suspends after ~90 idle frames; `powerPreference: 'low-power'` | Issue #341 — continuous rAF rendering overheated client laptops. Any external scene/material mutation must call `viewer.invalidate()` (see [web-viewer.md](web-viewer.md#render-budget)) |
 | OpenSCAD resolution | `$fn = 64` | Set per-file in `.scad` sources |
 | Thumbnail size | `800x600` | Set in build.yml render step |
 | OG hero image | `og-hero.png` (1200x630) | Composited by CI; stable URL, not cache-busted |

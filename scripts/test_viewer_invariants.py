@@ -19,8 +19,12 @@ import unittest
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 INDEX_HTML = REPO_ROOT / "index.html"
 EMBED_HTML = REPO_ROOT / "embed.html"
+STANDALONE_PY = REPO_ROOT / "scripts" / "generate-standalone.py"
 
 VIEWERS = (INDEX_HTML, EMBED_HTML)
+# Every place a WebGL render loop is written — the two viewers plus the
+# standalone generator's HTML_TEMPLATE.
+RENDER_SOURCES = (INDEX_HTML, EMBED_HTML, STANDALONE_PY)
 
 
 def read(path):
@@ -130,6 +134,59 @@ class ViewerChromeTests(unittest.TestCase):
     def test_index_disclosures_start_closed(self):
         html = read(INDEX_HTML)
         self.assertNotIn("det.open = true", html)
+
+
+class RenderBudgetTests(unittest.TestCase):
+    """Issue #341 — the viewers must render on demand, not every frame."""
+
+    def test_pixel_ratio_capped(self):
+        for path in RENDER_SOURCES:
+            text = read(path)
+            self.assertNotIn(
+                "setPixelRatio(window.devicePixelRatio)",
+                text,
+                f"{path.name} uses the raw device pixel ratio; cap it with "
+                "MAX_PIXEL_RATIO so Retina displays don't pay 4x fragment cost",
+            )
+            self.assertIn(
+                "MAX_PIXEL_RATIO",
+                text,
+                f"{path.name} must declare and apply MAX_PIXEL_RATIO",
+            )
+
+    def test_low_power_gpu_hint(self):
+        for path in RENDER_SOURCES:
+            self.assertIn(
+                "powerPreference: 'low-power'",
+                read(path),
+                f"{path.name} must hint the integrated GPU — a discrete GPU is "
+                "the biggest thermal lever on a dual-GPU laptop",
+            )
+
+    def test_on_demand_render_loop(self):
+        for path in RENDER_SOURCES:
+            text = read(path)
+            for token in ("needsRender", "function invalidate("):
+                self.assertIn(
+                    token,
+                    text,
+                    f"{path.name} must render on demand via {token!r}",
+                )
+
+    def test_resize_observer(self):
+        for path in RENDER_SOURCES:
+            text = read(path)
+            self.assertIn(
+                "new ResizeObserver(",
+                text,
+                f"{path.name} must observe canvas size instead of polling "
+                "clientWidth every frame",
+            )
+            self.assertIsNone(
+                re.search(r"requestAnimationFrame\(animate\);\s*\n\s*resize\(\);", text),
+                f"{path.name} still calls resize() from the animation loop, "
+                "which forces a layout flush every frame",
+            )
 
 
 if __name__ == "__main__":
