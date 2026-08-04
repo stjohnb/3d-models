@@ -24,7 +24,11 @@ Two workflow files live in `.github/workflows/`:
   label must exist on that runner's registration or the job queues forever.
   The runner is expected to have OpenSCAD, ImageMagick, ADMesh, qrencode,
   xvfb, Python 3, and AWS CLI pre-installed. Each dependency install step
-  checks availability first and only installs if missing.
+  checks availability first and only installs if missing. If `python3` is
+  absent from the runner's `PATH`, step 0 (Verify python3) fails the build
+  immediately with a pointer to file the fix as a runner defect in
+  `St-John-Software/nixos-config` — it does not attempt to locate or install
+  one itself.
 - **Concurrency**: Groups by `pages-main` or `pages-pr-{N}`. In-progress runs
   are cancelled when a new commit arrives.
 - **Permissions**: `contents: write`, `pull-requests: write`, `id-token: write`
@@ -32,6 +36,21 @@ Two workflow files live in `.github/workflows/`:
   on main-branch pushes.
 
 ## Pipeline Steps
+
+### 0. Verify Python Interpreter
+
+Runs as the very first step after checkout, before any step that shells out
+to `python3`. It checks that `python3` is on `PATH` and can create a venv
+(`import ensurepip, json, venv`); if not, it emits `::error::` naming the
+runner defect and pointing at `St-John-Software/nixos-config` as the place to
+fix it, then exits non-zero. This is a fail-fast precondition, not a deferred
+check — unlike dependency-graph, metadata, and interference validation, it
+hard-fails immediately rather than recording the failure for a later
+enforcement step, since a missing interpreter would otherwise break every
+downstream step with an unhelpful "command not found". It deliberately does
+not search for or fall back to an alternate interpreter: a missing `python3`
+is a runner defect (the runner declares it via `extraPackages` in
+nixos-config), not something a workflow should discover or paper over.
 
 ### 1. Verify Dependency Graph
 
@@ -78,31 +97,45 @@ step:
 
 Runs `python3 -m unittest test_render_view test_oembed_helpers
 test_fetch_openscad_wasm test_render_cache test_capped_openscad
-test_viewer_invariants -v` from within the `scripts/` directory. These are
-fast unit tests that mock external I/O (network, filesystem) and run on every
-push. They guard the helper functions used throughout the CI pipeline against
+test_viewer_invariants test_build_workflow -v` from
+within the `scripts/` directory. These are fast unit tests that mock
+external I/O (network, filesystem) and run on every push. They guard the
+helper functions used throughout the CI pipeline against
 regressions.
 
-### 3. Install OpenSCAD and Dependencies
+### 3. Check Build Dependencies
 
-Checks if OpenSCAD, ImageMagick, `zip`, and `qrencode` are already available;
-if not, installs via `apt-get` (along with `xvfb` for headless rendering).
-Verifies with `openscad --version` to fail fast if installation failed rather
-than producing a confusing error in later steps.
+Verifies that `openscad`, `xvfb-run`, `montage` (ImageMagick), `zip`, and
+`qrencode` are all on `PATH`. If any are missing, emits a single `::error::`
+naming every missing tool and exits.
 
-Uses `set -eo pipefail` so any failure in the install block is caught
-immediately.
+The step installs nothing. The runner is ryzen (NixOS) and the runner service
+is deliberately unprivileged — no `sudo` on its `PATH`, no sudoers entry, and
+no `apt-get` on the host at all. Build tools are provided by the runner host's
+Nix package set; a missing one is a host configuration problem, not something
+the job can fix. Failing here with the exact tool name beats dying several
+steps later with `openscad: command not found` inside a render loop.
+
+Uses `set -eo pipefail` so any failure in the block is caught immediately.
 
 ### 3.5. Prepare Xvfb Environment
 
-Before any rendering begins, stale X display lock files and sockets from
-prior interrupted CI runs are cleaned up on the self-hosted runner:
+Before any rendering begins, stale X display lock files from prior interrupted
+CI runs are cleaned up on the self-hosted runner:
 
-- Removes `/tmp/.X*-lock` files and `/tmp/.X11-unix/` with `sudo` (prior
-  jobs may leave root-owned files)
-- Recreates `/tmp/.X11-unix/` with `chmod 1777` (sticky bit — standard
-  permissions for X11 socket directories)
+- Removes `/tmp/.X*-lock` files with plain `rm` (no `sudo`). Locks left by our
+  own crashed Xvfb runs are owned by the runner user, so this clears exactly
+  the ones that matter
+- Creates `/tmp/.X11-unix/` with `chmod 1777` (sticky bit — standard
+  permissions for X11 socket directories) **only if it does not already
+  exist**. ryzen is also a live desktop, and an existing `/tmp/.X11-unix` holds
+  the real session's sockets — deleting or re-permissioning it would break GDM.
+  If the existing directory isn't writable by the runner user, the step emits a
+  `::warning::` with `ls -ld` output rather than trying to fix it
 - Verifies `xvfb-run` is installed; emits `::error::` and exits if missing
+
+`xvfb-run --auto-servernum` skips displays that are genuinely in use, so the
+desktop's own display is never contended for.
 
 Without this step, `xvfb-run` can fail with "Server is already active for
 display N" or "Cannot establish any listening sockets" when a stale lock file
@@ -135,11 +168,12 @@ triggers a warning; the maintainer then updates `.openscad-version` with a
 dedicated commit. This ensures the committed baseline stays in sync with the
 runner without CI having write access.
 
-### 5. Install ADMesh
+### 5. Check ADMesh
 
-Separate from the OpenSCAD install step. Checks if `admesh` is already
-available; if not, installs via `apt-get`. Follows the same idempotent
-`command -v` pattern as the other tool installs.
+Separate from the build-dependency step because mesh validation is optional to
+the rest of the pipeline's shape. Verifies `admesh` is on `PATH` and prints its
+version; emits `::error::` and exits if missing. Like step 3, it installs
+nothing — the unprivileged NixOS runner has no `apt-get`.
 
 ### 6. Render STL Files
 
@@ -273,6 +307,20 @@ environment: it loads the staged WASM assets, fetches a project's source files,
 applies parameter overrides, and verifies that the resulting STL bytes are
 non-empty and pass a basic header check.
 
+The runner has no system `nodejs`, so `actions/setup-node` is the only source
+of a `node` binary. The ryzen runner's relocated tool cache
+(`/var/lib/github-runner/ryzen-tool`) is writable but not executable by the
+runner service, which previously produced `Permission denied` / exit 126
+(issue #356). Overriding `RUNNER_TOOL_CACHE` via step `env:` does not work
+around this — the runner re-injects its own value into every step's process
+environment regardless of what the workflow declares. Instead, a
+`Relocate Node.js to an executable path` step copies the extracted toolchain
+into `$RUNNER_TEMP` (which the runner already executes step scripts from, so
+it is guaranteed exec-enabled) and prepends it to `PATH`. A
+`Verify Node.js is executable` step immediately follows and fails fast with a
+pointer to `St-John-Software/nixos-config` if the toolchain is still
+unusable.
+
 ### 7.5. Check Mating Part Interference
 
 After mesh validation, pairs of STL files declared in `meta.json`'s
@@ -381,7 +429,21 @@ Composites the rendered PNG thumbnails into a single 1200×630 `og-hero.png`
 for Open Graph social previews. Uses ImageMagick `montage` to tile thumbnails
 in a 3-column grid against the site's dark background (`#1a1a2e`). If no
 thumbnails exist (all renders failed), falls back to a solid-color image with
-text using `convert`.
+text using `magick`/`convert` (whichever is present — ImageMagick 7 ships
+`magick` and may omit the legacy `convert` symlink).
+
+Both the `montage` path and the solid-color fallback pass `-font
+Liberation-Sans` explicitly. ImageMagick on the NixOS runner has no
+distro-supplied `type.xml` and therefore no default font; `montage` needs one
+even when no visible text is requested, because it labels each tile by
+default. Font names in ImageMagick's own naming are hyphenated
+(`Liberation-Sans`, `DejaVu-Sans`), not the fontconfig family names
+(`"Liberation Sans"`, `sans`) — the latter do not resolve.
+
+The step is warning-only, matching the thumbnail/QR pattern: if `montage`
+fails to composite, it falls back to the plain solid-color hero image; if
+that also fails, the step emits `::warning::`, removes any partial
+`og-hero.png`, and lets the build continue rather than blocking the deploy.
 
 The image is deployed to a stable URL (`/3d-models/og-hero.png`) — it is
 intentionally not cache-busted so social media crawlers can cache it reliably.
@@ -520,11 +582,12 @@ and `llms.txt`. Then a Python script:
    explicit endpoint URLs (e.g., WordPress OEmbed allowlists) rather
    than relying on `<link>` discovery.
 
-### 19. Install AWS CLI
+### 19. Check AWS CLI
 
-Checks if `aws` is already available; if not, downloads and installs the
-AWS CLI v2 from the official zip archive. Follows the same conditional-install
-pattern as OpenSCAD and ImageMagick.
+Verifies `aws` is on `PATH` and prints its version; emits `::error::` and exits
+if missing. The bundled AWS CLI v2 installer needs root to write `/usr/local`,
+and its prebuilt binaries would not run unpatched on NixOS regardless — `aws`
+comes from the runner host's Nix package set like every other tool.
 
 ### 20. Deploy to S3
 
@@ -647,16 +710,19 @@ multiple fail, all errors are visible.
   fits the project's fully-static architecture — no new client-side
   dependencies. Only projects with 2+ files get a zip (single-file projects
   don't benefit from bundling).
-- **Conditional dependency install**: Each tool (OpenSCAD, ImageMagick,
-  ADMesh, qrencode, AWS CLI) checks `command -v` before installing. On a
-  pre-configured self-hosted runner this is a no-op; on a fresh runner,
-  dependencies are installed automatically.
+- **Check-only dependency verification**: Each tool (OpenSCAD, ImageMagick,
+  ADMesh, qrencode, AWS CLI) is checked with `command -v`; nothing is
+  installed. The runner service is unprivileged (no `sudo`, no `apt-get`), so
+  a missing tool is a host configuration problem, not something the job can
+  fix — the step fails fast with `::error::` naming every missing tool.
 - **Xvfb environment preparation**: A dedicated step (3.5) cleans stale X
-  lock files (`/tmp/.X*-lock`, `/tmp/.X11-unix/`) before any rendering begins.
-  Long-lived self-hosted runners accumulate stale locks from previously
-  interrupted jobs; without cleanup, `xvfb-run` fails with "Server is already
-  active" on the fixed display number. The step recreates `/tmp/.X11-unix/`
-  with the sticky bit (`chmod 1777`) to restore standard X11 permissions.
+  lock files (`/tmp/.X*-lock`) before any rendering begins. Long-lived
+  self-hosted runners accumulate stale locks from previously interrupted
+  jobs; without cleanup, `xvfb-run` fails with "Server is already active" on
+  the fixed display number. `/tmp/.X11-unix/` is created only if it doesn't
+  already exist — ryzen is also a live desktop, and an existing
+  `/tmp/.X11-unix` holds the real session's sockets, so the step never
+  deletes or re-permissions it.
 - **Graceful xvfb degradation**: The PNG rendering step checks for `xvfb-run`
   availability rather than assuming it's installed. This ensures the pipeline
   still produces STL files even if the runner cannot generate thumbnails.
@@ -711,6 +777,12 @@ multiple fail, all errors are visible.
 - **QR codes in separate directory**: QR PNGs are stored in `site/qr/` rather
   than alongside model thumbnails in `site/` to avoid being picked up by the
   OG hero image `montage` glob (`site/*.png`).
+- **Explicit ImageMagick font**: the OG hero step always passes `-font
+  Liberation-Sans` because the NixOS runner has no default ImageMagick font
+  and `montage` fails outright without one (issue #352). `MAGICK_FONT` and
+  supplying a `type.xml` via `MAGICK_CONFIGURE_PATH` were both tried on the
+  runner and did not fix the default; naming the font on every invocation is
+  the only fix that works.
 - **PR comment resilience**: The comment step uses `continue-on-error: true`
   and a `withRetry(fn, retries=3, delayMs=2000)` helper so transient GitHub
   API errors (rate limits, network blips) don't fail the workflow. The
@@ -794,10 +866,10 @@ multiple fail, all errors are visible.
   internal FS state. A new instance per render is more expensive but reliable.
 - **Unit tests run in CI**: `python3 -m unittest test_render_view
   test_oembed_helpers test_fetch_openscad_wasm test_render_cache
-  test_capped_openscad test_viewer_invariants` runs on every push (step 2.6)
-  before any heavy tools are invoked. These tests mock I/O and finish
-  in seconds, catching regressions in build-script helpers before rendering
-  begins.
+  test_capped_openscad test_viewer_invariants test_build_workflow` runs on
+  every push (step 2.6) before any heavy tools are invoked. These tests mock
+  I/O and finish in seconds, catching regressions in build-script helpers
+  before rendering begins.
 - **site/sources/ layout**: All `.scad` source files, validated
   `*.parameters.json` manifests, and binary render assets (`.png` files whose
   basename appears in a sibling `.scad`) are staged under

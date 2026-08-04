@@ -198,7 +198,7 @@ two laptops side by side.
 | `laptop_stand.parameters.json` | Parameter manifest — exposes `slot_gap` (5–40 mm, default 18), `groove_depth`, `stand_width`, `stand_depth`, `stand_height` |
 | `dual_laptop_stand.scad` | Renderable — dual-slot variant; same arch profiles, two parallel channels at ±`slot_spacing`/2 in Y |
 | `dual_laptop_stand.parameters.json` | Parameter manifest — exposes `slot_gap_1` (default 18), `slot_gap_2` (default 16), `slot_spacing` (default 40), `groove_depth`, `stand_width` (240), `stand_depth` (180), `stand_height` |
-| `meta.json` | Project metadata (description, tags, difficulty: intermediate, version 1.1.0) |
+| `meta.json` | Project metadata (description, tags, difficulty: intermediate, version 1.1.1, `printing_notes`: adaptive layer height over the near-horizontal arch crown, seam placement) |
 
 **Key parameters**: `slot_gap = 18 mm` (laptop thickness + clearance); `slot_length` is always
 wider than the arch so no un-slotted band remains at the shoulders. The arch profiles
