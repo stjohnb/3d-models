@@ -41,6 +41,24 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # A runner whose PATH lost python3 previously killed the build at the
+      # first Python step with a bare "command not found" (issue #348). Fail
+      # fast with a clear pointer to the runner fix instead of a confusing
+      # exit-127 later. Missing python3 is a runner defect — the fix belongs
+      # in St-John-Software/nixos-config, not a discovery script here.
+      - name: Verify python3
+        run: |
+          command -v python3 >/dev/null 2>&1 || {
+            echo "::error::python3 not found on the runner. This is a runner defect —"
+            echo "::error::open an issue on St-John-Software/nixos-config to add it."
+            exit 1
+          }
+          python3 -c 'import ensurepip, json, venv' 2>/dev/null || {
+            echo "::error::python3 is present but cannot create venvs (missing ensurepip/venv)."
+            echo "::error::This is a runner defect — open an issue on St-John-Software/nixos-config."
+            exit 1
+          }
+
       - name: Verify dependency graphs are up-to-date
         id: depgraph
         run: |
@@ -193,40 +211,56 @@ jobs:
       - name: Run Python unit tests for build scripts
         run: |
           cd scripts
-          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_render_cache test_capped_openscad test_viewer_invariants -v
+          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_render_cache test_capped_openscad test_viewer_invariants test_build_workflow -v
 
-      - name: Install OpenSCAD and dependencies
+      - name: Check build dependencies
         run: |
           set -eo pipefail
 
-          if command -v openscad &>/dev/null; then
-            echo "OpenSCAD already installed"
-          else
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq openscad xvfb
+          # The job cannot install anything: the runner is ryzen (NixOS) and the
+          # runner service is unprivileged — no sudo on its PATH, no sudoers
+          # entry (deliberate), and no apt-get on the host at all. These tools
+          # come from the runner host's Nix package set. If one goes missing,
+          # say so here with the exact name rather than dying five steps later
+          # with "openscad: command not found" inside a render loop.
+          missing=""
+          for tool in openscad xvfb-run montage zip qrencode; do
+            command -v "$tool" &>/dev/null || missing="$missing $tool"
+          done
+
+          if [ -n "$missing" ]; then
+            echo "::error::Missing build dependencies:$missing — install them on the runner host (NixOS: add to the runner's Nix package set). This job is unprivileged and cannot install them itself."
+            exit 1
           fi
 
-          if command -v montage &>/dev/null; then
-            echo "ImageMagick already installed"
-          else
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq imagemagick
-          fi
-
-          command -v zip &>/dev/null || sudo apt-get install -y -qq zip
-          command -v qrencode &>/dev/null || sudo apt-get install -y -qq qrencode
+          echo "All build dependencies present: openscad xvfb-run montage zip qrencode"
 
       - name: Prepare Xvfb environment
         run: |
           set -eo pipefail
-          # Remove stale X lock files and sockets that prior interrupted CI runs
-          # may have left behind on this self-hosted runner. Without this, xvfb-run
-          # can fail with "Server is already active for display N" or
-          # "Cannot establish any listening sockets".
-          sudo rm -f /tmp/.X*-lock 2>/dev/null || true
-          sudo rm -rf /tmp/.X11-unix 2>/dev/null || true
-          sudo mkdir -p /tmp/.X11-unix
-          sudo chmod 1777 /tmp/.X11-unix
+          # Remove stale X lock files that prior interrupted CI runs may have
+          # left behind on this self-hosted runner. Without this, xvfb-run can
+          # fail with "Server is already active for display N".
+          #
+          # NO sudo, and /tmp/.X11-unix is left alone if it already exists.
+          # The runner is ryzen (NixOS) now: the service is unprivileged (no
+          # sudo on its PATH, no sudoers entry — deliberate), and the machine
+          # is ALSO a live desktop, so `sudo rm -rf /tmp/.X11-unix` would
+          # delete the real session's sockets out from under GDM. Locks from
+          # our own crashed Xvfb runs are owned by the runner user, so plain
+          # `rm` handles exactly the ones that matter; anything root-owned
+          # belongs to the desktop and must survive. xvfb-run --auto-servernum
+          # skips displays that are genuinely in use either way.
+          rm -f /tmp/.X*-lock 2>/dev/null || true
+          if [ ! -d /tmp/.X11-unix ]; then
+            mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+          elif [ ! -w /tmp/.X11-unix ] || [ ! -x /tmp/.X11-unix ]; then
+            # We deliberately don't chmod a directory we don't own, but if the
+            # desktop's copy isn't writable by us then Xvfb can't create its
+            # socket and the failure surfaces as an opaque permission error.
+            # Say so up front instead.
+            echo "::warning::/tmp/.X11-unix exists but is not writable by $(id -un): $(ls -ld /tmp/.X11-unix). Xvfb may fail to create its socket."
+          fi
           if ! command -v xvfb-run >/dev/null; then
             echo "::error::xvfb-run is required but not installed"
             exit 1
@@ -256,13 +290,13 @@ jobs:
             echo "OpenSCAD version matches stored value ($CURRENT_VERSION)"
           fi
 
-      - name: Install ADMesh
+      - name: Check ADMesh
         run: |
-          if command -v admesh &>/dev/null; then
-            echo "ADMesh already installed"
-          else
-            sudo apt-get update -qq
-            sudo apt-get install -y -qq admesh
+          set -eo pipefail
+          # Same as "Check build dependencies": unprivileged runner, no apt-get.
+          if ! command -v admesh &>/dev/null; then
+            echo "::error::admesh is required for mesh validation but is not installed — add it to the runner host's Nix package set. This job is unprivileged and cannot install it itself."
+            exit 1
           fi
           admesh --version
 
@@ -472,10 +506,49 @@ jobs:
           " "$dir"
           done
 
+      # The ryzen runner sets AGENT_TOOLSDIRECTORY=/var/lib/github-runner/ryzen-tool
+      # so language toolchain caches stay off the /run tmpfs, but that path is
+      # writable and NOT executable by the runner's systemd DynamicUser unit:
+      # actions/setup-node extracts node there fine and then it dies with
+      # "…/ryzen-tool/node/20.19.4/x64/bin/node: Permission denied" (exit 126,
+      # issue #356). Overriding RUNNER_TOOL_CACHE via step-level `env:` does
+      # NOT work around this — the runner re-injects its own RUNNER_TOOL_CACHE
+      # / RUNNER_TEMP into every step's process environment after evaluating
+      # user `env:`, silently discarding the override (confirmed in the #356
+      # failure logs: the workflow-declared value showed up in the step's
+      # logged `env:` block, but the script's own `$RUNNER_TOOL_CACHE` still
+      # resolved to the real, non-executable path). Instead, copy the
+      # extracted toolchain into $RUNNER_TEMP — which the runner itself
+      # already executes step scripts from, so it is guaranteed exec-enabled
+      # — and point PATH at the copy. Remove this once the runner host makes
+      # the relocated tool cache executable (St-John-Software/nixos-config).
       - name: Set up Node.js for WASM smoke test
         uses: actions/setup-node@v7
         with:
           node-version: '20'
+
+      - name: Relocate Node.js to an executable path
+        run: |
+          if ! command -v node >/dev/null 2>&1; then
+            echo "::error::node is not on PATH after actions/setup-node. The runner has no system nodejs (it is not in the ryzen runner's extraPackages), so setup-node is the only source — open an issue on St-John-Software/nixos-config."
+            exit 1
+          fi
+          NODE_BIN="$(command -v node)"
+          NODE_TOOL_DIR="$(dirname "$(dirname "$NODE_BIN")")"
+          DEST="$RUNNER_TEMP/node-exec"
+          rm -rf "$DEST"
+          mkdir -p "$DEST"
+          cp -a "$NODE_TOOL_DIR/." "$DEST/"
+          echo "$DEST/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Node.js is executable
+        run: |
+          NODE_BIN="$(command -v node)"
+          if ! node --version; then
+            echo "::error::node resolves to $NODE_BIN but will not run (exit 126 = 'Permission denied'). Relocating it to \$RUNNER_TEMP did not help, so this is a deeper runner defect — open an issue on St-John-Software/nixos-config."
+            exit 1
+          fi
+          echo "node $(node --version) at $NODE_BIN"
 
       - name: Smoke-test WASM customizer rendering
         run: |
@@ -563,12 +636,15 @@ jobs:
             fi
             rc=$?
             cat /tmp/xvfb-stderr.log >&2
-            if grep -qE 'Xvfb failed to start|Server is already active|Cannot establish any listening sockets|Cannot open display' /tmp/xvfb-stderr.log; then
+            if grep -qE 'Xvfb failed to start|Server is already active|Cannot establish any listening sockets|Cannot open display|Permission denied|/tmp/\.X11-unix' /tmp/xvfb-stderr.log; then
               echo "::warning::Xvfb start failure on attempt $attempt (rc=$rc). Cleaning lock files and retrying."
-              sudo rm -f /tmp/.X*-lock 2>/dev/null || true
-              sudo rm -rf /tmp/.X11-unix 2>/dev/null || true
-              sudo mkdir -p /tmp/.X11-unix
-              sudo chmod 1777 /tmp/.X11-unix
+              # No sudo, and leave an existing /tmp/.X11-unix alone — same
+              # reasoning as the "Prepare Xvfb environment" step: the runner
+              # is unprivileged and shares the machine with a live desktop.
+              rm -f /tmp/.X*-lock 2>/dev/null || true
+              if [ ! -d /tmp/.X11-unix ]; then
+                mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+              fi
               sleep $((attempt * 2))
               attempt=$((attempt + 1))
               continue
@@ -643,21 +719,58 @@ jobs:
 
       - name: Generate OG hero image
         run: |
+          set -o pipefail
+          # ImageMagick on the NixOS runner ships no default font (no distro
+          # type.xml), so ANY text-capable operation fails with
+          #   "unable to read font `(null)'"  --  including montage, which
+          # labels each tile by default. `+label` does not suppress the lookup;
+          # MAGICK_FONT and a hand-supplied type.xml are both ignored. Naming a
+          # font explicitly is the only fix that works (issue #352).
+          # Liberation-Sans is present on every runner (liberation_ttf on NixOS,
+          # fonts-liberation on Ubuntu). ImageMagick font names are HYPHENATED:
+          # "DejaVu Sans", "Helvetica" and "sans" do NOT resolve.
+          OG_FONT='Liberation-Sans'
+
+          # ImageMagick 7 ships `magick`; IM6 only has `convert`.
+          if command -v magick >/dev/null 2>&1; then
+            IM_CONVERT=(magick)
+          else
+            IM_CONVERT=(convert)
+          fi
+
+          ok=0
           THUMBS=(site/*.png)
           if [ ${#THUMBS[@]} -gt 0 ] && [ -e "${THUMBS[0]}" ]; then
-            montage "${THUMBS[@]}" \
+            if montage "${THUMBS[@]}" \
+              -font "$OG_FONT" \
               -geometry 400x300+4+4 \
               -tile 3x \
               -background '#1a1a2e' \
               -resize 1200x630^ \
               -gravity center \
               -extent 1200x630 \
-              site/og-hero.png
-          else
-            convert -size 1200x630 xc:'#1a1a2e' \
+              site/og-hero.png; then
+              ok=1
+            else
+              echo "::warning::montage failed to composite og-hero.png; falling back to a plain hero image"
+            fi
+          fi
+
+          if [ "$ok" -eq 0 ]; then
+            if "${IM_CONVERT[@]}" -size 1200x630 xc:'#1a1a2e' \
+              -font "$OG_FONT" \
               -gravity center -pointsize 48 -fill white \
               -annotate 0 '3D Printable Models' \
-              site/og-hero.png
+              site/og-hero.png; then
+              ok=1
+            fi
+          fi
+
+          if [ "$ok" -eq 0 ]; then
+            rm -f site/og-hero.png
+            echo "::warning::Could not generate site/og-hero.png; social previews will 404 for this deploy"
+          else
+            identify -format '%wx%h\n' site/og-hero.png || true
           fi
 
       - name: Generate models manifest
@@ -968,16 +1081,15 @@ jobs:
           print(f'Injected structured data and {len(link_tags)} OEmbed link tags into index.html')
           "
 
-      - name: Install AWS CLI
+      - name: Check AWS CLI
         run: |
-          if command -v aws &>/dev/null; then
-            echo "AWS CLI already installed"
-          else
-            echo "Installing AWS CLI..."
-            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
-            unzip -qo /tmp/awscliv2.zip -d /tmp
-            sudo /tmp/aws/install
-            rm -rf /tmp/awscliv2.zip /tmp/aws
+          set -eo pipefail
+          # The bundled AWS CLI installer needs root to write /usr/local, and on
+          # NixOS its prebuilt binaries would not run unpatched anyway. Same as
+          # the other tools: the runner host provides `aws` via Nix.
+          if ! command -v aws &>/dev/null; then
+            echo "::error::aws is required for deployment but is not installed — add awscli2 to the runner host's Nix package set. This job is unprivileged and cannot install it itself."
+            exit 1
           fi
           aws --version
 
