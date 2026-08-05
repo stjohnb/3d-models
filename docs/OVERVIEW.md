@@ -42,9 +42,12 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_render_view.py     # Tests for render_view
 │   ├── render_cache.py         # Content-addressed render cache key computation (used by CI render step)
 │   ├── test_render_cache.py    # Tests for render_cache
+│   ├── project_dates.py        # Per-project last-commit dates (models.json `updated`; landing-page recency ordering)
+│   ├── test_project_dates.py   # Tests for project_dates
 │   ├── test_generate_standalone.py  # Regression tests for _load_filament_colors_js HTML injection escaping
 │   ├── test_wasm_customizer.mjs  # Node.js integration test for the in-browser WASM customizer pipeline
 │   ├── test_hash_routing.mjs    # Node.js test for index.html's parseHash/formatHash URL grammar
+│   ├── test_landing_order.mjs   # Node.js test for index.html's landing-gallery project ranking
 │   ├── test_viewer_invariants.py # Text-level checks on index.html/embed.html (build markers, slugify/PUBLIC_REPO parity, innerHTML)
 │   ├── sync_public_snapshot.py  # Builds a sanitized public snapshot for stjohnb/3d-models; not used by CI
 │   └── test_sync_public_snapshot.py  # Tests for sync_public_snapshot
@@ -78,6 +81,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
     ├── OVERVIEW.md             # This file — main entry point
     ├── model-projects.md       # Per-project file tables, geometry, and key parameters
     ├── web-viewer.md           # Detailed index.html/embed.html/standalone/OEmbed reference
+    ├── DESIGN.md               # Visual design choices for index.html (palette tokens, display face, motion)
     ├── ci-pipeline.md          # Detailed CI/CD pipeline step-by-step documentation
     ├── OPENSCAD_LIBRARIES.md   # Catalogue of available third-party OpenSCAD libraries
     ├── claws-automation.md     # How the Claws automation service manages issues, PRs, and docs (auto-maintained)
@@ -195,6 +199,16 @@ as diagnostic documentation — if a printed part doesn't fit, `rendered_with`
 helps determine whether the issue is a source change or a renderer regression.
 The committed `.openscad-version` file stores the expected version baseline;
 CI warns when the runner's version drifts from it.
+
+Each project entry also carries an `updated` field: the ISO-8601 committer
+date of the last commit touching that project's directory, produced by
+`scripts/project_dates.py`. It is **CI-derived, not a `meta.json` field** —
+there is nothing to hand-maintain and `meta.schema.json` is unaffected. Its
+only consumer is the landing gallery's recency ordering (see
+[web-viewer.md](web-viewer.md#landing-gallery)). Because the date comes from
+`git log`, `build.yml`'s checkout uses `fetch-depth: 0`; on a shallow clone
+`project_updated()` returns `{}`, `updated` is omitted everywhere, and the
+gallery silently falls back to interest-only ordering.
 
 ### Shared Connection Pattern (power-workshop)
 
@@ -435,7 +449,13 @@ This script is **not** used by CI and produces no build artifacts.
 A single-page application (no build tools, no framework, ES module JS,
 Three.js from a CDN via import map) that fetches `models.json` and presents
 a tree browser of every project and model alongside a stage of one to three
-viewer panes. Clicking a model loads it into the active pane; Ctrl/Cmd-click
+viewer panes. With nothing loaded — the default on arrival, and after the
+header's **← All models** button or a Back-navigation to the bare URL — the
+stage shows a landing gallery instead: a card grid of every project with
+hero and per-model thumbnails, ordered by an interest score (model count,
+difficulty, assembly, hardware, customizer manifests) plus a recency score
+from `updated`, so involved and recently-touched projects come first (#345).
+Clicking a model loads it into the active pane; Ctrl/Cmd-click
 (or the **+ Add to scene** toggle) adds it to the pane alongside what's
 already there, laid out side by side along world X. Panes provide
 download/source links, a filament color picker, cross-section and focus
@@ -450,9 +470,14 @@ The URL hash grammar separates panes with `+` and models within a pane with
 wild — `#project/model` from QR codes and `#project` from the README gallery
 — keeps working unchanged, and an incoming hash is never rewritten.
 `scripts/test_hash_routing.mjs` extracts `parseHash`/`formatHash` out of
-`index.html` and asserts that; `scripts/test_viewer_invariants.py` checks the
-build-time markers, the `slugify()`/`PUBLIC_REPO` copies, and the
+`index.html` and asserts that; `scripts/test_landing_order.mjs` does the same
+for the landing gallery's ranking functions; `scripts/test_viewer_invariants.py`
+checks the build-time markers, the `slugify()`/`PUBLIC_REPO` copies, and the
 no-`innerHTML`-for-user-data rule.
+
+Visual design choices for `index.html` — the palette tokens, the Space Grotesk
+display face, the layered background, and the reduced-motion rule — are
+recorded in [DESIGN.md](DESIGN.md).
 
 Every feature — core functionality, the XSS-safety convention, print-time
 estimates, the tree browser, filament colors, composite multi-colour assembly
@@ -531,10 +556,16 @@ See [ci-pipeline.md](ci-pipeline.md) for detailed documentation.
 **Summary**: On push to `main` or PR, the pipeline (`build.yml`) runs on a
 **self-hosted Linux runner pinned to `ryzen`** (`[self-hosted, linux, ryzen]`,
 so the render memory caps below are calibrated against a host of known RAM
-capacity — see issue #272), verifies dependency graphs, validates project metadata,
+capacity — see issue #272), The very first step fails fast with a pointer to
+`St-John-Software/nixos-config` if `python3` isn't usable on the runner — the
+workflow never tries to locate or install its own prerequisite (issue #348;
+same policy applied to the Node.js setup used by the WASM smoke test, issue
+#356). It then verifies dependency graphs, validates project metadata,
 installs tools (OpenSCAD, ImageMagick, ADMesh, qrencode, zip), prepares the
-Xvfb environment (clears stale X lock files from prior interrupted runs),
-renders all `.scad` files to STL via `scripts/capped-openscad.sh` (wrapping
+Xvfb environment (clears stale X lock files from prior interrupted runs and
+pins glvnd to the Mesa EGL vendor so Xvfb does not segfault in NVIDIA's EGL
+stack — issue #361), renders all `.scad` files to STL via
+`scripts/capped-openscad.sh` (wrapping
 `openscad --export-format binstl` under a memory ceiling and wall-clock
 timeout — `RENDER_MEM_MAX`/`RENDER_TIMEOUT`, default `28G`/`3600s` — so a
 pathological render fails the step cleanly instead of freezing the runner; a
@@ -587,6 +618,7 @@ comment.
 | Touch hint timeout | 5000 ms in `showTouchHint()` | Fade-out delay for gesture overlay |
 | Zip bundle threshold | 2+ STL files per project | Single-file projects don't get an STL zip; all projects get a source zip |
 | Deep link format | `#project-slug/model-slug`, panes joined by `+`, models within a pane by `,` | URL hash routing; legacy `#project/model` and `#project` links parse unchanged |
+| Landing gallery ordering | `__LANDING_ORDER_START__`/`__LANDING_ORDER_END__` block in `index.html` | `interestScore` (0–7, from `models.json` fields) + `recencyScore` (0–2, from `updated`); ties break on date then name. Pinned by `scripts/test_landing_order.mjs` |
 | QR code style | `-s 8 -m 2`, `E0E0E0` on `1A1A2E` | Module size 8, margin 2, dark theme colors |
 | Print-time heuristic | 0.2mm layers, 50mm/s, 5x multiplier | Conservative defaults; volume fallback for flat models |
 | Metadata schema | `meta.schema.json` (JSON Schema draft 2020-12) | Validated in CI; `description` required, all others optional |

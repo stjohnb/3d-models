@@ -29,6 +29,13 @@ Two workflow files live in `.github/workflows/`:
   immediately with a pointer to file the fix as a runner defect in
   `St-John-Software/nixos-config` — it does not attempt to locate or install
   one itself.
+- **Checkout depth**: `actions/checkout` runs with `fetch-depth: 0`. The models
+  manifest step calls `scripts/project_dates.py`, which asks `git log` for the
+  last-commit date of each project directory to populate `updated` for the
+  landing page's recency ordering (issue #345). A shallow clone doesn't fail —
+  `project_updated()` returns `{}`, every `updated` is omitted and the gallery
+  falls back to interest-only ordering — so the degradation is silent. Don't
+  drop the setting.
 - **Concurrency**: Groups by `pages-main` or `pages-pr-{N}`. In-progress runs
   are cancelled when a new commit arrives.
 - **Permissions**: `contents: write`, `pull-requests: write`, `id-token: write`
@@ -97,7 +104,7 @@ step:
 
 Runs `python3 -m unittest test_render_view test_oembed_helpers
 test_fetch_openscad_wasm test_render_cache test_capped_openscad
-test_viewer_invariants test_build_workflow -v` from
+test_viewer_invariants test_project_dates test_build_workflow -v` from
 within the `scripts/` directory. These are fast unit tests that mock
 external I/O (network, filesystem) and run on every push. They guard the
 helper functions used throughout the CI pipeline against
@@ -133,6 +140,10 @@ CI runs are cleaned up on the self-hosted runner:
   If the existing directory isn't writable by the runner user, the step emits a
   `::warning::` with `ls -ld` output rather than trying to fix it
 - Verifies `xvfb-run` is installed; emits `::error::` and exits if missing
+- Pins glvnd's EGL vendor to Mesa and forces software GL, exporting
+  `__EGL_VENDOR_LIBRARY_FILENAMES`, `__EGL_EXTERNAL_PLATFORM_CONFIG_DIRS`,
+  `__GLX_VENDOR_LIBRARY_NAME`, `LIBGL_ALWAYS_SOFTWARE`, and `GALLIUM_DRIVER`
+  via `$GITHUB_ENV` so every later step in the job inherits them
 
 `xvfb-run --auto-servernum` skips displays that are genuinely in use, so the
 desktop's own display is never contended for.
@@ -140,6 +151,34 @@ desktop's own display is never contended for.
 Without this step, `xvfb-run` can fail with "Server is already active for
 display N" or "Cannot establish any listening sockets" when a stale lock file
 from a previously interrupted job collides with a new display allocation.
+
+On ryzen, Xvfb's own GLX initialization crashes before it gets that far: it
+loads Mesa's `swrast_dri.so`, which loads libglvnd's `libEGL.so.1`, which
+enumerates every installed EGL vendor and pulls in `libEGL_nvidia.so.0` ->
+`libnvidia-egl-gbm.so.1` -> SIGSEGV ("Caught signal 11 ... Server
+aborting"). Xvfb aborts, OpenSCAD gets no X display, and every thumbnail
+PNG comes out 0 bytes (issue #361; St-John-Software/nixos-config#110, #111).
+Pinning glvnd to the Mesa EGL vendor and disabling EGL external platforms
+keeps the NVIDIA stack out of the process entirely, so Xvfb starts on
+Mesa's software path instead. This is a workaround to be removed once the
+host is fixed under nixos-config#110.
+
+### 3.6. Verify Headless OpenSCAD Rendering
+
+A 30-second smoke test that proves whether the EGL pin above actually
+worked, instead of waiting to find out from 50+ warnings in the thumbnail
+step much later in the pipeline. It renders a bare `cube(10);` through
+`xvfb-run` and `scripts/capped-openscad.sh` (capped at `4G`/`120s`) to a
+tiny 64x48 PNG, then checks the output's first 8 bytes against the PNG
+magic number (`89504e470d0a1a0a`) rather than relying on file size alone.
+
+The step's own `id` (`gl_smoke`) exposes a `headless_gl` output
+(`true`/`false`). It is entirely non-blocking: `continue-on-error: true` on
+the step, `|| true` on the render itself, and a `::warning::` (never
+`::error::`) if the PNG check fails, with the captured Xvfb server log
+printed alongside it for diagnosis. Build-blocking decisions for actual
+thumbnail rendering belong to the deferred-enforcement step(s) later in the
+pipeline, not to this smoke test.
 
 ### 4. Check OpenSCAD Version
 
@@ -301,11 +340,18 @@ Stages all assets the in-browser WASM customizer needs to function:
 
 ### 7.4. Set Up Node.js and Smoke-Test WASM Customizer
 
-Sets up Node.js 20 and runs `scripts/test_wasm_customizer.mjs`. This test
-exercises the full in-browser customizer pipeline end-to-end in a Node
-environment: it loads the staged WASM assets, fetches a project's source files,
-applies parameter overrides, and verifies that the resulting STL bytes are
-non-empty and pass a basic header check.
+Sets up Node.js 20 and runs three Node tests:
+
+- `scripts/test_wasm_customizer.mjs` — exercises the full in-browser customizer
+  pipeline end-to-end in a Node environment: it loads the staged WASM assets,
+  fetches a project's source files, applies parameter overrides, and verifies
+  that the resulting STL bytes are non-empty and pass a basic header check.
+- `scripts/test_hash_routing.mjs` — slices `parseHash`/`formatHash` out of
+  `index.html` between the `__HASH_ROUTING_*` markers and asserts the URL
+  grammar, including that legacy `#project/model` links round-trip unchanged.
+- `scripts/test_landing_order.mjs` — slices
+  `interestScore`/`recencyScore`/`landingOrder` out of `index.html` between the
+  `__LANDING_ORDER_*` markers and pins the landing gallery's project ranking.
 
 The runner has no system `nodejs`, so `actions/setup-node` is the only source
 of a `node` binary. The ryzen runner's relocated tool cache
@@ -448,6 +494,22 @@ that also fails, the step emits `::warning::`, removes any partial
 The image is deployed to a stable URL (`/3d-models/og-hero.png`) — it is
 intentionally not cache-busted so social media crawlers can cache it reliably.
 
+**Known unconfirmed caveat**: the `montage` operator order above
+(`-resize 1200x630^` / `-gravity center` / `-extent 1200x630` applied after
+the tiling) may not actually resize the composed montage — testing on the
+runner with three synthetic 400×300 inputs produced a `1224x308` output
+(exactly the raw `-tile 3x -geometry 400x300+4+4` tile size) instead of
+`1200x630`, though the owner noted this could be an artifact of the
+synthetic test inputs rather than real behavior (issue #352). This predates
+the font fix (the operator ordering is unchanged from the previous runner)
+so it is not a regression, but it has never been confirmed against real
+thumbnail output because the step used to die before reaching this point. If
+it reproduces, the likely fix is piping through an intermediate
+(`montage ... miff:- | magick - -resize ...`) rather than chaining `-resize`/
+`-extent` onto the `montage` invocation directly — check `identify -format
+'%wx%h\n' site/og-hero.png` on a real run before trusting the composed
+dimensions.
+
 ### 13. Generate Models Manifest
 
 A Python script reads `site/.scad-map` and produces `site/models.json`:
@@ -473,7 +535,8 @@ A Python script reads `site/.scad-map` and produces `site/models.json`:
     "version": "1.0.0",
     "hardware": [{"item": "M5 bolt", "quantity": 1}],
     "printing_notes": ["Enable adaptive layer height over the arch crown"],
-    "rendered_with": "OpenSCAD 2024.12.06"
+    "rendered_with": "OpenSCAD 2024.12.06",
+    "updated": "2026-07-30T09:14:22+12:00"
   }
 }
 ```
@@ -491,6 +554,11 @@ Manifests in `.param-failures` are excluded — the customizer never loads an
 invalid parameter set. Metadata fields (`description`, `tags`, `difficulty`,
 `version`, `hardware`, `assembly`, `viewer_rotate_x`, `printing_notes`) are
 merged from `meta.json` if the file exists and passed schema validation.
+The `updated` field is the ISO-8601 committer date of the last commit touching
+the project directory, from `scripts/project_dates.py`. It is CI-derived — not
+a `meta.json` field — and drives the landing gallery's recency ordering. It is
+omitted for any directory `git log` reports nothing for, which is what a
+shallow clone produces for every project (see "Checkout depth" above).
 The `rendered_with` field records the OpenSCAD version used to produce the
 STLs (e.g. `"OpenSCAD 2024.12.06"`), sourced from `site/openscad-version.txt`
 written by the version-check step. This field is diagnostic documentation:
@@ -722,7 +790,9 @@ multiple fail, all errors are visible.
   the fixed display number. `/tmp/.X11-unix/` is created only if it doesn't
   already exist — ryzen is also a live desktop, and an existing
   `/tmp/.X11-unix` holds the real session's sockets, so the step never
-  deletes or re-permissions it.
+  deletes or re-permissions it. The same step also pins glvnd to the Mesa
+  EGL vendor so Xvfb doesn't segfault inside NVIDIA's EGL stack (issue
+  #361).
 - **Graceful xvfb degradation**: The PNG rendering step checks for `xvfb-run`
   availability rather than assuming it's installed. This ensures the pipeline
   still produces STL files even if the runner cannot generate thumbnails.
@@ -866,10 +936,10 @@ multiple fail, all errors are visible.
   internal FS state. A new instance per render is more expensive but reliable.
 - **Unit tests run in CI**: `python3 -m unittest test_render_view
   test_oembed_helpers test_fetch_openscad_wasm test_render_cache
-  test_capped_openscad test_viewer_invariants test_build_workflow` runs on
-  every push (step 2.6) before any heavy tools are invoked. These tests mock
-  I/O and finish in seconds, catching regressions in build-script helpers
-  before rendering begins.
+  test_capped_openscad test_viewer_invariants test_project_dates
+  test_build_workflow` runs on every push (step 2.6) before any heavy tools
+  are invoked. These tests mock I/O and finish in seconds, catching
+  regressions in build-script helpers before rendering begins.
 - **site/sources/ layout**: All `.scad` source files, validated
   `*.parameters.json` manifests, and binary render assets (`.png` files whose
   basename appears in a sibling `.scad`) are staged under

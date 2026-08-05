@@ -40,6 +40,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Full history: scripts/project_dates.py reads each project dir's
+          # last-commit date for landing-page recency ordering (#345).
+          fetch-depth: 0
 
       # A runner whose PATH lost python3 previously killed the build at the
       # first Python step with a bare "command not found" (issue #348). Fail
@@ -211,7 +215,7 @@ jobs:
       - name: Run Python unit tests for build scripts
         run: |
           cd scripts
-          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_render_cache test_capped_openscad test_viewer_invariants test_build_workflow -v
+          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow -v
 
       - name: Check build dependencies
         run: |
@@ -266,7 +270,75 @@ jobs:
             exit 1
           fi
           xvfb-run --help >/dev/null 2>&1 || true
+
+          # Xvfb on this host segfaults at startup inside NVIDIA's EGL vendor
+          # library: Xvfb's GLX init loads Mesa's swrast_dri.so, which loads
+          # libglvnd's libEGL.so.1, which enumerates every installed EGL vendor
+          # and pulls in libEGL_nvidia.so.0 -> libnvidia-egl-gbm.so.1 -> SIGSEGV
+          # ("Caught signal 11 ... Server aborting"). OpenSCAD then has no X
+          # display and writes 0-byte PNGs (issue #361;
+          # St-John-Software/nixos-config#110, #111).
+          #
+          # Pinning glvnd to the Mesa EGL vendor keeps the NVIDIA stack out of
+          # the process entirely. This sets environment only — it installs
+          # nothing, which the unprivileged NixOS runner could not do anyway.
+          # Remove once nixos-config#110 is fixed on the host.
+          egl_vendor_json=""
+          for cand in \
+            /run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json \
+            /run/current-system/sw/share/glvnd/egl_vendor.d/50_mesa.json \
+            /usr/share/glvnd/egl_vendor.d/50_mesa.json; do
+            if [ -f "$cand" ]; then egl_vendor_json="$cand"; break; fi
+          done
+          if [ -n "$egl_vendor_json" ]; then
+            echo "Pinning EGL vendor to $egl_vendor_json"
+            echo "__EGL_VENDOR_LIBRARY_FILENAMES=$egl_vendor_json" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No Mesa EGL vendor JSON found; Xvfb may segfault in libEGL_nvidia (St-John-Software/nixos-config#110)."
+          fi
+
+          # Empty dir => no EGL external platforms (this is where the crashing
+          # libnvidia-egl-gbm config lives).
+          mkdir -p "$RUNNER_TEMP/egl-no-external-platforms"
+          echo "__EGL_EXTERNAL_PLATFORM_CONFIG_DIRS=$RUNNER_TEMP/egl-no-external-platforms" >> "$GITHUB_ENV"
+
+          # Keep OpenSCAD's own GL client on llvmpipe rather than probing the
+          # NVIDIA GLX/driver stack from inside an Xvfb session.
+          echo "__GLX_VENDOR_LIBRARY_NAME=mesa" >> "$GITHUB_ENV"
+          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
+          echo "GALLIUM_DRIVER=llvmpipe" >> "$GITHUB_ENV"
+
           echo "Xvfb environment prepared."
+
+      - name: Verify headless OpenSCAD rendering
+        id: gl_smoke
+        continue-on-error: true
+        env:
+          RENDER_MEM_MAX: 4G
+          RENDER_TIMEOUT: "120"
+        run: |
+          set -o pipefail
+          printf 'cube(10);\n' > "$RUNNER_TEMP/glsmoke.scad"
+          rm -f "$RUNNER_TEMP/glsmoke.png"
+          xvfb-run --auto-servernum -e "$RUNNER_TEMP/xvfb-smoke.log" \
+            --server-args="-screen 0 1024x768x24" \
+            bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" \
+              -o "$RUNNER_TEMP/glsmoke.png" --imgsize=64,48 \
+              "$RUNNER_TEMP/glsmoke.scad" || true
+          echo "--- Xvfb server log (smoke) ---"
+          cat "$RUNNER_TEMP/xvfb-smoke.log" 2>/dev/null || true
+          echo "--- end Xvfb server log (smoke) ---"
+          ok=false
+          if [ -s "$RUNNER_TEMP/glsmoke.png" ] \
+             && [ "$(od -An -tx1 -N8 "$RUNNER_TEMP/glsmoke.png" | tr -d ' \n')" = "89504e470d0a1a0a" ]; then
+            ok=true
+          fi
+          if [ "$ok" = true ]; then
+            echo "Headless OpenSCAD PNG rendering works on this runner."
+          else
+            echo "::warning::Headless OpenSCAD PNG rendering is broken on this runner — Xvfb cannot provide an X/OpenGL context, so every thumbnail will be a 0-byte PNG. See the Xvfb server log above; host fix tracked in St-John-Software/nixos-config#110. This job is unprivileged and must not install or start system services."
+          fi
+          echo "headless_gl=$ok" >> "$GITHUB_OUTPUT"
 
       - name: Check OpenSCAD version
         id: scad_version
@@ -554,6 +626,7 @@ jobs:
         run: |
           node scripts/test_wasm_customizer.mjs
           node scripts/test_hash_routing.mjs
+          node scripts/test_landing_order.mjs
 
       - name: Check mating part interference
         id: interference
@@ -780,6 +853,7 @@ jobs:
           import json, os, sys
           sys.path.insert(0, '.')
           from scripts.oembed_helpers import load_meta_failures
+          from scripts.project_dates import project_updated
 
           # Load OpenSCAD version used for this render
           openscad_version = ''
@@ -840,6 +914,10 @@ jobs:
                           pass
                   groups[project_name]['files'].append(file_entry)
 
+          # Last-commit date per project dir, for the landing page's recency
+          # ordering. Empty on a shallow clone — see scripts/project_dates.py.
+          updated = project_updated([g['dir'] for g in groups.values()])
+
           result = {}
           for k in sorted(groups):
               entry = {'dir': groups[k]['dir'], 'files': sorted(groups[k]['files'], key=lambda m: m['stl'])}
@@ -864,6 +942,8 @@ jobs:
                           entry[field] = meta[field]
               if openscad_version:
                   entry['rendered_with'] = openscad_version
+              if groups[k]['dir'] in updated:
+                  entry['updated'] = updated[groups[k]['dir']]
               result[k] = entry
 
           with open('site/models.json', 'w') as f:

@@ -10,6 +10,10 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="favicon.svg">
   <link rel="manifest" href="site.webmanifest">
+  <!-- Display face for headings only (see docs/DESIGN.md). index.html only —
+       standalone viewers stay self-contained and never fetch a web font. -->
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap">
 
   <!-- Primary Meta -->
   <meta name="description" content="Interactive 3D viewer for printable OpenSCAD models — browse, rotate, and download STL files.">
@@ -39,7 +43,18 @@
 
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    :root { --header-h: 3.25rem; }
+    /* Design tokens (docs/DESIGN.md). Used by the landing gallery and the
+       header wordmark only — the existing pane chrome keeps its literal
+       colours so this change stays scoped to the landing work. */
+    :root {
+      --header-h: 3.25rem;
+      --surface: #16213e;
+      --surface-raised: #1c2b4f;
+      --accent: #64b5f6;
+      --text: #e0e0e0;
+      --text-dim: #9aa7c4;
+      --display: 'Space Grotesk', 'Segoe UI', sans-serif;
+    }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: #1a1a2e;
@@ -56,9 +71,24 @@
       border-bottom: 1px solid rgba(255,255,255,0.08);
     }
     header h1 {
+      font-family: var(--display);
       font-size: 1.25rem;
-      font-weight: 600;
+      font-weight: 700;
+      letter-spacing: -0.01em;
     }
+    #home-btn {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--text);
+      border-radius: 6px;
+      padding: 0.25rem 0.6rem;
+      font: inherit;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+    #home-btn[hidden] { display: none; }
+    #home-btn:hover { border-color: var(--accent); color: var(--accent); }
+    #home-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
     #sidebar-toggle {
       display: none;
       background: transparent;
@@ -253,6 +283,161 @@
       pointer-events: none;
     }
     .pane-empty[hidden] { display: none; }
+
+    /* --- Landing gallery --- */
+    /* `#panes` and `.stage-toolbar` set display: grid/flex, which outranks the
+       UA `[hidden] { display: none }` rule — without these the gallery and the
+       panes would render on top of each other. */
+    #panes[hidden], .stage-toolbar[hidden], #landing[hidden] { display: none; }
+    #landing {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0.5rem 0.25rem 2rem;
+      background-image: radial-gradient(circle at 20% 0%, rgba(100,181,246,0.10), transparent 45%);
+    }
+    .landing-title {
+      font-family: var(--display);
+      font-size: clamp(1.6rem, 4vw, 2.4rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+    .landing-sub {
+      color: var(--text-dim);
+      font-size: 0.95rem;
+      margin: 0.35rem 0 1.25rem;
+      max-width: 52ch;
+    }
+    .landing-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1rem;
+    }
+    .landing-card-wrap {
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      border-radius: 12px;
+      overflow: visible;
+    }
+    .landing-card {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      overflow: hidden;
+      text-decoration: none;
+      color: var(--text);
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .landing-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+    .landing-card:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .landing-hero {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      object-fit: cover;
+      background: #0f3460;
+      display: block;
+    }
+    .landing-card-body {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      padding: 0.6rem 0.7rem 0.7rem;
+    }
+    .landing-card-title {
+      font-family: var(--display);
+      font-size: 1.05rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .landing-card-desc {
+      font-size: 0.82rem;
+      color: var(--text-dim);
+      line-height: 1.4;
+    }
+    .landing-card-meta {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+    }
+    .landing-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.25rem;
+      margin-top: 0.1rem;
+    }
+    .landing-tag {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      background: rgba(255,255,255,0.06);
+      border-radius: 999px;
+      padding: 0.05rem 0.45rem;
+    }
+    .landing-models {
+      display: flex;
+      gap: 0.3rem;
+      flex-wrap: wrap;
+      padding: 0 0.6rem 0.6rem;
+    }
+    .landing-model {
+      display: block;
+      border-radius: 4px;
+      overflow: hidden;
+      line-height: 0;
+    }
+    .landing-model img {
+      width: 64px;
+      height: 48px;
+      object-fit: cover;
+      background: #0f3460;
+      display: block;
+    }
+    .landing-model:hover { outline: 1px solid var(--accent); }
+    .landing-model:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .landing-model--more {
+      width: 64px;
+      height: 48px;
+      background: var(--surface-raised);
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.8rem;
+      line-height: 1;
+      text-decoration: none;
+    }
+    /* Stands in for a thumbnail whose PNG is missing, so a card keeps its
+       shape instead of collapsing to text (#359). Must follow .landing-hero
+       to win on source order. */
+    .thumb-missing {
+      width: 64px;
+      height: 48px;
+      background: var(--surface-raised);
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      font-size: 0.62rem;
+      line-height: 1.2;
+      padding: 0 0.2rem;
+      overflow: hidden;
+    }
+    .landing-hero.thumb-missing {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 4 / 3;
+      font-size: 0.8rem;
+    }
+
     .pane-chips {
       display: flex;
       flex-wrap: wrap;
@@ -681,6 +866,10 @@
         height: 55dvh;
         min-height: 240px;
       }
+      /* The page itself scrolls below 900px, so the gallery must not trap a
+         second scroll container inside it. */
+      #landing { overflow: visible; }
+      .landing-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
       .customizer-panel { max-height: 60vh; }
       .touch-hint { gap: 1rem; flex-wrap: wrap; }
       .view-btn, .cross-btn, .customize-btn, .layout-btn, .rerender-btn {
@@ -705,6 +894,7 @@
 <body>
   <header>
     <button id="sidebar-toggle" type="button" aria-label="Toggle model list" aria-expanded="false" aria-controls="sidebar">&#9776;</button>
+    <button id="home-btn" type="button" hidden>&#8592; All models</button>
     <h1>3D Models</h1>
   </header>
   <div class="app">
@@ -714,6 +904,11 @@
       <p id="tree-empty" hidden>No matching models</p>
     </aside>
     <main id="stage">
+      <section id="landing" hidden aria-label="Model gallery">
+        <h2 class="landing-title">Browse the collection</h2>
+        <p class="landing-sub">Interactive 3D previews of every printable model. Newest and most involved projects first.</p>
+        <div id="landing-grid" class="landing-grid"></div>
+      </section>
       <div class="stage-toolbar">
         <span class="toolbar-label">Layout</span>
         <button class="layout-btn" type="button" data-layout="1" aria-pressed="true" aria-label="Show one viewer pane">1</button>
@@ -749,6 +944,10 @@
     const addModeBtn = document.getElementById('add-mode');
     const sidebarToggle = document.getElementById('sidebar-toggle');
     const layoutBtns = [...document.querySelectorAll('.layout-btn[data-layout]')];
+    const landingEl = document.getElementById('landing');
+    const landingGridEl = document.getElementById('landing-grid');
+    const stageToolbarEl = document.querySelector('.stage-toolbar');
+    const homeBtn = document.getElementById('home-btn');
 
     // openscad-wasm renders run in a dedicated Web Worker so the CGAL/mesh
     // export work doesn't freeze the main thread. One worker is shared by
@@ -1336,6 +1535,44 @@
       return index;
     }
 
+    // __LANDING_ORDER_START__
+    // Landing-page ordering (#345): "interesting & recent above simple & old".
+    // interestScore is 0..7 from data already in models.json; recencyScore is
+    // 0..2 from the CI-published `updated` commit date. Total = 0..9, desc.
+    function interestScore(project) {
+      const files = project.files || [];
+      let s = 0;
+      if (files.length >= 4) s += 2; else if (files.length >= 2) s += 1;
+      if (project.difficulty === 'advanced') s += 2;
+      else if (project.difficulty === 'intermediate') s += 1;
+      if (project.assembly) s += 1;
+      if (Array.isArray(project.hardware) && project.hardware.length) s += 1;
+      if (files.some(f => f.parameters)) s += 1;
+      return s;
+    }
+
+    function recencyScore(project, now) {
+      const t = project.updated ? Date.parse(project.updated) : NaN;
+      if (!Number.isFinite(t)) return 0;
+      const days = (now - t) / 86400000;
+      if (days < 90) return 2;
+      if (days < 365) return 1;
+      return 0;
+    }
+
+    function landingOrder(models, now) {
+      return Object.entries(models)
+        .map(([name, project]) => ({
+          name, project,
+          score: interestScore(project) + recencyScore(project, now),
+          updatedMs: Date.parse(project.updated || '') || 0,
+        }))
+        .sort((a, b) => (b.score - a.score)
+          || (b.updatedMs - a.updatedMs)
+          || a.name.localeCompare(b.name));
+    }
+    // __LANDING_ORDER_END__
+
     function resolveRef(spec) {
       if (spec.m) {
         return MODEL_INDEX.find(r => r.projectSlug === spec.p && r.modelSlug === spec.m) || null;
@@ -1495,6 +1732,128 @@
       }
 
       if (projectOrder.length) setRoving(projectOrder[0].labelBtn);
+    }
+
+    // ------------------------------------------------------------------
+    // Landing gallery
+    // ------------------------------------------------------------------
+
+    // Thumbnails sit next to their STL; a project whose thumbnail render was
+    // skipped degrades to a labelled placeholder tile, so the card keeps its
+    // shape instead of collapsing to bare text (#359).
+    function landingThumb(stl, w, h) {
+      const img = document.createElement('img');
+      img.src = `${stl.replace(/\.stl$/i, '.png')}${cacheBust}`;
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.alt = '';
+      img.width = w;
+      img.height = h;
+      img.onerror = () => {
+        const ph = document.createElement('div');
+        ph.className = img.className ? `${img.className} thumb-missing` : 'thumb-missing';
+        ph.setAttribute('role', 'img');
+        ph.setAttribute('aria-label', 'Preview unavailable');
+        ph.textContent = 'No preview';
+        img.replaceWith(ph);
+      };
+      return img;
+    }
+
+    // Every node is built with createElement/textContent — project names,
+    // descriptions and tags all come from meta.json (see CLAUDE.md's XSS rule).
+    function buildLanding(models) {
+      const cards = document.createDocumentFragment();
+
+      for (const { name, project } of landingOrder(models, Date.now())) {
+        const files = project.files || [];
+        if (!files.length) continue;
+        const projectSlug = slugify(name);
+
+        const wrap = document.createElement('div');
+        wrap.className = 'landing-card-wrap';
+
+        const card = document.createElement('a');
+        card.className = 'landing-card';
+        card.setAttribute('href', `#${projectSlug}`);
+
+        const heroStl = (project.assembly && project.assembly.stl) || files[0].stl;
+        const hero = landingThumb(heroStl, 400, 300);
+        hero.className = 'landing-hero';
+        card.appendChild(hero);
+
+        const body = document.createElement('div');
+        body.className = 'landing-card-body';
+
+        const title = document.createElement('h3');
+        title.className = 'landing-card-title';
+        title.textContent = name;
+        body.appendChild(title);
+
+        if (project.description) {
+          const desc = document.createElement('p');
+          desc.className = 'landing-card-desc';
+          desc.textContent = project.description;
+          body.appendChild(desc);
+        }
+
+        const metaParts = [`${files.length} model${files.length === 1 ? '' : 's'}`];
+        if (project.difficulty) metaParts.push(project.difficulty);
+        const updatedMs = Date.parse(project.updated || '');
+        if (Number.isFinite(updatedMs)) {
+          metaParts.push(`Updated ${new Date(updatedMs).toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}`);
+        }
+        const meta = document.createElement('p');
+        meta.className = 'landing-card-meta';
+        meta.textContent = metaParts.join(' · ');
+        body.appendChild(meta);
+
+        const tags = (project.tags || []).slice(0, 4);
+        if (tags.length) {
+          const tagRow = document.createElement('div');
+          tagRow.className = 'landing-tags';
+          for (const tag of tags) {
+            const chip = document.createElement('span');
+            chip.className = 'landing-tag';
+            chip.textContent = tag;
+            tagRow.appendChild(chip);
+          }
+          body.appendChild(tagRow);
+        }
+
+        card.appendChild(body);
+        wrap.appendChild(card);
+
+        // Per-model shortcuts live outside the card anchor — nesting anchors
+        // is invalid HTML.
+        if (files.length > 1) {
+          const strip = document.createElement('div');
+          strip.className = 'landing-models';
+          for (const file of files.slice(0, 5)) {
+            const link = document.createElement('a');
+            link.className = 'landing-model';
+            link.setAttribute('href', `#${projectSlug}/${slugify(file.stl)}`);
+            const label = displayName(file.stl);
+            link.title = label;
+            link.setAttribute('aria-label', label);
+            link.appendChild(landingThumb(file.stl, 64, 48));
+            strip.appendChild(link);
+          }
+          if (files.length > 5) {
+            const more = document.createElement('a');
+            more.className = 'landing-model landing-model--more';
+            more.setAttribute('href', `#${projectSlug}`);
+            more.textContent = `+${files.length - 5}`;
+            more.setAttribute('aria-label', `Show all ${files.length} ${name} models`);
+            strip.appendChild(more);
+          }
+          wrap.appendChild(strip);
+        }
+
+        cards.appendChild(wrap);
+      }
+
+      landingGridEl.replaceChildren(cards);
     }
 
     treeEl.addEventListener('focusin', (e) => {
@@ -1999,6 +2358,11 @@
 
     async function setPaneModels(pane, refs) {
       pane.models = refs.slice();
+      // Landing visibility depends only on pane.models, which is final here —
+      // one call covers the empty-refs return, the load, and the catch. It has
+      // to run *before* the await too, so the panes are laid out (non-zero
+      // canvas) by the time the viewer frames the mesh.
+      refreshLanding();
       const token = ++pane.loadToken;
 
       if (pane.customizerCleanup) {
@@ -2070,6 +2434,7 @@
       }
       refreshTreeSelection();
       updateHash();
+      refreshLanding();
     }
 
     function onTreeModelActivate(ref, additive) {
@@ -2352,6 +2717,24 @@
       setSidebarOpen(!document.body.classList.contains('sidebar-open'));
     });
 
+    // The landing gallery and the viewer panes are mutually exclusive: the
+    // grid is what you get until something is actually loaded.
+    function refreshLanding() {
+      const anyLoaded = panes.some(p => p.models.length > 0);
+      landingEl.hidden = anyLoaded;
+      panesEl.hidden = !anyLoaded;
+      stageToolbarEl.hidden = !anyLoaded;
+      homeBtn.hidden = !anyLoaded;
+    }
+
+    async function showLanding() {
+      await Promise.all(panes.map(p => setPaneModels(p, [])));
+      announce('Showing the model gallery');
+      landingEl.scrollTop = 0;
+    }
+
+    homeBtn.addEventListener('click', () => { showLanding(); });
+
     for (const btn of layoutBtns) {
       btn.addEventListener('click', () => setLayout(Number(btn.dataset.layout)));
     }
@@ -2442,6 +2825,14 @@
 
     window.addEventListener('hashchange', () => {
       if (window.location.hash.slice(1) === lastWrittenHash) return;
+      // Navigating back to the bare URL returns to the gallery rather than
+      // leaving the last-loaded model on screen. This path deliberately does
+      // not suppress updateHash() — emptying the panes writes the now-empty
+      // hash back to lastWrittenHash, so a forward-navigation still routes.
+      if (!window.location.hash.slice(1)) {
+        showLanding().catch(err => console.warn('Failed to show the gallery', err));
+        return;
+      }
       applyingHash = true;
       applyHash()
         .catch(err => console.warn('Failed to apply hash route', err))
@@ -2482,6 +2873,7 @@
 
       MODEL_INDEX = buildModelIndex(models);
       buildTree(models);
+      buildLanding(models);
       panesEl.replaceChildren();
 
       // Hold hash writes until the initial route has settled so an incoming
@@ -2500,25 +2892,28 @@
 
       if (routed) {
         lastWrittenHash = window.location.hash.slice(1);
-        return;
+      } else {
+        // No deep link. In a PR preview, changed.json still jumps straight to
+        // the changed model; otherwise nothing is loaded and the landing
+        // gallery is what the visitor gets (issue #345).
+        let firstRef = null;
+        if (changedProjects && changedProjects.length) {
+          for (const name of changedProjects) {
+            const node = projectNodes.get(slugify(name));
+            if (node) setExpanded(node, true);
+          }
+          for (const name of changedProjects) {
+            const ref = MODEL_INDEX.find(r => r.projectName === name);
+            if (ref) { firstRef = ref; break; }
+          }
+        }
+        if (firstRef) {
+          revealInTree(firstRef);
+          await setPaneModels(panes[0], [firstRef]);
+        }
       }
 
-      let firstRef = null;
-      if (changedProjects && changedProjects.length) {
-        for (const name of changedProjects) {
-          const node = projectNodes.get(slugify(name));
-          if (node) setExpanded(node, true);
-        }
-        for (const name of changedProjects) {
-          const ref = MODEL_INDEX.find(r => r.projectName === name);
-          if (ref) { firstRef = ref; break; }
-        }
-      }
-      if (!firstRef) firstRef = MODEL_INDEX[0] || null;
-      if (firstRef) {
-        revealInTree(firstRef);
-        await setPaneModels(panes[0], [firstRef]);
-      }
+      refreshLanding();
     }
 
     init();
