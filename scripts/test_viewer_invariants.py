@@ -63,6 +63,34 @@ class BuildMarkerTests(unittest.TestCase):
         )
 
 
+class LandingPageTests(unittest.TestCase):
+    """Issue #345: index.html opens on a gallery of every project."""
+
+    def test_landing_order_markers(self):
+        html = read(INDEX_HTML)
+        for marker in ("__LANDING_ORDER_START__", "__LANDING_ORDER_END__"):
+            self.assertEqual(
+                html.count(marker),
+                1,
+                f"index.html must contain exactly one {marker!r} "
+                "(scripts/test_landing_order.mjs slices between them)",
+            )
+        self.assertLess(
+            html.index("__LANDING_ORDER_START__"),
+            html.index("__LANDING_ORDER_END__"),
+            "__LANDING_ORDER_START__ must precede __LANDING_ORDER_END__",
+        )
+
+    def test_landing_markup_and_builder(self):
+        html = read(INDEX_HTML)
+        for token in ('id="landing"', 'id="home-btn"', "function buildLanding("):
+            self.assertIn(
+                token,
+                html,
+                f"index.html must contain {token!r} for the landing gallery",
+            )
+
+
 class CopiedInvariantTests(unittest.TestCase):
     """Functions duplicated across viewers must stay textually identical."""
 

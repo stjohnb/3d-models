@@ -29,7 +29,7 @@ ES module JS. Pulls Three.js from a CDN via import map.
   the page cost no longer grows with the model count. On first load a
   `#project/model` or `#project` hash decides what to show; in PR previews
   `changed.json` expands the modified projects and loads the first of them;
-  otherwise the first project's first model is loaded
+  otherwise the landing gallery is shown (see Landing Gallery below)
 - Uses a `__BUILD_HASH__` placeholder replaced at build time with the commit
   SHA for cache busting
 - Includes Open Graph, Twitter Card meta tags, and Schema.org JSON-LD
@@ -163,6 +163,61 @@ Keyboard support follows the tree pattern with a roving `tabindex`:
 Up/Down move through visible items, Right expands a project or steps into
 its first model, Left collapses or moves to the parent, Home/End jump to the
 ends, and Enter/Space activate. `/` focuses the filter box from anywhere.
+
+### Landing Gallery
+
+With nothing loaded, the stage shows `#landing` instead of the panes: a
+`repeat(auto-fill, minmax(260px, 1fr))` grid with one card per project. Each
+card is an `<a href="#project-slug">` carrying a 4:3 hero thumbnail (the
+`assembly.stl` thumbnail when the project declares one, otherwise the first
+model's), the project name, its description, a `N models · difficulty ·
+Updated Mon YYYY` metadata line, and up to four tag chips. Multi-model projects
+get a strip of up to five 64×48 per-model links (`#project-slug/model-slug`)
+below the card, plus a `+N` tile linking to the project. The strip sits
+*outside* the card anchor — nested anchors are invalid HTML. Every thumbnail is
+`loading="lazy"`/`decoding="async"` and hides itself on error, so a project
+whose thumbnail render was skipped degrades to a card with no image.
+
+Because the links are real anchors, clicking one just changes the hash and the
+existing `applyHash()` route loads the model; keyboard activation, middle-click
+and "copy link address" all work with no extra code. The header's **← All
+models** button (`#home-btn`, hidden while the gallery is showing) calls
+`showLanding()`, which empties every pane; an empty hash — including one
+arrived at by pressing Back — does the same.
+
+`refreshLanding()` is the single toggle: `#landing`, `#panes`,
+`.stage-toolbar` and `#home-btn` are shown or hidden purely on whether any pane
+holds a model. `#panes` and `.stage-toolbar` need explicit `[hidden]` CSS rules
+because their `display: grid`/`flex` outranks the UA `[hidden]` rule.
+
+Ordering is "interesting and recent above simple and old", computed by
+`landingOrder(models, now)` between the `__LANDING_ORDER_START__` /
+`__LANDING_ORDER_END__` markers (sliced out and tested by
+`scripts/test_landing_order.mjs`):
+
+- `interestScore` (0–7), all from fields already in `models.json`: +2 for four
+  or more models (+1 for two or three), +2 for `difficulty: advanced` (+1 for
+  `intermediate`), +1 for a composite `assembly`, +1 for a non-empty `hardware`
+  list, +1 if any model ships a parameter manifest.
+- `recencyScore` (0–2), from the CI-published `updated` commit date: 2 under 90
+  days, 1 under a year, 0 beyond that or when `updated` is missing/unparseable.
+
+Ties break on `updated` descending, then project name ascending. Deliberately
+*not* included: any "new" or maturity badge — `ideas/rejected.md` declines
+"Model maturity lifecycle badges".
+
+The grid is built client-side from `models.json` by `buildLanding()`; nothing
+is pre-rendered into `index.html`, since `ideas/rejected.md` also declines a
+"Static HTML fallback for no-JavaScript environments". Like the rest of the
+viewer it is assembled with `createElement`/`textContent` only — project names,
+descriptions and tags are all model-derived data.
+
+PR previews are unaffected: when `changed.json` is non-empty the changed
+model still opens directly and the gallery is skipped.
+
+The landing view is `index.html` only. `embed.html`, the standalone viewers,
+the OG hero, structured data and the OEmbed endpoints are all single-model
+surfaces and are untouched by it.
 
 A `panes` array tracks per-pane state: the pane element and canvas, its
 viewer instance, the `MODEL_INDEX` entries it holds, selected filament

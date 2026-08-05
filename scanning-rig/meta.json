@@ -1,0 +1,13 @@
+{
+  "description": "Photogrammetry 3D-scanning rig: a fully printed hand-rotated turntable whose platter locates on a 45-degree V-groove race and a centring spindle, with 15-degree rotation tick marks against an index pointer on the base rim, plus a generic leaning phone stand whose slot width is customizable (default fits an iPhone 15 Pro, bare or cased). No non-printed hardware required.",
+  "tags": ["photogrammetry", "scanning", "utility", "desk"],
+  "version": "1.0.0",
+  "difficulty": "beginner",
+  "printing_notes": [
+    "All parts print support-free in their exported orientations: turntable base and platter flat on the bed, phone stand on its side face (every layer is the same cross-section).",
+    "The platter is exported groove-side down — slice it as-is so the V-groove's 45-degree walls stay self-supporting.",
+    "If the platter feels gritty to turn, work a little candle wax or PTFE lubricant into the V-groove and across the base plate's top face. Do not sand the 45-degree flanks; they set the concentricity.",
+    "The 14mm phone slot fits most cased phones; use the customizer to narrow slot_w for a snug grip on a bare phone.",
+    "For landscape scanning, slide the phone along the slot so the camera-bump corner overhangs past the end of the stand rather than resting on the backrest."
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "parameters": [
+    {
+      "name": "base_d",
+      "label": "Base plate diameter (mm) — keep >= platter + 12",
+      "type": "number",
+      "min": 160,
+      "max": 220,
+      "step": 1,
+      "default": 166
+    },
+    {
+      "name": "race_r",
+      "label": "V-race radius — must match platter (mm)",
+      "type": "number",
+      "min": 40,
+      "max": 60,
+      "step": 1,
+      "default": 55
+    },
+    {
+      "name": "spindle_d",
+      "label": "Centring spindle diameter — must match platter (mm)",
+      "type": "number",
+      "min": 10,
+      "max": 24,
+      "step": 0.5,
+      "default": 16
+    }
+  ]
+}
