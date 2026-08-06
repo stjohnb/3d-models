@@ -14,11 +14,13 @@ proposed in the issue or plan, not assumed by an implementer.
 
 Spell out each of the following in the plan before proposing a library:
 
-- **CI tool chain**: The runner already has OpenSCAD, ImageMagick, ADMesh,
-  qrencode, zip, xvfb, Python 3, and AWS CLI (see `docs/OVERVIEW.md`
-  "Configuration"). Pure-`.scad` libraries need only to be vendored under a
-  top-level `lib/` directory and referenced via `include`/`use`; no new install
-  step is required.
+- **CI tool chain**: The runner itself provides only `nix`, `git`, and
+  `docker` — OpenSCAD, ImageMagick, ADMesh, qrencode, zip, Python 3, and the
+  AWS CLI all come from this repo's `flake.nix` devShells (see
+  `docs/OVERVIEW.md` "Configuration"). There is no Xvfb anywhere; OpenSCAD
+  runs via the flake's headless EGL/llvmpipe wrapper. Pure-`.scad` libraries
+  need only to be vendored under a top-level `lib/` directory and referenced
+  via `include`/`use`; no new install step is required.
 - **Library detection heuristics**: CI skips underscore-prefixed `_*.scad`
   files by convention, detects "top level object is empty" from OpenSCAD log
   output, and falls back to an empty-STL heuristic (see OVERVIEW "Library vs.

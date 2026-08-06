@@ -22,13 +22,15 @@ Two workflow files live in `.github/workflows/`:
   (rather than any `[self-hosted, linux]` box) so the render memory caps
   below are calibrated against a host of known RAM capacity; the `ryzen`
   label must exist on that runner's registration or the job queues forever.
-  The runner is expected to have OpenSCAD, ImageMagick, ADMesh, qrencode,
-  xvfb, Python 3, and AWS CLI pre-installed. Each dependency install step
-  checks availability first and only installs if missing. If `python3` is
-  absent from the runner's `PATH`, step 0 (Verify python3) fails the build
-  immediately with a pointer to file the fix as a runner defect in
-  `St-John-Software/nixos-config` — it does not attempt to locate or install
-  one itself.
+  The runner itself provides almost nothing beyond `nix`, `git`, and
+  `docker`. Every tool the job shells out to — OpenSCAD (a headless
+  EGL/llvmpipe wrapper), ImageMagick, ADMesh, qrencode, Python 3, Node.js,
+  and the AWS CLI — comes from this repo's own `flake.nix` `default`
+  devShell instead, entered via the job-level `defaults.run.shell` (`nix
+  develop ...#default --command bash -euo pipefail {0}`), so every `run:`
+  step executes inside it automatically. If the runner has no `nix` at all,
+  step 0 (Set up Nix) fails the build immediately with a pointer to fix the
+  runner rather than attempting to install anything itself.
 - **Checkout depth**: `actions/checkout` runs with `fetch-depth: 0`. The models
   manifest step calls `scripts/project_dates.py`, which asks `git log` for the
   last-commit date of each project directory to populate `updated` for the
@@ -44,20 +46,33 @@ Two workflow files live in `.github/workflows/`:
 
 ## Pipeline Steps
 
-### 0. Verify Python Interpreter
+### 0. Set up Nix
 
-Runs as the very first step after checkout, before any step that shells out
-to `python3`. It checks that `python3` is on `PATH` and can create a venv
-(`import ensurepip, json, venv`); if not, it emits `::error::` naming the
-runner defect and pointing at `St-John-Software/nixos-config` as the place to
-fix it, then exits non-zero. This is a fail-fast precondition, not a deferred
-check — unlike dependency-graph, metadata, and interference validation, it
-hard-fails immediately rather than recording the failure for a later
-enforcement step, since a missing interpreter would otherwise break every
-downstream step with an unhelpful "command not found". It deliberately does
-not search for or fall back to an alternate interpreter: a missing `python3`
-is a runner defect (the runner declares it via `extraPackages` in
-nixos-config), not something a workflow should discover or paper over.
+Runs `.github/actions/setup-nix` — a small composite action shared with
+`nixos-config` — as the very first step after checkout, before any step
+that relies on the devShell being resolvable. It puts the runner's system
+`nix` binary on `PATH` (checking
+`/nix/var/nix/profiles/default/bin/nix` first, falling back to whatever
+`nix` already resolves) and emits `::error::` naming the runner defect if
+neither is found, then exits non-zero. This is a fail-fast precondition, not
+a deferred check — like the old python3 check it replaced, it hard-fails
+immediately rather than recording the failure for a later enforcement step,
+since every other step in the job runs inside `nix develop` and would
+otherwise fail with a confusing error once that resolution fails.
+
+Every subsequent `run:` step executes inside `nix develop
+${{ github.workspace }}#default --command bash -euo pipefail {0}` (the
+job-level `defaults.run.shell`), which resolves the `default` devShell from
+this repo's `flake.nix`. That devShell — not the runner host — is what
+actually provides `openscad`, `admesh`, `python3`, `node`, `imagemagick`,
+`zip`/`unzip`, `qrencode`, and `aws`. There are no more `command -v`
+preflight steps for any of these (the old "Check build dependencies", "Check
+ADMesh", and "Check AWS CLI" steps, and the Xvfb-preparation step, are gone
+entirely): if a tool is missing from `flake.nix`, `nix develop` still
+succeeds (it just doesn't put that tool on `PATH`) and the step that needs it
+fails with a plain `command not found` — so a new tool must be added to
+`flake.nix` before a step can shell out to it, not discovered via a
+preflight check. See "CI dependencies come from flake.nix" in `CLAUDE.md`.
 
 ### 1. Verify Dependency Graph
 
@@ -66,7 +81,7 @@ Runs `scripts/scad-dep-graph.sh` and checks whether the per-project
 up to date. If they differ, the step emits a `::warning::` annotation and
 records `failed=true` in its step output — but does **not** fail the build
 immediately. The working tree is restored via `git checkout` so subsequent
-render steps aren't affected. Enforcement is deferred to step 23 at the end
+render steps aren't affected. Enforcement is deferred to step 22 at the end
 of the pipeline, following the same pattern as mesh validation. This step has
 no external dependencies (pure Bash + grep) and runs instantly.
 
@@ -98,7 +113,7 @@ step:
 - Records failed file paths to `.param-failures` (always creates the file, even
   when there are no manifests, so the enforce step's check is reliable)
 - Uses the **deferred enforcement** pattern — records `failed=true` to
-  `$GITHUB_OUTPUT` but does not fail the build until step 27
+  `$GITHUB_OUTPUT` but does not fail the build until step 25
 
 ### 2.6. Run Python Unit Tests for Build Scripts
 
@@ -110,73 +125,25 @@ external I/O (network, filesystem) and run on every push. They guard the
 helper functions used throughout the CI pipeline against
 regressions.
 
-### 3. Check Build Dependencies
+### 3. Verify Headless OpenSCAD Rendering
 
-Verifies that `openscad`, `xvfb-run`, `montage` (ImageMagick), `zip`, and
-`qrencode` are all on `PATH`. If any are missing, emits a single `::error::`
-naming every missing tool and exits.
-
-The step installs nothing. The runner is ryzen (NixOS) and the runner service
-is deliberately unprivileged — no `sudo` on its `PATH`, no sudoers entry, and
-no `apt-get` on the host at all. Build tools are provided by the runner host's
-Nix package set; a missing one is a host configuration problem, not something
-the job can fix. Failing here with the exact tool name beats dying several
-steps later with `openscad: command not found` inside a render loop.
-
-Uses `set -eo pipefail` so any failure in the block is caught immediately.
-
-### 3.5. Prepare Xvfb Environment
-
-Before any rendering begins, stale X display lock files from prior interrupted
-CI runs are cleaned up on the self-hosted runner:
-
-- Removes `/tmp/.X*-lock` files with plain `rm` (no `sudo`). Locks left by our
-  own crashed Xvfb runs are owned by the runner user, so this clears exactly
-  the ones that matter
-- Creates `/tmp/.X11-unix/` with `chmod 1777` (sticky bit — standard
-  permissions for X11 socket directories) **only if it does not already
-  exist**. ryzen is also a live desktop, and an existing `/tmp/.X11-unix` holds
-  the real session's sockets — deleting or re-permissioning it would break GDM.
-  If the existing directory isn't writable by the runner user, the step emits a
-  `::warning::` with `ls -ld` output rather than trying to fix it
-- Verifies `xvfb-run` is installed; emits `::error::` and exits if missing
-- Pins glvnd's EGL vendor to Mesa and forces software GL, exporting
-  `__EGL_VENDOR_LIBRARY_FILENAMES`, `__EGL_EXTERNAL_PLATFORM_CONFIG_DIRS`,
-  `__GLX_VENDOR_LIBRARY_NAME`, `LIBGL_ALWAYS_SOFTWARE`, and `GALLIUM_DRIVER`
-  via `$GITHUB_ENV` so every later step in the job inherits them
-
-`xvfb-run --auto-servernum` skips displays that are genuinely in use, so the
-desktop's own display is never contended for.
-
-Without this step, `xvfb-run` can fail with "Server is already active for
-display N" or "Cannot establish any listening sockets" when a stale lock file
-from a previously interrupted job collides with a new display allocation.
-
-On ryzen, Xvfb's own GLX initialization crashes before it gets that far: it
-loads Mesa's `swrast_dri.so`, which loads libglvnd's `libEGL.so.1`, which
-enumerates every installed EGL vendor and pulls in `libEGL_nvidia.so.0` ->
-`libnvidia-egl-gbm.so.1` -> SIGSEGV ("Caught signal 11 ... Server
-aborting"). Xvfb aborts, OpenSCAD gets no X display, and every thumbnail
-PNG comes out 0 bytes (issue #361; St-John-Software/nixos-config#110, #111).
-Pinning glvnd to the Mesa EGL vendor and disabling EGL external platforms
-keeps the NVIDIA stack out of the process entirely, so Xvfb starts on
-Mesa's software path instead. This is a workaround to be removed once the
-host is fixed under nixos-config#110.
-
-### 3.6. Verify Headless OpenSCAD Rendering
-
-A 30-second smoke test that proves whether the EGL pin above actually
-worked, instead of waiting to find out from 50+ warnings in the thumbnail
-step much later in the pipeline. It renders a bare `cube(10);` through
-`xvfb-run` and `scripts/capped-openscad.sh` (capped at `4G`/`120s`) to a
-tiny 64x48 PNG, then checks the output's first 8 bytes against the PNG
-magic number (`89504e470d0a1a0a`) rather than relying on file size alone.
+A smoke test that proves the flake's `openscadHeadless` wrapper (see
+`flake.nix`) actually produces a PNG on this runner, instead of waiting to
+find out from 50+ warnings in the thumbnail step much later in the
+pipeline. It renders a bare `cube(10);` through `scripts/capped-openscad.sh`
+(capped at `4G`/`120s`) to a tiny 64x48 PNG, then checks the output's first
+8 bytes against the PNG magic number (`89504e470d0a1a0a`) rather than
+relying on file size alone. There is no Xvfb or X server involved — the
+wrapper forces OpenSCAD onto the EGL/llvmpipe software-GL path
+(`LIBGL_ALWAYS_SOFTWARE`, a pinned Mesa EGL vendor JSON, `QT_QPA_PLATFORM=
+offscreen`, `DISPLAY` unset), so this step is purely checking that the
+wrapper itself still works, not that a virtual display started.
 
 The step's own `id` (`gl_smoke`) exposes a `headless_gl` output
 (`true`/`false`). It is entirely non-blocking: `continue-on-error: true` on
 the step, `|| true` on the render itself, and a `::warning::` (never
-`::error::`) if the PNG check fails, with the captured Xvfb server log
-printed alongside it for diagnosis. Build-blocking decisions for actual
+`::error::`) if the PNG check fails, pointing at the `openscadHeadless`
+wrapper in `flake.nix` for diagnosis. Build-blocking decisions for actual
 thumbnail rendering belong to the deferred-enforcement step(s) later in the
 pipeline, not to this smoke test.
 
@@ -207,18 +174,18 @@ triggers a warning; the maintainer then updates `.openscad-version` with a
 dedicated commit. This ensures the committed baseline stays in sync with the
 runner without CI having write access.
 
-### 5. Check ADMesh
-
-Separate from the build-dependency step because mesh validation is optional to
-the rest of the pipeline's shape. Verifies `admesh` is on `PATH` and prints its
-version; emits `::error::` and exits if missing. Like step 3, it installs
-nothing — the unprivileged NixOS runner has no `apt-get`.
-
-### 6. Render STL Files
+### 5. Render STL Files
 
 Finds all `.scad` files (excluding `.github/`) and renders each to
-`site/{name}.stl` via `scripts/capped-openscad.sh --export-format binstl -o
-site/{name}.stl {file}` (binary STL output). The wrapper runs OpenSCAD under
+`site/{name}.stl` via `scripts/capped-openscad.sh --backend=CGAL
+--export-format binstl -o site/{name}.stl {file}` (binary STL output). The
+`--backend=CGAL` flag is pinned because openscad-unstable's default Manifold
+backend emits zero-area (degenerate) facets for the drawer baseplate grids
+(112 per model), which fails ADMesh validation; CGAL is the backend the
+2021.01 renders used and produces clean meshes. The flag only applies to this
+STL export — the PNG thumbnail and orthographic-view steps (9, 9.5) don't
+pass `--render`/full-render flags, so they use the OpenCSG preview path and
+are unaffected. The wrapper runs OpenSCAD under
 a memory ceiling and wall-clock timeout (`RENDER_MEM_MAX` / `RENDER_TIMEOUT`,
 workflow-level env, default `28G` / `3600`s — sized for the heaviest models,
 the full-res 512 px `nz-ski-fields` part renders, which take tens of minutes
@@ -269,7 +236,10 @@ across runs on the long-lived self-hosted runner. The key (computed by
 `scripts/render_cache.py`) is a SHA-256 over the renderable's full transitive
 `include`/`use` chain, any binary assets it references via
 `surface(file=...)`/`import(...)`, the OpenSCAD version string, and a
-`CACHE_VERSION` constant. On a hit the stored STL is copied into `site/` and its
+`CACHE_VERSION` constant (bumped to `"2"` alongside the `--backend=CGAL` pin
+above, so pre-existing cache entries rendered with the old Manifold-backend
+flags are treated as misses and re-rendered rather than served as CGAL-clean
+STLs). On a hit the stored STL is copied into `site/` and its
 mtime refreshed; on a miss the freshly rendered STL is written into the cache
 atomically (`.tmp.$$` then `mv`). Because the key is content-addressed, a hit is
 byte-identical regardless of which branch populated it, so the cache is safely
@@ -281,7 +251,7 @@ from the key: the precomputed STL uses the defaults baked into the `.scad` (no
 runner's `$HOME` is ephemeral per job every build is a cold miss (correct, just no
 speedup) — point `RENDER_CACHE_DIR` at a persistent volume to retain the cache.
 
-### 7. Validate STL Meshes
+### 6. Validate STL Meshes
 
 After rendering, each STL is validated using [ADMesh](https://github.com/admesh/admesh):
 
@@ -309,7 +279,7 @@ pass/fail). If any model fails validation, the main-branch deploy is skipped
 and the job exits with failure after the PR comment is posted — ensuring
 reviewers see the full report.
 
-### 7.3. Bundle openscad-wasm and Sources for In-Browser Customizer
+### 6.3. Bundle openscad-wasm and Sources for In-Browser Customizer
 
 Stages all assets the in-browser WASM customizer needs to function:
 
@@ -338,9 +308,10 @@ Stages all assets the in-browser WASM customizer needs to function:
    discover both library files and binary assets without needing to enumerate the
    bucket.
 
-### 7.4. Set Up Node.js and Smoke-Test WASM Customizer
+### 6.4. Smoke-Test WASM Customizer Rendering
 
-Sets up Node.js 20 and runs three Node tests:
+Runs three Node tests using the `nodejs_22` package from the flake's
+`default` devShell — there is no separate Node setup step:
 
 - `scripts/test_wasm_customizer.mjs` — exercises the full in-browser customizer
   pipeline end-to-end in a Node environment: it loads the staged WASM assets,
@@ -353,21 +324,15 @@ Sets up Node.js 20 and runs three Node tests:
   `interestScore`/`recencyScore`/`landingOrder` out of `index.html` between the
   `__LANDING_ORDER_*` markers and pins the landing gallery's project ranking.
 
-The runner has no system `nodejs`, so `actions/setup-node` is the only source
-of a `node` binary. The ryzen runner's relocated tool cache
-(`/var/lib/github-runner/ryzen-tool`) is writable but not executable by the
-runner service, which previously produced `Permission denied` / exit 126
-(issue #356). Overriding `RUNNER_TOOL_CACHE` via step `env:` does not work
-around this — the runner re-injects its own value into every step's process
-environment regardless of what the workflow declares. Instead, a
-`Relocate Node.js to an executable path` step copies the extracted toolchain
-into `$RUNNER_TEMP` (which the runner already executes step scripts from, so
-it is guaranteed exec-enabled) and prepends it to `PATH`. A
-`Verify Node.js is executable` step immediately follows and fails fast with a
-pointer to `St-John-Software/nixos-config` if the toolchain is still
-unusable.
+This replaces the old `actions/setup-node` + relocate-to-`$RUNNER_TEMP` dance
+(issue #356): `actions/setup-node`'s prebuilt tarball and the ryzen runner's
+relocated tool cache (`/var/lib/github-runner/ryzen-tool`, writable but not
+executable by the runner's systemd `DynamicUser` unit, which previously
+produced `Permission denied` / exit 126) were both unusable on the NixOS
+runners. Node now comes from the same Nix-store closure as every other CI
+tool, so there is nothing to relocate or verify separately.
 
-### 7.5. Check Mating Part Interference
+### 6.5. Check Mating Part Interference
 
 After mesh validation, pairs of STL files declared in `meta.json`'s
 `mating_pairs` field are checked for geometric overlap using
@@ -381,14 +346,14 @@ After mesh validation, pairs of STL files declared in `meta.json`'s
   `part_a`, `part_b`, `overlap_volume_mm3`, `passed`, and `skipped` flags
 - Uses the **deferred enforcement** pattern — records `failed=true` to
   `$GITHUB_OUTPUT` but does not fail the build until the final enforcement
-  step (step 26)
+  step (step 24)
 - PR comments include an interference table showing part names, overlap
   volume, and pass/fail/skip status
 
 This catches design errors where two parts that are supposed to fit together
 actually physically overlap — impossible to assemble in the real world.
 
-### 8. Generate Standalone HTML Viewers
+### 7. Generate Standalone HTML Viewers
 
 Runs `scripts/generate-standalone.py`, which produces one self-contained
 HTML file per model at `site/standalone/<name>.html`. The script:
@@ -403,7 +368,7 @@ HTML file per model at `site/standalone/<name>.html`. The script:
 - Base64-encodes both JS libraries and STL data into the HTML via import map
   data URIs, producing files that work from `file://` with zero dependencies
 
-### 9. Bundle Project Zips
+### 8. Bundle Project Zips
 
 Groups rendered STL files by project directory (from `.scad-map`) and creates
 a zip bundle for each project with **2 or more** STL files. Single-file
@@ -413,9 +378,9 @@ use `zip -j` (junk paths) so the archive contains flat filenames without
 the `site/` prefix. The zip files are deployed alongside the STLs and
 referenced from `models.json`.
 
-### 9.5. Bundle Project Source Zips
+### 8.5. Bundle Project Source Zips
 
-A sibling step runs immediately after step 9 and creates a source zip for
+A sibling step runs immediately after step 8 and creates a source zip for
 **every** project (no 2+ file threshold). For each unique project directory in
 `.scad-map`, the step runs `git ls-files` to enumerate all tracked files in
 that directory and archives them with their `<dir>/` path prefix preserved
@@ -428,21 +393,33 @@ xargs -0`. Only git-tracked files are included — gitignored outputs (STLs,
 STLs via the existing `aws s3 sync` step and referenced from `models.json` as
 the optional `sourceZip` field.
 
-### 10. Render PNG Thumbnails
+### 9. Render PNG Thumbnails
 
-For each rendered STL, finds the corresponding `.scad` source and renders an
-800x600 PNG thumbnail via `scripts/capped-openscad.sh`, with a step-level
+For each rendered STL (read from `site/.scad-map`), renders an 800x600 PNG
+thumbnail via `scripts/capped-openscad.sh`, with a step-level
 `RENDER_MEM_MAX=4G` / `RENDER_TIMEOUT=120` override (lower than the STL
-render cap, since thumbnails are supplementary). Xvfb is invoked with
-`--auto-servernum` and retried up to 3 times to tolerate transient `Xvfb
-failed to start` errors on the self-hosted runner. Falls back to direct
-rendering with a warning if `xvfb-run` is not installed.
+render cap, since thumbnails are supplementary). No Xvfb is involved: the
+flake's `openscadHeadless` wrapper renders offscreen via EGL/llvmpipe with
+no X server at all, so the old `xvfb-run --auto-servernum` retry-on-stale-
+lock loop (up to 3 attempts) is gone.
+
+Every output is validated against the 8-byte PNG signature
+(`89 50 4e 47 0d 0a 1a 0a`, read with `od`) rather than merely checked for
+non-emptiness. OpenSCAD exits 0 after `Cannot create OpenGL OffscreenView`
+but leaves a 0-byte file behind, and a 0-byte PNG syncs to S3 as happily as
+a real one; that is exactly what shipped a text-only landing gallery for
+five consecutive main builds (issue #359). An invalid output is deleted and
+its model name is appended to `.thumb-failures` at the repo root.
 
 Individual thumbnail failures — including a cap hit — emit a GitHub Actions
-warning but do not fail the build — STL files are the core output,
-thumbnails are supplementary.
+warning and do not fail the step. Instead the step records `failed=true` to
+`$GITHUB_OUTPUT` (`id: thumbnails`) and the separate **Enforce thumbnail
+rendering** step at the end of the pipeline fails the build, listing
+`.thumb-failures`. Because that step runs after the S3 sync, the site still
+deploys — minus the deleted broken PNGs — while the build goes red. See the
+deferred enforcement pattern below.
 
-### 10.5. Render Extra Orthographic Views for Complex-Interior Models
+### 9.5. Render Extra Orthographic Views for Complex-Interior Models
 
 For any model whose project has `complex_interior: true` in `meta.json`,
 three additional orthographic PNGs are rendered: `top`, `bottom`, and
@@ -452,13 +429,12 @@ three additional orthographic PNGs are rendered: `top`, `bottom`, and
 with the same 4G/120s step-level cap as thumbnails. `power-workshop` and
 `drawer-organiser` declare `complex_interior: true`.
 
-Xvfb handling here uses a simpler fallback than step 10: if `xvfb-run` is
-available the render script runs under it; if Xvfb fails to start, the
-script retries without a virtual display (warning only, not a failure).
-Empty or missing output PNGs are removed with a warning annotation rather
-than failing the build.
+No Xvfb here either — same as step 9, the flake's `openscadHeadless` wrapper
+renders offscreen directly with no virtual display involved. Empty or
+missing output PNGs are removed with a warning annotation rather than
+failing the build.
 
-### 11. Generate QR Codes
+### 10. Generate QR Codes
 
 Generates a QR code PNG per model at `site/qr/<name>.png` using `qrencode`.
 Each QR encodes the model's deep link URL
@@ -469,7 +445,7 @@ and margin 2. QR codes are stored in a separate `site/qr/` directory to avoid
 polluting the `site/*.png` glob used by the OG hero image step. Failures
 emit a warning but don't break the build (same pattern as thumbnails).
 
-### 12. Generate OG Hero Image
+### 11. Generate OG Hero Image
 
 Composites the rendered PNG thumbnails into a single 1200×630 `og-hero.png`
 for Open Graph social previews. Uses ImageMagick `montage` to tile thumbnails
@@ -479,12 +455,15 @@ text using `magick`/`convert` (whichever is present — ImageMagick 7 ships
 `magick` and may omit the legacy `convert` symlink).
 
 Both the `montage` path and the solid-color fallback pass `-font
-Liberation-Sans` explicitly. ImageMagick on the NixOS runner has no
+Liberation-Sans` explicitly. ImageMagick from the flake has no
 distro-supplied `type.xml` and therefore no default font; `montage` needs one
 even when no visible text is requested, because it labels each tile by
-default. Font names in ImageMagick's own naming are hyphenated
-(`Liberation-Sans`, `DejaVu-Sans`), not the fontconfig family names
-(`"Liberation Sans"`, `sans`) — the latter do not resolve.
+default. The font resolves via fontconfig: the `default` devShell pins
+`FONTCONFIG_FILE` (via `pkgs.makeFontsConf` in `flake.nix`) to a font set
+containing `liberation_ttf`, so this works identically on every runner
+regardless of what's installed on the host. Font names in ImageMagick's own
+naming are hyphenated (`Liberation-Sans`, `DejaVu-Sans`), not the fontconfig
+family names (`"Liberation Sans"`, `sans`) — the latter do not resolve.
 
 The step is warning-only, matching the thumbnail/QR pattern: if `montage`
 fails to composite, it falls back to the plain solid-color hero image; if
@@ -510,7 +489,7 @@ it reproduces, the likely fix is piping through an intermediate
 '%wx%h\n' site/og-hero.png` on a real run before trusting the composed
 dimensions.
 
-### 13. Generate Models Manifest
+### 12. Generate Models Manifest
 
 A Python script reads `site/.scad-map` and produces `site/models.json`:
 
@@ -545,7 +524,7 @@ Project names are derived from directory names (hyphens/underscores → spaces,
 title-cased). The `zip` field is only present when a zip bundle was generated
 (projects with 2+ files). The `sourceZip` field is present for every project
 that has tracked source files; it references the per-project source zip
-produced by step 9.5. The `estimated_minutes` field is merged from
+produced by step 8.5. The `estimated_minutes` field is merged from
 `validation.json`. The `qr` field is present only when the QR PNG exists.
 The `parameters` field is present on a file entry when a validated
 `<basename>.parameters.json` manifest exists next to the `.scad` source; its
@@ -568,7 +547,7 @@ renderer regression.
 The viewer reads this manifest to populate the gallery and conditionally show
 features.
 
-### 13.5. Generate sitemap.xml
+### 12.5. Generate sitemap.xml
 
 After the models manifest is written, a Python snippet reads `site/.scad-map`
 via `oembed_helpers.parse_scad_map()` and generates `site/sitemap.xml` — a
@@ -579,7 +558,7 @@ viewer (`/standalone/<model>.html`). URLs are built from `BASE_URL` in
 with `robots.txt`, crawlers only read the authoritative copy at the origin root
 (`/sitemap.xml`), which requires a separate infra step.
 
-### 14. Generate README Gallery (main branch only)
+### 13. Generate README Gallery (main branch only)
 
 Runs `scripts/generate-gallery.py`, which reads `site/models.json` and
 per-project `meta.json` descriptions to generate a visual gallery table in
@@ -588,7 +567,7 @@ markers. Each row has a thumbnail, project link, model count, and description.
 On PRs, the script is smoke-tested (run then reverted with `git checkout`)
 to catch breakage without modifying the PR.
 
-### 15. Generate Structured Data
+### 14. Generate Structured Data
 
 A Python script reads `site/.scad-map` and `site/validation.json` to produce
 `site/structured-data.json` — a Schema.org JSON-LD object using
@@ -599,7 +578,7 @@ A Python script reads `site/.scad-map` and `site/validation.json` to produce
 Absolute URLs are required by JSON-LD spec. Uses shared helpers from
 `scripts/oembed_helpers.py`.
 
-### 16. Generate OEmbed JSON Files
+### 15. Generate OEmbed JSON Files
 
 A Python script reads `site/.scad-map` and generates one OEmbed JSON file per
 model at `site/oembed/<project-slug>/<model-slug>.json`. Each file is a
@@ -615,14 +594,14 @@ standard OEmbed v1.0 "rich" type response containing:
 The slugify logic is imported from `scripts/oembed_helpers.py` and matches
 `index.html` exactly: strip `.stl`, replace `[_\s]+` with `-`, lowercase.
 
-### 17. Generate Changed Projects List (PR only)
+### 16. Generate Changed Projects List (PR only)
 
 Diffs the PR commit to find changed `.scad` files, extracts their top-level
 directories, and writes `site/changed.json` — an array of project names.
 The viewer uses this to auto-expand sections for changed models and collapse
 unchanged ones.
 
-### 18. Copy Static Assets and Inject Data
+### 17. Copy Static Assets and Inject Data
 
 Copies `index.html`, `embed.html`, and `openscad-worker.js` to `site/`,
 replacing the `__BUILD_HASH__` placeholder with the first 8 characters of the
@@ -650,14 +629,7 @@ and `llms.txt`. Then a Python script:
    explicit endpoint URLs (e.g., WordPress OEmbed allowlists) rather
    than relying on `<link>` discovery.
 
-### 19. Check AWS CLI
-
-Verifies `aws` is on `PATH` and prints its version; emits `::error::` and exits
-if missing. The bundled AWS CLI v2 installer needs root to write `/usr/local`,
-and its prebuilt binaries would not run unpatched on NixOS regardless — `aws`
-comes from the runner host's Nix package set like every other tool.
-
-### 20. Deploy to S3
+### 18. Deploy to S3
 
 Uses OIDC (`aws-actions/configure-aws-credentials@v6`) with the
 `AWS_ROLE_ARN` secret. v6 requires an explicit `role-session-name` input for
@@ -671,7 +643,7 @@ passing `github-actions-${{ github.run_id }}`, #291).
   PR deploys are not gated on validation so reviewers can inspect broken
   models in the 3D viewer.
 
-### 21. Commit README Gallery Update (main branch only)
+### 19. Commit README Gallery Update (main branch only)
 
 After a successful deploy, if the gallery script produced changes to
 `README.md`, the step commits and pushes the update using the
@@ -681,7 +653,7 @@ to handle concurrent pushes. Gated on both the gallery step succeeding
 and mesh validation passing. Uses `continue-on-error: true` so a push
 race condition doesn't fail the entire workflow.
 
-### 22. Comment on PR (PR only)
+### 20. Comment on PR (PR only)
 
 Posts or updates a bot comment on the PR with:
 - A link to the interactive preview deployment
@@ -706,31 +678,31 @@ don't fail the entire workflow. All three GitHub API calls (`listFiles`,
 `withRetry(fn, retries=3, delayMs=2000)` helper that retries with linear
 backoff (delay × attempt number) on error.
 
-### 23. Enforce Mesh Validation
+### 21. Enforce Mesh Validation
 
 If the validate step recorded any failures, this step exits with an error
 after all other steps (thumbnails, manifests, PR comment, deploy) have
 completed. This ensures the full report is visible to reviewers before the
 job fails.
 
-### 24. Enforce Dependency Graph Check
+### 22. Enforce Dependency Graph Check
 
 If the dependency graph verification (step 1) recorded a failure, this step
 exits with an error telling the contributor to regenerate. Placed after all
 other steps so the full pipeline output (renders, PR comment, deploy) is
 available even when graphs are stale.
 
-### 25. Enforce Metadata Validation
+### 23. Enforce Metadata Validation
 
 If the metadata validation (step 2) recorded a failure, this step exits with
 an error indicating which `meta.json` files don't match the schema.
 
-### 26. Enforce Interference Check
+### 24. Enforce Interference Check
 
-If the mating part interference check (step 7.5) recorded a failure, this
+If the mating part interference check (step 6.5) recorded a failure, this
 step exits with an error indicating which part pairs have geometric overlap.
 
-### 27. Enforce Parameters Validation
+### 25. Enforce Parameters Validation
 
 If the parameters manifest validation (step 2.5) recorded a failure, this
 step exits with an error and prints `.param-failures` so the contributor
@@ -778,24 +750,28 @@ multiple fail, all errors are visible.
   fits the project's fully-static architecture — no new client-side
   dependencies. Only projects with 2+ files get a zip (single-file projects
   don't benefit from bundling).
-- **Check-only dependency verification**: Each tool (OpenSCAD, ImageMagick,
-  ADMesh, qrencode, AWS CLI) is checked with `command -v`; nothing is
-  installed. The runner service is unprivileged (no `sudo`, no `apt-get`), so
-  a missing tool is a host configuration problem, not something the job can
-  fix — the step fails fast with `::error::` naming every missing tool.
-- **Xvfb environment preparation**: A dedicated step (3.5) cleans stale X
-  lock files (`/tmp/.X*-lock`) before any rendering begins. Long-lived
-  self-hosted runners accumulate stale locks from previously interrupted
-  jobs; without cleanup, `xvfb-run` fails with "Server is already active" on
-  the fixed display number. `/tmp/.X11-unix/` is created only if it doesn't
-  already exist — ryzen is also a live desktop, and an existing
-  `/tmp/.X11-unix` holds the real session's sockets, so the step never
-  deletes or re-permissions it. The same step also pins glvnd to the Mesa
-  EGL vendor so Xvfb doesn't segfault inside NVIDIA's EGL stack (issue
-  #361).
-- **Graceful xvfb degradation**: The PNG rendering step checks for `xvfb-run`
-  availability rather than assuming it's installed. This ensures the pipeline
-  still produces STL files even if the runner cannot generate thumbnails.
+- **Nix-provided dependencies, no preflight checks**: Every tool (OpenSCAD,
+  ImageMagick, ADMesh, qrencode, AWS CLI, Node, Python) comes from this
+  repo's `flake.nix` `default` devShell, entered via the job-level
+  `defaults.run.shell` (see step 0). This replaced a set of `command
+  -v`-based preflight steps ("Check build dependencies", "Check ADMesh",
+  "Check AWS CLI") that failed fast with `::error::` naming any tool missing
+  from the runner host's own package set — those steps no longer exist. If a
+  devShell package is missing, `nix develop` still succeeds but the step
+  that needs the tool fails with a plain `command not found`; the fix is to
+  add the tool to `flake.nix`, not to the runner host.
+- **Headless OpenSCAD rendering, no Xvfb**: The flake's `openscadHeadless`
+  wrapper (`flake.nix`) forces OpenSCAD onto the EGL/llvmpipe software-GL
+  path (`LIBGL_ALWAYS_SOFTWARE`, a pinned Mesa EGL vendor JSON,
+  `QT_QPA_PLATFORM=offscreen`, `DISPLAY` unset), so PNG export works with no
+  X server at all. This replaced the "Prepare Xvfb environment" step (stale
+  `/tmp/.X*-lock` cleanup, `/tmp/.X11-unix` permission checks, glvnd
+  EGL-vendor pinning via `$GITHUB_ENV`) and the `xvfb-run` retry-on-stale-lock
+  loops in the thumbnail and orthographic-view render steps (issue #361;
+  St-John-Software/nixos-config#110, #111). The "Verify headless OpenSCAD
+  rendering" smoke test (step 3) still runs to catch a wrapper regression
+  fast, but it no longer needs to reason about a separate X server's startup
+  failures.
 - **Complex-interior orthographic views**: Models with `complex_interior: true`
   get three extra orthographic PNGs (`_top`, `_bottom`, `_front`) to expose
   internal cavity geometry that the default isometric thumbnail obscures. These
@@ -812,8 +788,10 @@ multiple fail, all errors are visible.
   other assets). Social media crawlers cache by URL, so a stable path ensures
   previews update when the image content changes rather than producing stale
   entries for old URLs.
-- **Fail-fast verification**: `openscad --version` runs after the install
-  step to surface installation failures immediately with a clear error message.
+- **Fail-fast verification**: `openscad --version` (step 4) runs early,
+  right after the devShell resolves the toolchain, to surface a version
+  mismatch against the committed `.openscad-version` baseline before the
+  (potentially very long) STL render step begins.
 - **Deferred enforcement pattern**: Mesh validation, dependency graph checks,
   and metadata validation all use the same non-blocking pattern: the check
   step records `failed=true` to `$GITHUB_OUTPUT` and emits a warning
@@ -848,11 +826,14 @@ multiple fail, all errors are visible.
   than alongside model thumbnails in `site/` to avoid being picked up by the
   OG hero image `montage` glob (`site/*.png`).
 - **Explicit ImageMagick font**: the OG hero step always passes `-font
-  Liberation-Sans` because the NixOS runner has no default ImageMagick font
-  and `montage` fails outright without one (issue #352). `MAGICK_FONT` and
-  supplying a `type.xml` via `MAGICK_CONFIGURE_PATH` were both tried on the
-  runner and did not fix the default; naming the font on every invocation is
-  the only fix that works.
+  Liberation-Sans` because ImageMagick has no default font and `montage`
+  fails outright without one (issue #352). `MAGICK_FONT` and supplying a
+  `type.xml` via `MAGICK_CONFIGURE_PATH` were both tried and did not fix the
+  default; naming the font on every invocation is the only fix that works.
+  The `default` devShell now pins `FONTCONFIG_FILE` (via
+  `pkgs.makeFontsConf` in `flake.nix`) to a font set containing
+  `liberation_ttf` so `Liberation-Sans` resolves identically on every
+  runner — see step 11.
 - **PR comment resilience**: The comment step uses `continue-on-error: true`
   and a `withRetry(fn, retries=3, delayMs=2000)` helper so transient GitHub
   API errors (rate limits, network blips) don't fail the workflow. The
@@ -894,12 +875,12 @@ multiple fail, all errors are visible.
   table with overlap volume in mm³. The step uses the same deferred
   enforcement pattern as mesh and metadata validation — failures are
   recorded early but only block the build at the final enforcement step
-  (step 27), so the full pipeline output is always available.
+  (step 24), so the full pipeline output is always available.
 - **Parameters manifest deferred enforcement**: `*.parameters.json` validation
   (step 2.5) follows the same deferred pattern. Failures go to `.param-failures`;
   the manifest generation step reads that file and excludes invalid manifests from
   `models.json` so the customizer never loads a broken parameter set. Enforcement
-  fires at step 27 (the last step) so the full pipeline output is always available
+  fires at step 25 (the last step) so the full pipeline output is always available
   even when a manifest is malformed.
 - **Non-threaded openscad-wasm build**: The customizer uses the non-threaded
   WASM build (`openscad.js` / `openscad.wasm`) rather than the threaded build.
@@ -925,7 +906,7 @@ multiple fail, all errors are visible.
   without requiring manual updates when models are added or removed.
 - **Static web assets at repo root**: `favicon.svg`, `site.webmanifest`,
   `robots.txt`, and `llms.txt` live at the repo root and are copied to `site/`
-  during CI (step 18), just like `index.html` and `filament-colors.json`.
+  during CI (step 17), just like `index.html` and `filament-colors.json`.
   Keeping them as committed source files means they are version-controlled and
   reviewable via PR, while the copy step ensures they land in the deployed
   directory.
@@ -943,7 +924,7 @@ multiple fail, all errors are visible.
 - **site/sources/ layout**: All `.scad` source files, validated
   `*.parameters.json` manifests, and binary render assets (`.png` files whose
   basename appears in a sibling `.scad`) are staged under
-  `site/sources/<project>/` during CI (step 7.3). A per-project `manifest.json`
+  `site/sources/<project>/` during CI (step 6.3). A per-project `manifest.json`
   lists all `.scad` and `.png` filenames because S3 does not serve directory
   indexes. The browser's `loadProjectSources()` function fetches this manifest to
   discover all project files; `.scad` entries are fetched as text and written into
@@ -956,6 +937,19 @@ Defined in `.github/workflows/notify-failures.yml`. Triggers on
 `workflow_run` completion of `Build Models` on the `main` branch — allowing
 it to observe build outcomes without requiring `contents: write` on the
 build workflow itself.
+
+Both jobs (`notify`, `close-on-success`) run on `[self-hosted, linux]`
+(deliberately *not* pinned to `ryzen` — see "Capped OpenSCAD renders" below)
+and follow the same flake.nix migration as `build.yml`: the only tool either
+job shells out to is `gh`, which comes from the flake's `scripts` devShell,
+entered via a job-level `defaults.run.shell` (`nix develop
+${{ github.workspace }}#scripts --command bash -euo pipefail {0}`). Because
+that devShell is resolved from this repo's own `flake.nix`/`flake.lock`,
+both jobs now start with `actions/checkout@v7` (no `fetch-depth: 0` needed —
+neither job reads git history) followed by the shared `Set up Nix` composite
+action, exactly like steps 0 in `build.yml`. Neither step existed before
+this migration: previously `gh` was assumed to be on the runner host
+directly, so no checkout was required to resolve a devShell.
 
 ### `notify` job (on failure)
 

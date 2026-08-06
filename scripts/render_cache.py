@@ -18,7 +18,11 @@ import os
 import re
 import sys
 
-CACHE_VERSION = "1"  # bump to force-invalidate every cached render
+# Bump to force-invalidate every cached render. "2": discard STLs rendered
+# by openscad-unstable's Manifold backend before build.yml pinned STL export
+# to --backend=CGAL (Manifold emitted degenerate facets; the render flags are
+# not part of the key, so a bump is the only way to evict those entries).
+CACHE_VERSION = "2"
 
 # Mirrors the include/use detection in scad-dep-graph.sh.
 _INCLUDE_RE = re.compile(r'^\s*(?:include|use)\s+<([^>]*)>')

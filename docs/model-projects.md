@@ -370,6 +370,58 @@ continuing 1.5mm above the flange base within the flange (`bore_extra=1.5`). The
 collar cylinder provides solid material through this zone; the bore remains clear
 of the socket (socket bottom is at z=24.5, bore top at z=21.0).
 
+### scanning-rig/
+
+A fully-printed photogrammetry rig for scanning small objects with a phone
+camera — no bearings, bolts, or other hardware required (the issue #343
+request explicitly allowed adding bearings "if needed"; the shipped design
+doesn't need them). Two independent parts: a hand-rotated **turntable** (base
++ platter riding on a printed 45-degree V-groove race, held concentric by a
+centring spindle) and a **generic leaning phone stand** (parametric slot
+width, default sized to fit an iPhone 15 Pro bare or in a case).
+
+| File | Role |
+|------|------|
+| `_scanning_rig.scad` | Shared library — `$fn = 64`, all parameters, modules `turntable_base()`, `turntable_platter()`, `stand_profile()`/`notch_profile()`/`phone_stand()`; no top-level geometry |
+| `turntable_base.scad` | Renderable — base plate with V-ridge race, centring spindle, and an index pointer on the exposed rim; prints as-is, Z-up, no supports |
+| `turntable_platter.scad` | Renderable — platter with underside V-groove, spindle clearance bore, rim finger-grip scallops, and rotation tick marks; prints as-is, top face up (groove-side down), no supports |
+| `phone_stand.scad` | Renderable — leaning phone cradle; single side profile `linear_extrude()`d along Z, no viewer rotation needed (see below) |
+| `scanning_rig_assembly.scad` | Renderable — preview-only assembly (platter dropped onto the base with a display-only gap, phone stand alongside); applies `rotate([-90, 0, 0])` (assembly-file convention) |
+| `turntable_base.parameters.json` | Customizer manifest — `base_d`, `race_r`, `spindle_d` |
+| `turntable_platter.parameters.json` | Customizer manifest — `platter_d`, `race_r`, `spindle_d`, `race_clear`, `bore_clear`, `tick_count` |
+| `phone_stand.parameters.json` | Customizer manifest — `slot_w`, `lean`, `stand_w`, `backrest_h`, `lip_h`, `foot_rear` |
+| `meta.json` | Project metadata (description, tags: photogrammetry/scanning/utility/desk, difficulty: beginner, version 1.0.0, `printing_notes`: support-free orientations, groove lubrication, slot-width tuning, landscape-scan overhang tip) |
+| `dependency-graph.md` | Auto-generated `include` dependency graph — every renderable includes `_scanning_rig.scad` |
+
+**Turntable fit**: the platter's V-groove is the ridge triangle grown by
+`race_clear` (0.3mm default) on both flanks, so the pair contacts on the
+45-degree flanks only, `race_clear / sqrt(2)` (~0.21mm) apart — locating the
+platter concentrically without binding. `race_r` and `spindle_d` must match
+between `turntable_base.scad` and `turntable_platter.scad` (both customizer
+manifests expose them for that reason). `platter_t` (8mm) is deliberately
+**not** exposed in the customizer: below ~6mm the groove would break through
+the platter's top face. `tick_count` rotation ticks on the platter (24 =
+15-degree steps, one widened as the 0-degree reference) line up against a
+fixed index pointer on the base rim, so a scan can be stepped through even
+angular increments by hand.
+
+**Phone stand profile**: `stand_profile()` draws the side view in XY with
++Y up and +X rearward (the lean direction), then `phone_stand()` extrudes it
+along Z (`stand_w`, the stand's width) — so every layer of the print is the
+identical cross-section and no part of the wedge/lip/backrest can overhang
+regardless of `lean`. Because the profile's "up" is already +Y, the exported
+STL needs no `rotate([-90, 0, 0])` to display upright in the Y-up viewer even
+though it's also already print-oriented (see
+[OVERVIEW.md](OVERVIEW.md#viewer-rotation)) — a pattern worth reusing for
+future single-profile extruded parts. The cradle floor is carried above the
+foot plate by a `hull()`-based wedge (tilted floor strip to a shallow strip
+sunk into the foot) rather than being sunk into the foot directly, so the
+tilted floor stays supported across its full width at any `lean`. A cable
+notch is cut through the lip and floor in the slot's own tipped-back frame;
+its deepest point is bounded (`stand_base_t - 1 + 4*sin(lean) - 0.5*cos(lean)`)
+to stay well clear of severing the foot plate across the customizer's `lean`
+range.
+
 ### sink-tray/
 
 | File | Role |

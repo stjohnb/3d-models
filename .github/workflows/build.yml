@@ -15,6 +15,13 @@ concurrency:
   group: pages-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'main' }}
   cancel-in-progress: true
 
+# The org's CI runs on self-hosted NixOS runners, and every tool this
+# workflow shells out to — openscad (EGL-headless wrapper), admesh, python3,
+# node, imagemagick, zip/unzip, qrencode, aws — comes from this repo's own
+# flake.nix via `nix develop`, isolated in the nix store from whatever other
+# repos put on the same runners. Do NOT add actions/setup-node,
+# actions/setup-python, sudo/apt-get, or ask for packages on the runner
+# itself; add tools to flake.nix instead.
 env:
   # Memory/time caps for capped-openscad.sh STL renders (issue #272).
   # Thumbnail/orthographic-view steps override these lower via step-level env.
@@ -38,6 +45,19 @@ jobs:
     # queues forever.
     runs-on: [self-hosted, linux, ryzen]
 
+    # Every run step executes inside the flake's default devShell. The job
+    # therefore starts with checkout + setup-nix, and the first devShell
+    # entry after a flake.lock bump downloads the toolchain closure into the
+    # runner's nix store (warm runs are unaffected).
+    #
+    # The shell below adds `-u` (nounset) at the job level: every step's
+    # `run:` block must be nounset-safe (guard optional vars with
+    # `${VAR:-}`), since referencing an unset variable now hard-fails instead
+    # of silently expanding to empty.
+    defaults:
+      run:
+        shell: nix --extra-experimental-features nix-command --extra-experimental-features flakes develop ${{ github.workspace }}#default --command bash -euo pipefail {0}
+
     steps:
       - uses: actions/checkout@v7
         with:
@@ -45,23 +65,8 @@ jobs:
           # last-commit date for landing-page recency ordering (#345).
           fetch-depth: 0
 
-      # A runner whose PATH lost python3 previously killed the build at the
-      # first Python step with a bare "command not found" (issue #348). Fail
-      # fast with a clear pointer to the runner fix instead of a confusing
-      # exit-127 later. Missing python3 is a runner defect — the fix belongs
-      # in St-John-Software/nixos-config, not a discovery script here.
-      - name: Verify python3
-        run: |
-          command -v python3 >/dev/null 2>&1 || {
-            echo "::error::python3 not found on the runner. This is a runner defect —"
-            echo "::error::open an issue on St-John-Software/nixos-config to add it."
-            exit 1
-          }
-          python3 -c 'import ensurepip, json, venv' 2>/dev/null || {
-            echo "::error::python3 is present but cannot create venvs (missing ensurepip/venv)."
-            echo "::error::This is a runner defect — open an issue on St-John-Software/nixos-config."
-            exit 1
-          }
+      - name: Set up Nix
+        uses: ./.github/actions/setup-nix
 
       - name: Verify dependency graphs are up-to-date
         id: depgraph
@@ -217,99 +222,12 @@ jobs:
           cd scripts
           python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow -v
 
-      - name: Check build dependencies
-        run: |
-          set -eo pipefail
-
-          # The job cannot install anything: the runner is ryzen (NixOS) and the
-          # runner service is unprivileged — no sudo on its PATH, no sudoers
-          # entry (deliberate), and no apt-get on the host at all. These tools
-          # come from the runner host's Nix package set. If one goes missing,
-          # say so here with the exact name rather than dying five steps later
-          # with "openscad: command not found" inside a render loop.
-          missing=""
-          for tool in openscad xvfb-run montage zip qrencode; do
-            command -v "$tool" &>/dev/null || missing="$missing $tool"
-          done
-
-          if [ -n "$missing" ]; then
-            echo "::error::Missing build dependencies:$missing — install them on the runner host (NixOS: add to the runner's Nix package set). This job is unprivileged and cannot install them itself."
-            exit 1
-          fi
-
-          echo "All build dependencies present: openscad xvfb-run montage zip qrencode"
-
-      - name: Prepare Xvfb environment
-        run: |
-          set -eo pipefail
-          # Remove stale X lock files that prior interrupted CI runs may have
-          # left behind on this self-hosted runner. Without this, xvfb-run can
-          # fail with "Server is already active for display N".
-          #
-          # NO sudo, and /tmp/.X11-unix is left alone if it already exists.
-          # The runner is ryzen (NixOS) now: the service is unprivileged (no
-          # sudo on its PATH, no sudoers entry — deliberate), and the machine
-          # is ALSO a live desktop, so `sudo rm -rf /tmp/.X11-unix` would
-          # delete the real session's sockets out from under GDM. Locks from
-          # our own crashed Xvfb runs are owned by the runner user, so plain
-          # `rm` handles exactly the ones that matter; anything root-owned
-          # belongs to the desktop and must survive. xvfb-run --auto-servernum
-          # skips displays that are genuinely in use either way.
-          rm -f /tmp/.X*-lock 2>/dev/null || true
-          if [ ! -d /tmp/.X11-unix ]; then
-            mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
-          elif [ ! -w /tmp/.X11-unix ] || [ ! -x /tmp/.X11-unix ]; then
-            # We deliberately don't chmod a directory we don't own, but if the
-            # desktop's copy isn't writable by us then Xvfb can't create its
-            # socket and the failure surfaces as an opaque permission error.
-            # Say so up front instead.
-            echo "::warning::/tmp/.X11-unix exists but is not writable by $(id -un): $(ls -ld /tmp/.X11-unix). Xvfb may fail to create its socket."
-          fi
-          if ! command -v xvfb-run >/dev/null; then
-            echo "::error::xvfb-run is required but not installed"
-            exit 1
-          fi
-          xvfb-run --help >/dev/null 2>&1 || true
-
-          # Xvfb on this host segfaults at startup inside NVIDIA's EGL vendor
-          # library: Xvfb's GLX init loads Mesa's swrast_dri.so, which loads
-          # libglvnd's libEGL.so.1, which enumerates every installed EGL vendor
-          # and pulls in libEGL_nvidia.so.0 -> libnvidia-egl-gbm.so.1 -> SIGSEGV
-          # ("Caught signal 11 ... Server aborting"). OpenSCAD then has no X
-          # display and writes 0-byte PNGs (issue #361;
-          # St-John-Software/nixos-config#110, #111).
-          #
-          # Pinning glvnd to the Mesa EGL vendor keeps the NVIDIA stack out of
-          # the process entirely. This sets environment only — it installs
-          # nothing, which the unprivileged NixOS runner could not do anyway.
-          # Remove once nixos-config#110 is fixed on the host.
-          egl_vendor_json=""
-          for cand in \
-            /run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json \
-            /run/current-system/sw/share/glvnd/egl_vendor.d/50_mesa.json \
-            /usr/share/glvnd/egl_vendor.d/50_mesa.json; do
-            if [ -f "$cand" ]; then egl_vendor_json="$cand"; break; fi
-          done
-          if [ -n "$egl_vendor_json" ]; then
-            echo "Pinning EGL vendor to $egl_vendor_json"
-            echo "__EGL_VENDOR_LIBRARY_FILENAMES=$egl_vendor_json" >> "$GITHUB_ENV"
-          else
-            echo "::warning::No Mesa EGL vendor JSON found; Xvfb may segfault in libEGL_nvidia (St-John-Software/nixos-config#110)."
-          fi
-
-          # Empty dir => no EGL external platforms (this is where the crashing
-          # libnvidia-egl-gbm config lives).
-          mkdir -p "$RUNNER_TEMP/egl-no-external-platforms"
-          echo "__EGL_EXTERNAL_PLATFORM_CONFIG_DIRS=$RUNNER_TEMP/egl-no-external-platforms" >> "$GITHUB_ENV"
-
-          # Keep OpenSCAD's own GL client on llvmpipe rather than probing the
-          # NVIDIA GLX/driver stack from inside an Xvfb session.
-          echo "__GLX_VENDOR_LIBRARY_NAME=mesa" >> "$GITHUB_ENV"
-          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
-          echo "GALLIUM_DRIVER=llvmpipe" >> "$GITHUB_ENV"
-
-          echo "Xvfb environment prepared."
-
+      # The flake's `openscad` is a wrapper around openscad-unstable that
+      # forces the EGL/llvmpipe software-GL path (QT_QPA_PLATFORM=offscreen,
+      # DISPLAY unset) — no Xvfb, no X server, no NVIDIA EGL stack involved.
+      # This replaces the old "Prepare Xvfb environment" step and its lock
+      # file / EGL-vendor-pinning workarounds (issues #361;
+      # St-John-Software/nixos-config#110, #111).
       - name: Verify headless OpenSCAD rendering
         id: gl_smoke
         continue-on-error: true
@@ -317,33 +235,26 @@ jobs:
           RENDER_MEM_MAX: 4G
           RENDER_TIMEOUT: "120"
         run: |
-          set -o pipefail
           printf 'cube(10);\n' > "$RUNNER_TEMP/glsmoke.scad"
           rm -f "$RUNNER_TEMP/glsmoke.png"
-          xvfb-run --auto-servernum -e "$RUNNER_TEMP/xvfb-smoke.log" \
-            --server-args="-screen 0 1024x768x24" \
-            bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" \
-              -o "$RUNNER_TEMP/glsmoke.png" --imgsize=64,48 \
-              "$RUNNER_TEMP/glsmoke.scad" || true
-          echo "--- Xvfb server log (smoke) ---"
-          cat "$RUNNER_TEMP/xvfb-smoke.log" 2>/dev/null || true
-          echo "--- end Xvfb server log (smoke) ---"
+          bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" \
+            -o "$RUNNER_TEMP/glsmoke.png" --imgsize=64,48 \
+            "$RUNNER_TEMP/glsmoke.scad" || true
           ok=false
           if [ -s "$RUNNER_TEMP/glsmoke.png" ] \
              && [ "$(od -An -tx1 -N8 "$RUNNER_TEMP/glsmoke.png" | tr -d ' \n')" = "89504e470d0a1a0a" ]; then
             ok=true
           fi
           if [ "$ok" = true ]; then
-            echo "Headless OpenSCAD PNG rendering works on this runner."
+            echo "Headless OpenSCAD PNG rendering works (EGL offscreen via the flake's openscad wrapper)."
           else
-            echo "::warning::Headless OpenSCAD PNG rendering is broken on this runner — Xvfb cannot provide an X/OpenGL context, so every thumbnail will be a 0-byte PNG. See the Xvfb server log above; host fix tracked in St-John-Software/nixos-config#110. This job is unprivileged and must not install or start system services."
+            echo "::warning::Headless OpenSCAD PNG rendering is broken — the flake's openscad wrapper could not produce a PNG, so every thumbnail render below will fail too. Check the openscadHeadless wrapper in flake.nix."
           fi
           echo "headless_gl=$ok" >> "$GITHUB_OUTPUT"
 
       - name: Check OpenSCAD version
         id: scad_version
         run: |
-          set -eo pipefail
           mkdir -p site
           CURRENT_VERSION="$(openscad --version 2>&1)"
           CURRENT_VERSION="${CURRENT_VERSION%%$'\n'*}"
@@ -361,16 +272,6 @@ jobs:
           else
             echo "OpenSCAD version matches stored value ($CURRENT_VERSION)"
           fi
-
-      - name: Check ADMesh
-        run: |
-          set -eo pipefail
-          # Same as "Check build dependencies": unprivileged runner, no apt-get.
-          if ! command -v admesh &>/dev/null; then
-            echo "::error::admesh is required for mesh validation but is not installed — add it to the runner host's Nix package set. This job is unprivileged and cannot install it itself."
-            exit 1
-          fi
-          admesh --version
 
       - name: Render STL files
         run: |
@@ -403,7 +304,13 @@ jobs:
               continue
             fi
             echo "Rendering: $file -> site/$name.stl (cache MISS $key)"
-            bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" --export-format binstl -o "site/$name.stl" "$file" > /tmp/scad.log 2>&1 && rc=0 || rc=$?
+            # --backend=CGAL: openscad-unstable's default Manifold backend
+            # emits zero-area (degenerate) facets for the drawer baseplate
+            # grids — 112 per model, which fails admesh validation. CGAL is
+            # the backend the 2021.01 renders used and produces clean meshes;
+            # PNG previews below don't full-render, so only STL export needs
+            # the flag.
+            bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" --backend=CGAL --export-format binstl -o "site/$name.stl" "$file" > /tmp/scad.log 2>&1 && rc=0 || rc=$?
             cat /tmp/scad.log
             if [ "$rc" -eq 124 ] || [ "$rc" -ge 128 ]; then
               echo "::error::render exceeded memory/time cap: $file (rc=$rc)"
@@ -578,50 +485,10 @@ jobs:
           " "$dir"
           done
 
-      # The ryzen runner sets AGENT_TOOLSDIRECTORY=/var/lib/github-runner/ryzen-tool
-      # so language toolchain caches stay off the /run tmpfs, but that path is
-      # writable and NOT executable by the runner's systemd DynamicUser unit:
-      # actions/setup-node extracts node there fine and then it dies with
-      # "…/ryzen-tool/node/20.19.4/x64/bin/node: Permission denied" (exit 126,
-      # issue #356). Overriding RUNNER_TOOL_CACHE via step-level `env:` does
-      # NOT work around this — the runner re-injects its own RUNNER_TOOL_CACHE
-      # / RUNNER_TEMP into every step's process environment after evaluating
-      # user `env:`, silently discarding the override (confirmed in the #356
-      # failure logs: the workflow-declared value showed up in the step's
-      # logged `env:` block, but the script's own `$RUNNER_TOOL_CACHE` still
-      # resolved to the real, non-executable path). Instead, copy the
-      # extracted toolchain into $RUNNER_TEMP — which the runner itself
-      # already executes step scripts from, so it is guaranteed exec-enabled
-      # — and point PATH at the copy. Remove this once the runner host makes
-      # the relocated tool cache executable (St-John-Software/nixos-config).
-      - name: Set up Node.js for WASM smoke test
-        uses: actions/setup-node@v7
-        with:
-          node-version: '20'
-
-      - name: Relocate Node.js to an executable path
-        run: |
-          if ! command -v node >/dev/null 2>&1; then
-            echo "::error::node is not on PATH after actions/setup-node. The runner has no system nodejs (it is not in the ryzen runner's extraPackages), so setup-node is the only source — open an issue on St-John-Software/nixos-config."
-            exit 1
-          fi
-          NODE_BIN="$(command -v node)"
-          NODE_TOOL_DIR="$(dirname "$(dirname "$NODE_BIN")")"
-          DEST="$RUNNER_TEMP/node-exec"
-          rm -rf "$DEST"
-          mkdir -p "$DEST"
-          cp -a "$NODE_TOOL_DIR/." "$DEST/"
-          echo "$DEST/bin" >> "$GITHUB_PATH"
-
-      - name: Verify Node.js is executable
-        run: |
-          NODE_BIN="$(command -v node)"
-          if ! node --version; then
-            echo "::error::node resolves to $NODE_BIN but will not run (exit 126 = 'Permission denied'). Relocating it to \$RUNNER_TEMP did not help, so this is a deeper runner defect — open an issue on St-John-Software/nixos-config."
-            exit 1
-          fi
-          echo "node $(node --version) at $NODE_BIN"
-
+      # node comes from the flake devShell (this replaces the old
+      # actions/setup-node + relocate-to-$RUNNER_TEMP dance from issue #356 —
+      # setup-node's prebuilt tarball and the runner tool cache are both
+      # unusable on the NixOS runners).
       - name: Smoke-test WASM customizer rendering
         run: |
           node scripts/test_wasm_customizer.mjs
@@ -659,7 +526,6 @@ jobs:
 
       - name: Bundle project source zips
         run: |
-          set -o pipefail
           mapfile -t dirs < <(cut -f2 site/.scad-map | sort -u)
           for dir in "${dirs[@]}"; do
             [ -d "$dir" ] || continue
@@ -669,64 +535,50 @@ jobs:
               || { echo "::error::Failed to create $zipname"; exit 1; }
           done
 
+      # No Xvfb: the flake's openscad wrapper renders PNGs offscreen via
+      # EGL/llvmpipe, so the old xvfb-run retry/lock-cleanup machinery is gone.
+      #
+      # OpenSCAD exits 0 after "Cannot create OpenGL OffscreenView" but leaves
+      # a 0-byte file behind, and a 0-byte PNG syncs to S3 just as happily as
+      # a real one (issue #359: every thumbnail on the live site was empty, so
+      # the landing gallery rendered as bare text). Only a file starting with
+      # the 8-byte PNG signature counts as rendered — same check as the
+      # gl_smoke probe above. Failures are recorded here and block the build
+      # in the "Enforce thumbnail rendering" step at the end (deferred
+      # enforcement, after the S3 deploy, like the other Enforce steps).
       - name: Render PNG thumbnails
+        id: thumbnails
         env:
           RENDER_MEM_MAX: 4G
           RENDER_TIMEOUT: "120"
         run: |
-          set -o pipefail
-          render_thumbs() {
-            xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" bash -c '
-              while IFS="$(printf "\t")" read -r stl dir src; do
-                name="${stl%.stl}"
-                echo "Rendering thumbnail: $src -> site/$name.png"
-                bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" -o "site/$name.png" --imgsize=800,600 "$src" \
-                  || echo "::warning::Failed to render thumbnail for $name"
-              done < site/.scad-map
-            '
+          valid_png() {
+            [ -s "$1" ] || return 1
+            [ "$(od -An -tx1 -N8 "$1" | tr -d ' \n')" = "89504e470d0a1a0a" ]
           }
+          : > .thumb-failures
+          while IFS="$(printf "\t")" read -r stl dir src; do
+            name="${stl%.stl}"
+            echo "Rendering thumbnail: $src -> site/$name.png"
+            bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" -o "site/$name.png" --imgsize=800,600 "$src" \
+              || echo "::warning::Failed to render thumbnail for $name"
+            if ! valid_png "site/$name.png"; then
+              echo "::warning::No valid PNG produced for $name"
+              rm -f "site/$name.png"
+              printf '%s\n' "$name" >> .thumb-failures
+            fi
+          done < site/.scad-map
 
-          if ! command -v xvfb-run >/dev/null; then
-            echo "::warning::xvfb-run not available, attempting direct rendering (thumbnails may fail)"
-            bash -c '
-              while IFS="$(printf "\t")" read -r stl dir src; do
-                name="${stl%.stl}"
-                echo "Rendering thumbnail: $src -> site/$name.png"
-                bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" -o "site/$name.png" --imgsize=800,600 "$src" \
-                  || echo "::warning::Failed to render thumbnail for $name"
-              done < site/.scad-map
-            '
-            exit 0
+          expected=$(grep -c . site/.scad-map || true)
+          n=$(grep -c . .thumb-failures || true)
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "::warning::${n} of ${expected} models produced no valid PNG thumbnail"
+            cat .thumb-failures
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "All ${expected} thumbnails rendered."
+            echo "failed=false" >> "$GITHUB_OUTPUT"
           fi
-
-          attempt=1
-          max_attempts=3
-          while [ $attempt -le $max_attempts ]; do
-            echo "Xvfb thumbnail render attempt $attempt/$max_attempts"
-            if render_thumbs 2>/tmp/xvfb-stderr.log; then
-              cat /tmp/xvfb-stderr.log >&2
-              exit 0
-            fi
-            rc=$?
-            cat /tmp/xvfb-stderr.log >&2
-            if grep -qE 'Xvfb failed to start|Server is already active|Cannot establish any listening sockets|Cannot open display|Permission denied|/tmp/\.X11-unix' /tmp/xvfb-stderr.log; then
-              echo "::warning::Xvfb start failure on attempt $attempt (rc=$rc). Cleaning lock files and retrying."
-              # No sudo, and leave an existing /tmp/.X11-unix alone — same
-              # reasoning as the "Prepare Xvfb environment" step: the runner
-              # is unprivileged and shares the machine with a live desktop.
-              rm -f /tmp/.X*-lock 2>/dev/null || true
-              if [ ! -d /tmp/.X11-unix ]; then
-                mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
-              fi
-              sleep $((attempt * 2))
-              attempt=$((attempt + 1))
-              continue
-            fi
-            echo "::error::Thumbnail render failed (rc=$rc), not an Xvfb start error."
-            exit $rc
-          done
-          echo "::error::Xvfb failed to start after $max_attempts attempts."
-          exit 1
 
       - name: Render extra orthographic views for complex-interior models
         env:
@@ -762,15 +614,7 @@ jobs:
           done < site/.scad-map
           SCRIPT
 
-          if command -v xvfb-run &>/dev/null; then
-            xvfb-run bash "$RUNNER_TEMP/render-interior-views.sh" || {
-              echo "::warning::xvfb-run failed to start Xvfb, retrying without virtual display"
-              bash "$RUNNER_TEMP/render-interior-views.sh"
-            }
-          else
-            echo "::warning::xvfb not available, rendering without virtual display (may fail)"
-            bash "$RUNNER_TEMP/render-interior-views.sh"
-          fi
+          bash "$RUNNER_TEMP/render-interior-views.sh"
 
       - name: Generate QR codes
         run: |
@@ -792,16 +636,16 @@ jobs:
 
       - name: Generate OG hero image
         run: |
-          set -o pipefail
-          # ImageMagick on the NixOS runner ships no default font (no distro
+          # ImageMagick from the flake ships no default font (no distro
           # type.xml), so ANY text-capable operation fails with
           #   "unable to read font `(null)'"  --  including montage, which
           # labels each tile by default. `+label` does not suppress the lookup;
           # MAGICK_FONT and a hand-supplied type.xml are both ignored. Naming a
           # font explicitly is the only fix that works (issue #352).
-          # Liberation-Sans is present on every runner (liberation_ttf on NixOS,
-          # fonts-liberation on Ubuntu). ImageMagick font names are HYPHENATED:
-          # "DejaVu Sans", "Helvetica" and "sans" do NOT resolve.
+          # Liberation-Sans resolves via fontconfig: the flake's devShell pins
+          # FONTCONFIG_FILE to a font set containing liberation_ttf, so this
+          # works identically on every runner. ImageMagick font names are
+          # HYPHENATED: "DejaVu Sans", "Helvetica" and "sans" do NOT resolve.
           OG_FONT='Liberation-Sans'
 
           # ImageMagick 7 ships `magick`; IM6 only has `convert`.
@@ -1103,7 +947,9 @@ jobs:
       - name: Generate changed projects list (PR only)
         if: github.event_name == 'pull_request'
         run: |
-          git diff --name-only HEAD~1 HEAD | grep '\.scad$' | \
+          # `|| true`: no .scad changes in the diff is a normal outcome, and
+          # the job-level default shell runs with pipefail on.
+          git diff --name-only HEAD~1 HEAD | { grep '\.scad$' || true; } | \
             sed 's|/.*||' | sort -u | \
             python3 -c "
           import json, sys
@@ -1160,18 +1006,6 @@ jobs:
 
           print(f'Injected structured data and {len(link_tags)} OEmbed link tags into index.html')
           "
-
-      - name: Check AWS CLI
-        run: |
-          set -eo pipefail
-          # The bundled AWS CLI installer needs root to write /usr/local, and on
-          # NixOS its prebuilt binaries would not run unpatched anyway. Same as
-          # the other tools: the runner host provides `aws` via Nix.
-          if ! command -v aws &>/dev/null; then
-            echo "::error::aws is required for deployment but is not installed — add awscli2 to the runner host's Nix package set. This job is unprivileged and cannot install it itself."
-            exit 1
-          fi
-          aws --version
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
@@ -1468,4 +1302,11 @@ jobs:
         run: |
           echo "::error::Parameters manifest validation failed"
           cat .param-failures
+          exit 1
+
+      - name: Enforce thumbnail rendering
+        if: steps.thumbnails.outputs.failed == 'true'
+        run: |
+          echo "::error::Thumbnail rendering produced no valid PNG for the models listed below. The flake's openscad wrapper renders offscreen via EGL/llvmpipe — check the gl_smoke step output and the openscadHeadless wrapper in flake.nix."
+          cat .thumb-failures
           exit 1

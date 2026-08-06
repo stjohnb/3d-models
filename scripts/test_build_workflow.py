@@ -1,37 +1,29 @@
 """Text-level invariant tests for the build workflow.
 
-ImageMagick on the NixOS runner ships no default font (no distro
-``type.xml``), so every text-capable invocation in ``build.yml`` — ``montage``
-(which labels tiles by default) and the ``convert``/``magick`` fallback — must
-name a font explicitly or it fails with "unable to read font `(null)'"
-(issue #352). These tests guard against a future edit reintroducing a
-fontless ImageMagick call.
+CI runs on the org's self-hosted NixOS runners, which deliberately provide
+only nix/git/docker. Every tool build.yml shells out to comes from this
+repo's own flake.nix devShell, entered via the job-level default shell
+(`nix ... develop ...#default --command bash ...`). These tests guard
+against edits that reintroduce runner-provided tooling:
 
-The ryzen runner also has no system ``nodejs``, so ``actions/setup-node`` is
-the only source of a ``node`` binary. When the runner's tool cache was
-relocated off the ``/run`` tmpfs (St-John-Software/nixos-config issue #85),
-the new path became writable but not executable by the runner's systemd
-``DynamicUser`` unit, producing "Permission denied" / exit 126 (issue #356).
-Overriding ``RUNNER_TOOL_CACHE`` via step ``env:`` does not work around this
-— the runner re-injects its own value into every step's process environment
-regardless of what the workflow declares. The workaround instead copies the
-extracted toolchain into ``$RUNNER_TEMP`` (guaranteed exec-enabled, since the
-runner executes step scripts from there) and adds a fail-fast verification
-step; these tests guard against a future edit dropping that relocation or
-reordering the steps.
+* ``actions/setup-node`` / ``actions/setup-python`` never work here — their
+  prebuilt tarballs hardcode FHS loader paths and the tool manifest matches
+  against an Ubuntu release (issues #348, #356). node/python come from the
+  flake.
+* ``sudo``/``apt-get`` don't exist on the runners; the job is unprivileged
+  by design.
+* OpenSCAD PNG rendering must stay on the flake's EGL/llvmpipe headless
+  wrapper. The old Xvfb + NVIDIA-EGL-pinning workarounds (issue #361;
+  St-John-Software/nixos-config#110, #111) are gone and must not creep back.
+
+ImageMagick from the flake ships no distro ``type.xml``, so every
+text-capable invocation in ``build.yml`` — ``montage`` (which labels tiles
+by default) and the ``convert``/``magick`` fallback — must name a font
+explicitly or it fails with "unable to read font `(null)'" (issue #352).
+The flake pins FONTCONFIG_FILE to a Liberation font set so the named font
+always resolves.
 
 Run with: python3 -m unittest test_build_workflow
-
-Xvfb on the ryzen runner segfaults during X server startup inside NVIDIA's
-EGL vendor library: Xvfb's GLX init loads Mesa's ``swrast_dri.so``, which
-loads libglvnd's ``libEGL.so.1``, which enumerates every installed EGL vendor
-and pulls in ``libEGL_nvidia.so.0`` -> ``libnvidia-egl-gbm.so.1`` -> SIGSEGV.
-OpenSCAD then has no X display and writes 0-byte PNGs for every thumbnail
-(issue #361; St-John-Software/nixos-config#110, #111). The "Prepare Xvfb
-environment" step now pins glvnd to the Mesa EGL vendor and forces software
-GL via environment variables written to ``$GITHUB_ENV``, and a new "Verify
-headless OpenSCAD rendering" step renders a smoke-test cube to prove whether
-the pin worked, without ever failing the build itself.
 """
 
 import pathlib
@@ -40,6 +32,8 @@ import unittest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD_YML = REPO_ROOT / ".github" / "workflows" / "build.yml"
+NOTIFY_YML = REPO_ROOT / ".github" / "workflows" / "notify-failures.yml"
+FLAKE_NIX = REPO_ROOT / "flake.nix"
 OG_FONT = "Liberation-Sans"
 
 
@@ -55,6 +49,13 @@ def step_body(text, name):
     start = text.index(marker)
     next_step = text.index("\n      - name: ", start + len(marker))
     return text[start:next_step]
+
+
+def code_lines(text):
+    """Workflow text with comment-only lines removed."""
+    return "\n".join(
+        line for line in text.splitlines() if not line.strip().startswith("#")
+    )
 
 
 class OgHeroFontTests(unittest.TestCase):
@@ -96,101 +97,94 @@ class OgHeroFontTests(unittest.TestCase):
                 "in the preceding 6 lines",
             )
 
-
-class NodeToolCacheTests(unittest.TestCase):
-    """setup-node's output must be relocated to an executable path (#356)."""
-
-    def test_no_runner_tool_cache_override(self):
-        # A step-level `env: RUNNER_TOOL_CACHE: ...` override looks like a
-        # fix but the runner silently discards it (confirmed in the #356
-        # failure logs) — don't let it creep back in.
-        text = read(BUILD_YML)
-        self.assertNotIn(
-            "RUNNER_TOOL_CACHE:",
-            text,
-            "RUNNER_TOOL_CACHE overrides via step env: are silently ignored "
-            "by the runner — see issue #356. Relocate the toolchain to "
-            "$RUNNER_TEMP instead.",
-        )
-
-    def test_step_order(self):
-        text = read(BUILD_YML)
-        setup_name = "- name: Set up Node.js for WASM smoke test"
-        relocate_name = "- name: Relocate Node.js to an executable path"
-        verify_name = "- name: Verify Node.js is executable"
-        smoke_name = "- name: Smoke-test WASM customizer rendering"
-        for name in (setup_name, relocate_name, verify_name, smoke_name):
-            self.assertIn(name, text)
-        self.assertLess(text.index(setup_name), text.index(relocate_name))
-        self.assertLess(text.index(relocate_name), text.index(verify_name))
-        self.assertLess(text.index(verify_name), text.index(smoke_name))
-
-    def test_relocate_step_targets_runner_temp(self):
-        lines = read(BUILD_YML).splitlines()
-        for i, line in enumerate(lines):
-            if "- name: Relocate Node.js to an executable path" not in line:
-                continue
-            window = lines[i : i + 14]
-            self.assertTrue(
-                any("$RUNNER_TEMP" in w for w in window),
-                "Relocate step must copy the toolchain into $RUNNER_TEMP — "
-                "see issue #356",
-            )
-            self.assertTrue(
-                any("$GITHUB_PATH" in w for w in window),
-                "Relocate step must add the copy to PATH via $GITHUB_PATH — "
-                "see issue #356",
-            )
-            return
-        self.fail("Relocate Node.js to an executable path step not found")
-
-
-class HeadlessGlEnvTests(unittest.TestCase):
-    """glvnd must be pinned to Mesa so Xvfb doesn't segfault (issue #361)."""
-
-    def test_egl_vendor_pinned_to_mesa(self):
-        text = read(BUILD_YML)
+    def test_flake_pins_fontconfig_to_liberation(self):
+        text = read(FLAKE_NIX)
         self.assertIn(
-            "__EGL_VENDOR_LIBRARY_FILENAMES",
+            "FONTCONFIG_FILE",
             text,
-            "build.yml must pin __EGL_VENDOR_LIBRARY_FILENAMES to a Mesa "
-            "EGL vendor JSON via $GITHUB_ENV — see issue #361",
+            "flake.nix must pin FONTCONFIG_FILE so ImageMagick can resolve "
+            f"{OG_FONT} — see issue #352",
         )
         self.assertIn(
-            "/run/opengl-driver/share/glvnd/egl_vendor.d/50_mesa.json",
+            "liberation_ttf",
             text,
-            "build.yml must probe the Mesa EGL vendor JSON candidate path",
+            "flake.nix's font set must include liberation_ttf",
         )
 
-    def test_egl_external_platforms_disabled(self):
+
+class NixDevShellTests(unittest.TestCase):
+    """Every CI tool must come from flake.nix, not the runner."""
+
+    def test_no_toolchain_setup_actions(self):
+        for forbidden in ("actions/setup-node", "actions/setup-python"):
+            for path in (BUILD_YML, NOTIFY_YML):
+                self.assertNotIn(
+                    forbidden,
+                    code_lines(read(path)),
+                    f"{path.name} must not use {forbidden} — its prebuilt "
+                    "toolchains do not work on the NixOS runners (#348, "
+                    "#356). Add the tool to flake.nix instead.",
+                )
+
+    def test_no_privileged_install(self):
+        for forbidden in ("sudo ", "apt-get", "dpkg "):
+            for path in (BUILD_YML, NOTIFY_YML):
+                self.assertNotIn(
+                    forbidden,
+                    code_lines(read(path)),
+                    f"{path.name} must not use {forbidden!r} — the NixOS "
+                    "runners have no apt or sudo, and CI tools belong in "
+                    "flake.nix.",
+                )
+
+    def test_build_job_runs_inside_default_devshell(self):
         text = read(BUILD_YML)
-        self.assertIn(
-            "__EGL_EXTERNAL_PLATFORM_CONFIG_DIRS",
-            text,
-            "build.yml must export __EGL_EXTERNAL_PLATFORM_CONFIG_DIRS to "
-            "an empty dir so glvnd cannot load the crashing NVIDIA EGL "
-            "external platform — see issue #361",
-        )
         self.assertRegex(
             text,
-            r"__EGL_EXTERNAL_PLATFORM_CONFIG_DIRS=\$RUNNER_TEMP",
-            "__EGL_EXTERNAL_PLATFORM_CONFIG_DIRS must point under "
-            "$RUNNER_TEMP",
+            r"shell: nix .*develop \$\{\{ github\.workspace \}\}#default"
+            r" --command bash -euo pipefail \{0\}",
+            "build.yml must run every step inside the flake's default "
+            "devShell via a job-level defaults.run.shell",
+        )
+        self.assertIn(
+            "--extra-experimental-features nix-command",
+            text,
+            "the nix develop shell must enable nix-command/flakes explicitly "
+            "— don't rely on the runner's nix.conf",
         )
 
-    def test_software_gl_env_exported(self):
+    def test_setup_nix_runs_before_shell_is_needed(self):
         text = read(BUILD_YML)
-        for var in (
-            "LIBGL_ALWAYS_SOFTWARE=1",
-            "GALLIUM_DRIVER=llvmpipe",
-            "__GLX_VENDOR_LIBRARY_NAME=mesa",
-        ):
-            self.assertIn(
-                var,
-                text,
-                f"build.yml must export {var} to $GITHUB_ENV so OpenSCAD "
-                "stays on the Mesa software GL path — see issue #361",
-            )
+        setup_nix = "uses: ./.github/actions/setup-nix"
+        self.assertIn(setup_nix, text, "build.yml must use the setup-nix action")
+        first_run = text.index("\n        run: |")
+        self.assertLess(
+            text.index(setup_nix),
+            first_run,
+            "setup-nix must run before the first run: step — the default "
+            "shell needs nix on PATH",
+        )
+
+    def test_runner_labels_unchanged(self):
+        self.assertIn(
+            "runs-on: [self-hosted, linux, ryzen]",
+            read(BUILD_YML),
+            "the build job must stay pinned to the ryzen runner — "
+            "RENDER_MEM_MAX is calibrated against that host's RAM",
+        )
+
+
+class HeadlessRenderTests(unittest.TestCase):
+    """Rendering must stay on the flake's EGL-offscreen openscad wrapper."""
+
+    def test_no_xvfb(self):
+        self.assertNotIn(
+            "xvfb",
+            code_lines(read(BUILD_YML)).lower(),
+            "build.yml must not use Xvfb — the flake's openscad wrapper "
+            "renders offscreen via EGL/llvmpipe (issue #361 is solved in "
+            "flake.nix, not in the workflow)",
+        )
 
     def test_gl_smoke_step_is_non_fatal(self):
         body = step_body(read(BUILD_YML), "Verify headless OpenSCAD rendering")
@@ -200,26 +194,87 @@ class HeadlessGlEnvTests(unittest.TestCase):
         self.assertNotIn("::error::", body)
         self.assertNotIn("exit 1", body)
 
-    def test_no_privileged_install_in_gl_steps(self):
-        text = read(BUILD_YML)
-        body = step_body(text, "Prepare Xvfb environment") + step_body(
-            text, "Verify headless OpenSCAD rendering"
+    def test_stl_export_pins_cgal_backend(self):
+        body = step_body(read(BUILD_YML), "Render STL files")
+        self.assertIn(
+            "--backend=CGAL --export-format binstl",
+            body,
+            "STL export must pin --backend=CGAL — openscad-unstable's "
+            "default Manifold backend emits degenerate facets for the "
+            "drawer baseplate grids, which fails admesh validation",
         )
-        # Explanatory comments legitimately say "no sudo" — only flag
-        # non-comment lines that would actually invoke a forbidden tool.
-        code_lines = "\n".join(
-            line
-            for line in body.splitlines()
-            if not line.strip().startswith("#")
-        )
-        for forbidden in ("apt-get", "apt ", "sudo", "dpkg", "nix-env", "/nix/store"):
-            self.assertNotIn(
-                forbidden,
-                code_lines,
-                f"Xvfb/GL smoke steps must not use {forbidden!r} — this job "
-                "is unprivileged and must not install or resolve its own "
-                "system prerequisites",
+
+    def test_flake_wrapper_forces_software_gl(self):
+        text = read(FLAKE_NIX)
+        for needle in (
+            "LIBGL_ALWAYS_SOFTWARE",
+            "__EGL_VENDOR_LIBRARY_FILENAMES",
+            "QT_QPA_PLATFORM offscreen",
+            "--unset DISPLAY",
+        ):
+            self.assertIn(
+                needle,
+                text,
+                f"flake.nix's openscad wrapper must set {needle!r} so PNG "
+                "export works with no X server (issue #361)",
             )
+
+
+class ThumbnailRenderTests(unittest.TestCase):
+    """Thumbnail rendering must fail loudly, not ship 0-byte PNGs (#359).
+
+    OpenSCAD exits 0 after "Cannot create OpenGL OffscreenView" but leaves an
+    empty file behind. Without an output check those empties synced to S3 and
+    the landing gallery hid every image, showing bare text.
+    """
+
+    def test_thumbnail_step_validates_png_magic(self):
+        body = step_body(read(BUILD_YML), "Render PNG thumbnails")
+        self.assertIn(
+            "89504e470d0a1a0a",
+            body,
+            "the thumbnail step must check the 8-byte PNG signature — a "
+            "non-empty file is not enough, and `file`/`identify` are not "
+            "guaranteed in the devShell",
+        )
+
+    def test_thumbnail_step_records_failures(self):
+        text = read(BUILD_YML)
+        self.assertGreaterEqual(
+            text.count(".thumb-failures"),
+            2,
+            "the thumbnail step must write .thumb-failures and the "
+            "enforcement step must cat it",
+        )
+
+    def test_thumbnail_step_has_id(self):
+        self.assertIn(
+            "id: thumbnails",
+            read(BUILD_YML),
+            "the enforcement step keys off steps.thumbnails.outputs.failed",
+        )
+
+    def test_thumbnail_enforcement_step_exists(self):
+        text = read(BUILD_YML)
+        self.assertIn("steps.thumbnails.outputs.failed == 'true'", text)
+        enforce = "- name: Enforce thumbnail rendering"
+        deploy = "- name: Deploy to S3"
+        self.assertIn(enforce, text)
+        self.assertIn(deploy, text)
+        self.assertLess(
+            text.index(deploy),
+            text.index(enforce),
+            "deferred enforcement: the site must still deploy before the "
+            "thumbnail failure blocks the build",
+        )
+
+    def test_invalid_thumbnails_are_deleted(self):
+        body = step_body(read(BUILD_YML), "Render PNG thumbnails")
+        self.assertIn(
+            'rm -f "site/$name.png"',
+            body,
+            "an invalid PNG must be deleted so the S3 sync cannot ship it",
+        )
 
 
 if __name__ == "__main__":

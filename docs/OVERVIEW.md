@@ -18,6 +18,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── macbook-pro-laptop-stand/  # Parametric vertical laptop dock with swept arch frame
 ├── nz-ski-fields/        # Topographic terrain model of the NZ ski-fields region (3-part split)
 ├── power-workshop/       # Fisher-Price Power Workshop replacement parts
+├── scanning-rig/         # Photogrammetry rig: hand-rotated turntable + generic leaning phone stand
 ├── sink-tray/            # Sink tray foot
 ├── toothbrush/           # Toothbrush/toothpaste holder system
 ├── ukulele-wall-hook/    # Single-piece wall-mounted yoke that cradles a ukulele neck
@@ -49,12 +50,15 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_hash_routing.mjs    # Node.js test for index.html's parseHash/formatHash URL grammar
 │   ├── test_landing_order.mjs   # Node.js test for index.html's landing-gallery project ranking
 │   ├── test_viewer_invariants.py # Text-level checks on index.html/embed.html (build markers, slugify/PUBLIC_REPO parity, innerHTML)
+│   ├── test_build_workflow.py  # Text-level invariant checks on build.yml/flake.nix (ImageMagick font args, no-toolchain-setup-actions, no-Xvfb, EGL pinning); see ci-pipeline.md
 │   ├── sync_public_snapshot.py  # Builds a sanitized public snapshot for stjohnb/3d-models; not used by CI
 │   └── test_sync_public_snapshot.py  # Tests for sync_public_snapshot
 ├── README.md             # Project readme; gallery section auto-generated (see below)
 ├── README.public.md      # Hand-maintained readme text for the public snapshot (stjohnb/3d-models); see public-snapshot.md
 ├── filament-colors.json  # Shared color palette (single source of truth)
 ├── .openscad-version     # Committed expected OpenSCAD version baseline; CI warns on drift
+├── flake.nix             # Repo-owned CI/dev toolchain (default/scripts devShells); see ci-pipeline.md
+├── flake.lock            # Pinned nixpkgs revision consumed by flake.nix
 ├── index.html            # Single-page 3D viewer: tree browser + 1–3 model panes (deployed to S3)
 ├── embed.html            # Minimal single-model viewer for iframe/OEmbed embedding
 ├── openscad-worker.js    # Web Worker — runs openscad-wasm renders off the main thread
@@ -74,6 +78,9 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   └── iterate_with_render_view.md  # How to use render_view.py for iterative local design
 ├── .github/
 │   ├── dependabot.yml         # Weekly grouped Dependabot updates for the github-actions ecosystem only
+│   ├── actions/
+│   │   └── setup-nix/
+│   │       └── action.yml    # Composite action: puts the runner's system `nix` on PATH or fails fast
 │   └── workflows/
 │       ├── build.yml             # CI: render, validate, thumbnail, deploy
 │       └── notify-failures.yml   # Monitors build.yml; opens/closes failure issues on main
@@ -107,6 +114,7 @@ generated artifacts produced by CI.
 | `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons and a slot the laptop slides into |
 | `nz-ski-fields/` | Topographic NZ terrain model split into three separately-printable parts (lake/terrain/snow); viewer shows them as a coloured composite assembly |
 | `power-workshop/` | Fisher-Price Power Workshop replacement parts sharing a square-peg connection |
+| `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings) and a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased) |
 | `sink-tray/` | Single-file sink tray foot with counterbore |
 | `toothbrush/` | Multi-part holder system with dovetail-attached clips and a removable drip tray |
 | `ukulele-wall-hook/` | Single-piece wall-mounted yoke with two upturned prongs that cradle a ukulele neck behind the headstock |
@@ -377,6 +385,7 @@ Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
 `esp32-display-case` (`case_back`, `case_front`), `hex-connector` (`hex_connector`),
 `macbook-pro-laptop-stand` (`laptop_stand`),
 `nz-ski-fields` (`lake`, `terrain`, `snow`),
+`scanning-rig` (`turntable_base`, `turntable_platter`, `phone_stand`),
 `sink-tray` (`tray_foot`), `ukulele-wall-hook` (`ukulele_hook`), and
 `vacuum-hose` (`adapter`, `reducer`). Adding one
 for a new model is just a matter of dropping a `<basename>.parameters.json` next
@@ -394,7 +403,7 @@ intended for the web viewer apply `rotate([-90, 0, 0])` at the top-level
 assembly.
 
 This is applied selectively: dedicated assembly/preview files
-(`gate_assembly.scad`, `Toothbrush assembly.scad`), tube-shaped models that
+(`gate_assembly.scad`, `Toothbrush assembly.scad`, `scanning-rig/scanning_rig_assembly.scad`), tube-shaped models that
 look awkward in Z-up orientation (`vacuum-hose/adapter.scad`,
 `vacuum-hose/reducer.scad`), and terrain/surface models (`nz-ski-fields/lake.scad`,
 `nz-ski-fields/terrain.scad`, `nz-ski-fields/snow.scad`)
@@ -407,7 +416,13 @@ files (`flathead_attachment.scad`, `drill_bit.scad`, etc.) do **not** apply
 it — they are oriented peg-down
 (Z-up), matching their natural print orientation. Symmetric or upright models
 (`hex-connector`, `sink-tray`, `macbook-pro-laptop-stand`, `esp32-display-case`,
-`ukulele-wall-hook`) also omit it.
+`ukulele-wall-hook`, `scanning-rig/turntable_base.scad`,
+`scanning-rig/turntable_platter.scad`) also omit it. `scanning-rig/phone_stand.scad`
+omits it for a distinct reason worth reusing: it's a single side profile
+`linear_extrude()`d along Z with the profile drawn "+Y up", so the exported
+STL is simultaneously print-oriented (flat face on the bed) and upright in
+the Y-up viewer with no rotation needed at all — a model built this way never
+needs the print/viewer orientations to be reconciled in the first place.
 
 ## Iterative Design Helpers
 
@@ -556,15 +571,18 @@ See [ci-pipeline.md](ci-pipeline.md) for detailed documentation.
 **Summary**: On push to `main` or PR, the pipeline (`build.yml`) runs on a
 **self-hosted Linux runner pinned to `ryzen`** (`[self-hosted, linux, ryzen]`,
 so the render memory caps below are calibrated against a host of known RAM
-capacity — see issue #272), The very first step fails fast with a pointer to
-`St-John-Software/nixos-config` if `python3` isn't usable on the runner — the
-workflow never tries to locate or install its own prerequisite (issue #348;
-same policy applied to the Node.js setup used by the WASM smoke test, issue
-#356). It then verifies dependency graphs, validates project metadata,
-installs tools (OpenSCAD, ImageMagick, ADMesh, qrencode, zip), prepares the
-Xvfb environment (clears stale X lock files from prior interrupted runs and
-pins glvnd to the Mesa EGL vendor so Xvfb does not segfault in NVIDIA's EGL
-stack — issue #361), renders all `.scad` files to STL via
+capacity — see issue #272). The very first step (`Set up Nix`, running
+`.github/actions/setup-nix`) fails fast with a pointer to
+`St-John-Software/nixos-config` if the runner has no working `nix` binary —
+the workflow never tries to locate or install its own prerequisites (issue
+#348). Every subsequent step then runs inside `nix develop
+...#default --command bash -euo pipefail {0}`, which resolves this repo's own
+`flake.nix` `default` devShell; that devShell — not the runner host —
+provides OpenSCAD (a headless EGL/llvmpipe wrapper; no Xvfb involved),
+ImageMagick, ADMesh, qrencode, zip, Python 3, Node.js, and the AWS CLI (this
+also replaced the old `actions/setup-node` dance for the WASM smoke test,
+issue #356). It then verifies dependency graphs, validates project metadata,
+renders all `.scad` files to STL via
 `scripts/capped-openscad.sh` (wrapping
 `openscad --export-format binstl` under a memory ceiling and wall-clock
 timeout — `RENDER_MEM_MAX`/`RENDER_TIMEOUT`, default `28G`/`3600s` — so a
@@ -576,7 +594,10 @@ print-time estimates), checks mating part interference for pairs declared in
 `meta.json`'s `mating_pairs` field (using `trimesh` and `manifold3d` to detect
 geometric overlap — stored as `interference.json`, with CI warning annotations
 and PR comment table), generates standalone HTML viewers, bundles multi-file
-projects into zip archives, generates PNG thumbnails, renders extra orthographic
+projects into zip archives, generates PNG thumbnails (each validated against the
+PNG signature — OpenSCAD exits 0 but writes a 0-byte file when it cannot open an
+OpenGL context, and those empties shipped a text-only landing gallery in issue
+#359), renders extra orthographic
 views for models with `complex_interior: true` in their `meta.json`, generates
 QR codes, composites an OG hero image, builds `models.json` (with metadata,
 print times, and QR references), generates a `sitemap.xml` listing the
@@ -584,8 +605,9 @@ gallery and all standalone viewer URLs, generates the README gallery, builds
 Schema.org structured data and OEmbed endpoints, and deploys to S3. PRs get preview deployments and an
 auto-generated comment showing thumbnails, file sizes, triangle counts, mesh
 validation results, and interference check results for changed models.
-Dependency graph checks, mesh validation, metadata validation, and
-interference checks all use a **deferred enforcement** pattern — failures are
+Dependency graph checks, mesh validation, metadata validation,
+interference checks, and thumbnail rendering all use a **deferred
+enforcement** pattern — failures are
 recorded early but only block the build at the very end, so the full pipeline
 output is always available.
 
@@ -598,7 +620,7 @@ comment.
 
 | Item | Location | Notes |
 |------|----------|-------|
-| CI runner | `[self-hosted, linux, ryzen]` in `build.yml`; `[self-hosted, linux]` in `notify-failures.yml` | Expects OpenSCAD, ImageMagick, ADMesh, qrencode, zip, xvfb, Python 3, AWS CLI. `build.yml`'s `build` job is pinned to `ryzen` so render memory caps are calibrated to a known host (issue #272) — the label must exist on the runner or the job queues forever |
+| CI runner | `[self-hosted, linux, ryzen]` in `build.yml`; `[self-hosted, linux]` in `notify-failures.yml` | Runner provides only `nix`/`git`/`docker`; OpenSCAD, ImageMagick, ADMesh, qrencode, zip, Python 3, Node.js, and the AWS CLI all come from this repo's `flake.nix` devShells (`default` for `build.yml`, `scripts` for `notify-failures.yml`), entered via `.github/actions/setup-nix` + the job-level `defaults.run.shell`. `build.yml`'s `build` job is pinned to `ryzen` so render memory caps are calibrated to a known host (issue #272) — the label must exist on the runner or the job queues forever |
 | Render memory/time caps | `scripts/capped-openscad.sh`; `RENDER_MEM_MAX`/`RENDER_TIMEOUT` env in `build.yml` | Wraps every `openscad` call (STL render: `28G`/`3600s`, sized to the heaviest model's measured cost after the 2026-07-07 runner-freeze incident; thumbnails and orthographic views: `4G`/`120s`). Timeout (124) or SIGKILL (≥128) hard-fails the build before the "suspected library" heuristic can silently swallow it |
 | OpenSCAD version baseline | `.openscad-version` | Committed expected version string; CI warns on mismatch |
 | AWS deployment role | `secrets.AWS_ROLE_ARN` | OIDC role for S3 sync |

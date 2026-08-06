@@ -24,6 +24,10 @@ Never use `ubuntu-latest`, `ubuntu-22.04`, `windows-latest`, `windows-2022`, or 
 
 `build.yml`'s `build` job additionally pins a third label — `runs-on: [self-hosted, linux, ryzen]` — so the OpenSCAD render memory caps (`scripts/capped-openscad.sh`) are calibrated against a host of known RAM capacity (issue #272). Preserve this pin; don't widen it back to plain `[self-hosted, linux]`.
 
+## CI dependencies come from flake.nix
+
+The runners are NixOS and provide only a baseline (nix, git, docker). Every tool a workflow shells out to — openscad, admesh, python3, node, imagemagick, zip/unzip, qrencode, aws, gh — comes from this repo's `flake.nix` devShells, entered via the job-level `defaults.run.shell: nix ... develop ...` (see `.github/workflows/build.yml`). If CI needs a new tool, add it to the matching devShell; never `sudo apt-get install` (no apt or sudo on the runners), never `actions/setup-node`/`actions/setup-python` (their prebuilt toolchains don't work on NixOS), never ask for the tool on the runner host. The flake's `openscad` is a headless EGL/llvmpipe wrapper — no Xvfb anywhere. Bumping `flake.lock` can bump OpenSCAD, which invalidates the render cache and forces a slow full re-render; update `.openscad-version` when it does. `scripts/test_build_workflow.py` enforces these invariants.
+
 ## OpenSCAD conventions
 
 - **Library files**: underscore-prefixed (`_*.scad`). Define shared parameters and modules; produce no top-level geometry. CI skips these during STL rendering.
