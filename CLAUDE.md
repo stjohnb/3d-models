@@ -76,7 +76,7 @@ Validated against `parameters.schema.json`. Only `number` and `boolean` types ar
 
 ## Deferred enforcement pattern
 
-Dependency-graph checks, mesh validation, metadata validation, and interference checks record failures early but only block the build at the final enforcement step. This gives the full pipeline output even when some validations fail. Preserve this pattern when adding new CI validation.
+Dependency-graph checks, mesh validation, metadata validation, interference checks, and thumbnail rendering (PNG-signature validation — OpenSCAD can exit 0 while writing a 0-byte file, issue #359) record failures early but only block the build at the final enforcement step. This gives the full pipeline output even when some validations fail. Preserve this pattern when adding new CI validation.
 
 ## Generated artifacts — never hand-edit
 

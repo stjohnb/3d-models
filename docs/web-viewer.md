@@ -175,8 +175,12 @@ Updated Mon YYYY` metadata line, and up to four tag chips. Multi-model projects
 get a strip of up to five 64×48 per-model links (`#project-slug/model-slug`)
 below the card, plus a `+N` tile linking to the project. The strip sits
 *outside* the card anchor — nested anchors are invalid HTML. Every thumbnail is
-`loading="lazy"`/`decoding="async"` and hides itself on error, so a project
-whose thumbnail render was skipped degrades to a card with no image.
+`loading="lazy"`/`decoding="async"`; `landingThumb()`'s `img.onerror` replaces
+the broken `<img>` with a `div.thumb-missing` placeholder tile (`role="img"`,
+`aria-label="Preview unavailable"`, visible text "No preview") in place, so a
+project whose thumbnail render was skipped (e.g. the 0-byte-PNG failure mode
+in issue #359) keeps its card shape instead of collapsing to bare text (#362)
+— it no longer just hides the image and leaves an empty slot.
 
 Because the links are real anchors, clicking one just changes the hash and the
 existing `applyHash()` route loads the model; keyboard activation, middle-click
