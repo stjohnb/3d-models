@@ -448,6 +448,18 @@ vertical backplate, dovetail-attached clips, and a removable drip tray.
 | `meta.json` | Project metadata (description, tags, difficulty) |
 | `dependency-graph.md` | Auto-generated `include`/`use` dependency graph |
 
+**Key parameters**: `Toothbrush tray.scad` carries four `head_spike()` posts
+(`spike_base_d` 4 mm → `spike_tip_d` 3 mm, `spike_height` 20 mm total including
+a domed tip, flared at the base). Two sit at `x = ±spike_spacing/2`,
+`y = spike_y` and park a detached brush head upright while it dries (issue
+#371). Two more sit at `x = ±brush_spike_spacing/2` (= `±grip_spacing/2`,
+exactly under the clip axes, the same X as the alignment grooves) and
+`y = brush_spike_y` (−6.2 mm), acting as standoffs so a parked toothbrush
+rests on a point rather than in standing water (issue #374). The clip bore
+axis is at tray-local `y = −3.5`; `brush_spike_y` is pulled 2.7 mm behind it
+so the flared base clears the groove footprint (`y ∈ [−2.2, 2.2]`) — no post
+ever stands on the ~1.5 mm of floor above a groove.
+
 See [OVERVIEW.md](OVERVIEW.md#dovetail-joint-system-toothbrush) for the
 dovetail joint system used between the backplate and clips.
 

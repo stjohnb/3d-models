@@ -1,5 +1,6 @@
 {
   "description": "Gridfinity-compatible drawer organiser: a 15 × 10 grid covering a 630 × 424 × 69 mm drawer, built from six interlocking 5×5 baseplate tiles, plus an optional side filler strip for narrower grids, a 5×5 storage bin, a 10×5 bin split into two bed-sized halves, every layout container downloadable whole — and, where one exceeds the print bed, as pre-split bed-sized pieces whose seams are offset from the baseplate tile seams so each piece straddles a grid join (left container excepted) — and a full-drawer assembly preview showing a fitted set of nine containers: a full-depth 3×10 bin down the left, three 4×6 bins across the back row, and a 5×4, two 3×4s, a 1×3 and a 1×1 across the front, the four against a side wall flaring out to follow the drawer walls, and the back-centre bin's front half fitted with the divided half piece.",
+  "hero": "drawer_assembly.stl",
   "tags": ["organizer", "storage", "gridfinity", "drawer"],
   "version": "3.0.0",
   "difficulty": "intermediate",

@@ -364,6 +364,36 @@
       color: var(--text-dim);
       line-height: 1.4;
     }
+    /* #369: long meta.json descriptions turned cards into text walls. The
+       collapsed state clamps to 3 lines at the card's real width — the full
+       text stays in the DOM (findable, screen-reader-visible), only its
+       height changes. */
+    .landing-card-desc.is-collapsed {
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      line-clamp: 3;
+      overflow: hidden;
+    }
+    .landing-desc-toggle {
+      align-self: flex-start;
+      margin: 0.1rem 0.7rem 0.5rem;
+      padding: 0;
+      background: none;
+      border: 0;
+      color: var(--accent);
+      font-family: inherit;
+      font-size: 0.75rem;
+      line-height: 1.2;
+      cursor: pointer;
+      text-align: left;
+    }
+    .landing-desc-toggle:hover { text-decoration: underline; }
+    .landing-desc-toggle:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
     .landing-card-meta {
       font-size: 0.75rem;
       color: var(--text-dim);
@@ -1760,10 +1790,24 @@
       return img;
     }
 
+    // Populated by buildLanding(); each entry is a collapsed description and
+    // its More/Less button. A button is only shown when the text actually
+    // overflows the 3-line clamp, which depends on the card's rendered width,
+    // so it can only be decided after the grid is in the document (#369).
+    let descToggles = [];
+
+    function syncDescToggles() {
+      for (const { desc, toggle } of descToggles) {
+        if (toggle.getAttribute('aria-expanded') === 'true') continue;
+        toggle.hidden = desc.scrollHeight <= desc.clientHeight + 1;
+      }
+    }
+
     // Every node is built with createElement/textContent — project names,
     // descriptions and tags all come from meta.json (see CLAUDE.md's XSS rule).
     function buildLanding(models) {
       const cards = document.createDocumentFragment();
+      descToggles = [];
 
       for (const { name, project } of landingOrder(models, Date.now())) {
         const files = project.files || [];
@@ -1772,12 +1816,19 @@
 
         const wrap = document.createElement('div');
         wrap.className = 'landing-card-wrap';
+        let descToggle = null;
 
         const card = document.createElement('a');
         card.className = 'landing-card';
         card.setAttribute('href', `#${projectSlug}`);
 
-        const heroStl = (project.assembly && project.assembly.stl) || files[0].stl;
+        // A project nominates its landing thumbnail with meta.json's `hero`
+        // (issue #372: scanning-rig's card showed phone_stand, the first STL
+        // alphabetically). Fall back to a composite assembly's STL, then to
+        // the first file; ignore a `hero` naming no rendered model.
+        const heroPick = typeof project.hero === 'string'
+          && files.some(f => f.stl === project.hero) ? project.hero : null;
+        const heroStl = heroPick || (project.assembly && project.assembly.stl) || files[0].stl;
         const hero = landingThumb(heroStl, 400, 300);
         hero.className = 'landing-hero';
         card.appendChild(hero);
@@ -1791,10 +1842,35 @@
         body.appendChild(title);
 
         if (project.description) {
+          const full = String(project.description).replace(/\s+/g, ' ').trim();
           const desc = document.createElement('p');
-          desc.className = 'landing-card-desc';
-          desc.textContent = project.description;
+          desc.className = 'landing-card-desc is-collapsed';
+          desc.id = `landing-desc-${projectSlug}`;
+          desc.textContent = full;
           body.appendChild(desc);
+
+          // A <button> can't live inside the card <a> — interactive content
+          // may not nest in an anchor and browsers reparent it. It is appended
+          // to `wrap` instead, and mutates the <p> inside the card, so the
+          // text still expands in place.
+          descToggle = document.createElement('button');
+          descToggle.type = 'button';
+          descToggle.className = 'landing-desc-toggle';
+          descToggle.textContent = 'More';
+          descToggle.hidden = true;
+          descToggle.setAttribute('aria-expanded', 'false');
+          descToggle.setAttribute('aria-controls', desc.id);
+          descToggle.setAttribute('aria-label', `Show full description for ${name}`);
+          descToggle.addEventListener('click', () => {
+            const wasOpen = descToggle.getAttribute('aria-expanded') === 'true';
+            desc.classList.toggle('is-collapsed', wasOpen);
+            descToggle.textContent = wasOpen ? 'More' : 'Less';
+            descToggle.setAttribute('aria-expanded', wasOpen ? 'false' : 'true');
+            descToggle.setAttribute('aria-label', wasOpen
+              ? `Show full description for ${name}`
+              : `Hide full description for ${name}`);
+          });
+          descToggles.push({ desc, toggle: descToggle });
         }
 
         const metaParts = [`${files.length} model${files.length === 1 ? '' : 's'}`];
@@ -1823,6 +1899,8 @@
 
         card.appendChild(body);
         wrap.appendChild(card);
+
+        if (descToggle) wrap.appendChild(descToggle);
 
         // Per-model shortcuts live outside the card anchor — nesting anchors
         // is invalid HTML.
@@ -1854,7 +1932,17 @@
       }
 
       landingGridEl.replaceChildren(cards);
+      syncDescToggles();
     }
+
+    // Card width drives whether the clamp actually hides anything, so the
+    // More buttons are re-evaluated when the grid reflows (#369).
+    let descResizeTimer = null;
+    window.addEventListener('resize', () => {
+      if (landingEl.hidden) return;
+      if (descResizeTimer) clearTimeout(descResizeTimer);
+      descResizeTimer = setTimeout(syncDescToggles, 150);
+    });
 
     treeEl.addEventListener('focusin', (e) => {
       if (e.target.matches('.tree-project-label, .tree-model')) setRoving(e.target);
@@ -2725,6 +2813,9 @@
       panesEl.hidden = !anyLoaded;
       stageToolbarEl.hidden = !anyLoaded;
       homeBtn.hidden = !anyLoaded;
+      // #landing is display:none while hidden, so scrollHeight/clientHeight
+      // reads are meaningless until it's actually visible (#369 review).
+      if (!anyLoaded) syncDescToggles();
     }
 
     async function showLanding() {

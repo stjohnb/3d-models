@@ -111,7 +111,7 @@ generated artifacts produced by CI.
 | `drawer-organiser/` | Gridfinity-compatible drawer organiser: a 15×10 grid of interlocking 5×5 baseplate tiles covering a 630×424×69mm drawer, plus storage bins, a full-drawer assembly preview, and downloadable bed-splittable container parts |
 | `esp32-display-case/` | Two-part snap-fit case for the ESP32-2432S028R ("Cheap Yellow Display") board, with an integrated snap-in stylus holder |
 | `hex-connector/` | Single-piece hex male/female connector, 30mm tall, loose press fit |
-| `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons and a slot the laptop slides into |
+| `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons; single-slot and dual-slot (two laptops side by side) variants |
 | `nz-ski-fields/` | Topographic NZ terrain model split into three separately-printable parts (lake/terrain/snow); viewer shows them as a coloured composite assembly |
 | `power-workshop/` | Fisher-Price Power Workshop replacement parts sharing a square-peg connection |
 | `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings) and a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased) |
@@ -180,12 +180,13 @@ from downstream consumption (models.json, structured data).
 | `relatedModels` | `array` of `string` | Directory names of related projects |
 | `mating_pairs` | `array` of 2-element `string` arrays | Pairs of STL filenames that must fit without geometric overlap (validated by `check_interference.py`) |
 | `complex_interior` | `boolean` | When `true`, CI renders three extra orthographic views (`_top`, `_bottom`, `_front`) to expose internal cavity geometry; used by `power-workshop` and `drawer-organiser` |
+| `hero` | `string` | Rendered STL basename featured as the project's landing-gallery and README thumbnail; defaults to the first STL alphabetically. Set on every project with a clear representative part (assembly previews, the namesake variant); deliberately absent for single-model projects and for projects whose parts are co-equal (`adjustable-bracket`, `vacuum-hose`) |
 | `assembly` | `object` `{stl, parts}` | Declares that one project STL's viewer card is a coloured multi-part composite rather than a single mesh — see "Composite Multi-Colour Assembly Previews" below; currently only `nz-ski-fields` uses this |
 | `viewer_rotate_x` | `boolean` | When `true`, the interactive viewers (`index.html`, `embed.html`, standalone) rotate the loaded mesh -90° about X before framing — a display-only Z-up -> Y-up correction for print-oriented models whose STL must stay OpenSCAD Z-up for correct slicing (so the usual source-level `rotate([-90, 0, 0])` isn't an option); used by `drawer-organiser` |
 
 Metadata is merged into `models.json` at build time. Only viewer-relevant
 fields are propagated (`description`, `tags`, `difficulty`, `version`,
-`hardware`, `assembly`, `viewer_rotate_x`, `printing_notes`). `license`, `relatedModels`, and
+`hardware`, `hero`, `assembly`, `viewer_rotate_x`, `printing_notes`). `license`, `relatedModels`, and
 `mating_pairs` are intentionally excluded from the manifest.
 
 **Directory structure, not metadata, drives UI grouping.** When the two
@@ -379,11 +380,14 @@ Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
 `drawer-organiser` (`drawer_baseplate_5x5`, `drawer_baseplate_5x5_back`,
 `drawer_baseplate_4x5`, `drawer_baseplate_4x5_back`, `drawer_bin_5x5`,
 `drawer_bin_10x5_half`, `drawer_filler`, `drawer_container_left`,
-`drawer_container_back_4x6`, `drawer_container_back_4x6_right`,
+`drawer_container_left_front`, `drawer_container_left_back`,
+`drawer_container_back_4x6`, `drawer_container_back_4x6_half`,
+`drawer_container_back_4x6_half_divided`, `drawer_container_back_4x6_right`,
+`drawer_container_back_4x6_right_front`, `drawer_container_back_4x6_right_back`,
 `drawer_container_front_5x4`, `drawer_container_front_3x4`,
 `drawer_container_front_1x3`, `drawer_container_front_1x1`),
 `esp32-display-case` (`case_back`, `case_front`), `hex-connector` (`hex_connector`),
-`macbook-pro-laptop-stand` (`laptop_stand`),
+`macbook-pro-laptop-stand` (`laptop_stand`, `dual_laptop_stand`),
 `nz-ski-fields` (`lake`, `terrain`, `snow`),
 `scanning-rig` (`turntable_base`, `turntable_platter`, `phone_stand`),
 `sink-tray` (`tray_foot`), `ukulele-wall-hook` (`ukulele_hook`), and

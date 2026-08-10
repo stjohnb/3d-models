@@ -708,9 +708,15 @@ If the parameters manifest validation (step 2.5) recorded a failure, this
 step exits with an error and prints `.param-failures` so the contributor
 knows which manifests to fix.
 
-All five enforcement steps (mesh validation, dependency graph, metadata,
-interference, and parameters) use `if:` conditions and run independently — if
-multiple fail, all errors are visible.
+### 26. Enforce Thumbnail Rendering
+
+If the thumbnail rendering step (step 9) recorded `failed=true`, this step
+exits with an error and prints `.thumb-failures` so the contributor knows
+which models produced no valid PNG (issue #359).
+
+All six enforcement steps (mesh validation, dependency graph, metadata,
+interference, parameters, and thumbnail rendering) use `if:` conditions and
+run independently — if multiple fail, all errors are visible.
 
 ## Design Decisions
 
@@ -880,8 +886,8 @@ multiple fail, all errors are visible.
   (step 2.5) follows the same deferred pattern. Failures go to `.param-failures`;
   the manifest generation step reads that file and excludes invalid manifests from
   `models.json` so the customizer never loads a broken parameter set. Enforcement
-  fires at step 25 (the last step) so the full pipeline output is always available
-  even when a manifest is malformed.
+  fires at step 25 so the full pipeline output is always available even when a
+  manifest is malformed.
 - **Non-threaded openscad-wasm build**: The customizer uses the non-threaded
   WASM build (`openscad.js` / `openscad.wasm`) rather than the threaded build.
   The threaded build requires `SharedArrayBuffer`, which requires COOP/COEP

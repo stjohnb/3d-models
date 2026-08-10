@@ -111,11 +111,20 @@ jobs:
                   continue
               try:
                   validate(instance=data, schema=schema)
-                  print(f'  PASS: {path}')
               except ValidationError as e:
                   print(f'  FAIL: {path} — {e.message}')
                   errors += 1
                   failed_paths.append(path)
+                  continue
+              hero = data.get('hero')
+              if hero is not None:
+                  src = os.path.join(os.path.dirname(path), hero[:-4] + '.scad')
+                  if os.path.basename(src).startswith('_') or not os.path.isfile(src):
+                      print(f'  FAIL: {path} — hero {hero!r} has no renderable source at {src}')
+                      errors += 1
+                      failed_paths.append(path)
+                      continue
+              print(f'  PASS: {path}')
 
           # Write failed paths so downstream steps can skip invalid meta.json files
           with open('.meta-failures', 'w') as f:
@@ -781,7 +790,7 @@ jobs:
                       meta = {}
                   # Only propagate viewer-relevant fields to the manifest.
                   # license, relatedModels, and mating_pairs are intentionally excluded.
-                  for field in ('description', 'tags', 'difficulty', 'version', 'hardware', 'assembly', 'viewer_rotate_x', 'printing_notes'):
+                  for field in ('description', 'tags', 'difficulty', 'version', 'hardware', 'hero', 'assembly', 'viewer_rotate_x', 'printing_notes'):
                       if field in meta:
                           entry[field] = meta[field]
               if openscad_version:

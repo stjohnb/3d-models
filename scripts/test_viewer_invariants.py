@@ -83,7 +83,15 @@ class LandingPageTests(unittest.TestCase):
 
     def test_landing_markup_and_builder(self):
         html = read(INDEX_HTML)
-        for token in ('id="landing"', 'id="home-btn"', "function buildLanding("):
+        for token in (
+            'id="landing"',
+            'id="home-btn"',
+            "function buildLanding(",
+            "landing-desc-toggle",
+            "is-collapsed",
+            "function syncDescToggles(",
+            "project.hero",
+        ):
             self.assertIn(
                 token,
                 html,

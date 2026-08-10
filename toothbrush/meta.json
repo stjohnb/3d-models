@@ -1,6 +1,10 @@
 {
-  "description": "Modular wall-mounted toothbrush holder system with dovetail joints, clips, and drip tray.",
+  "description": "Modular wall-mounted toothbrush holder system with dovetail joints, clips, a drip tray with brush-head drying spikes, and support spikes that keep parked brushes off the tray floor.",
+  "hero": "Toothbrush assembly.stl",
   "tags": ["organizer", "bathroom", "modular"],
-  "version": "1.0.0",
-  "difficulty": "intermediate"
+  "version": "1.2.0",
+  "difficulty": "intermediate",
+  "printing_notes": [
+    "The tray's four spikes print vertically with no supports. Slow the top few layers or print with a second object on the plate so each spike tip has time to cool."
+  ]
 }

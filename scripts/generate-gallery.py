@@ -36,12 +36,17 @@ def load_description(project_dir):
         return "\u2014"
 
 
-def pick_thumbnail(files):
-    """Pick a representative thumbnail: first STL alphabetically, derive PNG name."""
+def pick_thumbnail(files, hero=None):
+    """Pick a representative thumbnail PNG.
+
+    Uses meta.json's `hero` STL when it names one of the project's rendered
+    files (issue #372), otherwise the first STL alphabetically.
+    """
     stls = sorted(f["stl"] for f in files if f.get("stl"))
     if not stls:
         return None
-    return stls[0].rsplit(".", 1)[0] + ".png"
+    chosen = hero if hero in stls else stls[0]
+    return chosen.rsplit(".", 1)[0] + ".png"
 
 
 def generate_gallery_table(models):
@@ -59,7 +64,7 @@ def generate_gallery_table(models):
             continue
 
         description = entry.get("description") or load_description(project_dir)
-        thumbnail = pick_thumbnail(files)
+        thumbnail = pick_thumbnail(files, entry.get("hero"))
         model_count = len(files)
         viewer_url = f"{BASE_URL}/#{slugify(project_name)}"
 

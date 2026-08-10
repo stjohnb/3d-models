@@ -71,8 +71,12 @@ guard — i.e. use `transition`/`animation`, never JS-driven tweens.
 
 ## Focus and hit targets
 
-Every interactive element in the gallery is a real `<a>`, so keyboard
-navigation, middle-click, and "copy link address" work without JS. Focus is
-always visible: `:focus-visible { outline: 2px solid var(--accent) }` with a
-2px offset, matching the rest of the viewer. Below 900px the grid drops to
-200px minimum columns and the page (not the gallery) scrolls.
+Every *navigational* element in the gallery is a real `<a>`, so keyboard
+navigation, middle-click, and "copy link address" work without JS. The sole
+exception is the description More/Less `<button>` (#369): it is an in-page
+disclosure toggle rather than a link, so it must not be an anchor. It is
+styled as accent-coloured link text at 0.75rem with the same 2px `--accent`
+focus ring as everything else, and it animates nothing. Focus is always
+visible: `:focus-visible { outline: 2px solid var(--accent) }` with a 2px
+offset, matching the rest of the viewer. Below 900px the grid drops to 200px
+minimum columns and the page (not the gallery) scrolls.

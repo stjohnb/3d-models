@@ -49,12 +49,12 @@ Audit of [specification.website/checklist](https://specification.website/checkli
 
 | Item | Status | Notes |
 |------|--------|-------|
-| ARIA attributes | ✅ | project sections: role="group"/aria-label; headings: role="button"/aria-expanded; canvases: role="img"/aria-label; all interactive elements have aria-label |
+| ARIA attributes | ✅ | model tree: role="tree" with role="treeitem" on project and model nodes carrying aria-expanded/aria-selected; canvases: role="img"/aria-label; all interactive elements have aria-label |
 | Focus styles | ✅ | :focus-visible outlines on cards, headings, buttons, swatches, links; :focus-within for fullscreen/QR visibility |
 | Keyboard navigation | ✅ | Arrow keys through the model tree; `/`=filter, 1/2/3=pane layout, F=fullscreen, D=download, C=cross-section, M=focus pane, R=re-render, Escape=dismiss, Enter/Space=activate |
 | prefers-reduced-motion | ❌ → ✅ | Added CSS media query in this PR (covers decorative transitions; WebGL OrbitControls are user-driven and intentionally untouched) |
 | Accessibility overlays | N/A | Correctly absent (Avoid per checklist) |
-| Alt text | ✅ | Thumbnail `<img>` elements have descriptive alt text via `displayName()` |
+| Alt text | ✅ | Thumbnail `<img>` elements use empty `alt=""` (decorative — the name is already present as adjacent text via `displayName()`) |
 
 ## Security
 
@@ -90,7 +90,7 @@ Audit of [specification.website/checklist](https://specification.website/checkli
 
 | Item | Status | Notes |
 |------|--------|-------|
-| Lazy loading (images) | ⚠️ → ✅ | IntersectionObserver already used; added `loading="lazy"` and `decoding="async"` on thumbnail img elements in this PR |
+| Lazy loading (images) | ⚠️ → ✅ | Added `loading="lazy"` and `decoding="async"` on thumbnail img elements in this PR; `IntersectionObserver` is not used (a possible future enhancement, see `ideas/viewer-experience.md`) |
 | Compression (gzip/brotli) | 🏗️ Infra-scope | S3/CloudFront configuration |
 | Cache-Control headers | 🏗️ Infra-scope | Response headers; build hash already used for cache-busting JS references |
 | HTTP/2 or HTTP/3 | 🏗️ Infra-scope | CloudFront configuration |

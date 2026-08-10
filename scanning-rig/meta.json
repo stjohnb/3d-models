@@ -9,5 +9,6 @@
     "If the platter feels gritty to turn, work a little candle wax or PTFE lubricant into the V-groove and across the base plate's top face. Do not sand the 45-degree flanks; they set the concentricity.",
     "The 14mm phone slot fits most cased phones; use the customizer to narrow slot_w for a snug grip on a bare phone.",
     "For landscape scanning, slide the phone along the slot so the camera-bump corner overhangs past the end of the stand rather than resting on the backrest."
-  ]
+  ],
+  "hero": "scanning_rig_assembly.stl"
 }
