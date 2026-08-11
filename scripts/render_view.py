@@ -29,9 +29,9 @@ PRESETS = {
     "right":  {"camera": "0,0,0,90,0,270,500", "projection": "ortho"},
 }
 
-# Y-up variants for files that apply rotate([-90, 0, 0]) at the top level
-# (gate_assembly.scad, Toothbrush assembly.scad, vacuum-hose/adapter.scad,
-#  vacuum-hose/reducer.scad). Pass --y-up when rendering those files.
+# Y-up variants of the preset table. No source in this repo needs them — every
+# .scad here is OpenSCAD Z-up (issue #382) — but --y-up keeps the presets usable
+# for ad-hoc rendering of an externally-sourced Y-up model.
 PRESETS_Y_UP = {
     "iso":    {"camera": "0,0,0,55,0,25,500",  "projection": "perspective"},
     "top":    {"camera": "0,0,0,90,0,0,500",   "projection": "ortho"},
@@ -112,7 +112,8 @@ def parse_args(argv=None):
         "--y-up",
         action="store_true",
         default=False,
-        help="Use Y-up preset table for files that apply rotate([-90, 0, 0]).",
+        help="Use the Y-up preset table (for externally-sourced Y-up models; "
+             "no file in this repo needs it).",
     )
     parser.add_argument(
         "-q", "--quiet",

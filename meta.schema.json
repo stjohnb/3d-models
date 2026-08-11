@@ -70,10 +70,6 @@
       "type": "boolean",
       "description": "Whether this model has significant interior cavities that a single isometric thumbnail cannot adequately convey. When true, CI renders additional orthographic views (top, bottom, front) alongside the standard isometric thumbnail."
     },
-    "viewer_rotate_x": {
-      "type": "boolean",
-      "description": "Rotate the loaded mesh -90 degrees about X in the interactive Three.js viewer only (index.html, embed.html, standalone viewers) — never in the .scad source. Use when a model's correct print orientation is OpenSCAD Z-up (so a source-level rotate([-90, 0, 0]) would misprint it) but the viewer's Y-up camera, cross-section slider, and default framing need the model's tall/open axis to read as up on screen."
-    },
     "hero": {
       "type": "string",
       "pattern": "^[A-Za-z0-9._ -]+\\.stl$",

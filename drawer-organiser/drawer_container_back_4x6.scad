@@ -11,7 +11,7 @@
 // in issue #324: neither reaches a drawer wall, so neither flares. The
 // back-right container stands against the wall and is a separate renderable,
 // drawer_container_back_4x6_right.
-// No rotate(): the project sets viewer_rotate_x in meta.json.
+// No rotate(): sources stay OpenSCAD Z-up; the viewer applies the Z-up -> Y-up conversion itself.
 
 include <_drawer_organiser.scad>
 

@@ -4,8 +4,7 @@
 
 include <_scanning_rig.scad>
 
-// Rotate to Y-up for the Three.js viewer (assembly-file convention)
-rotate([-90, 0, 0]) {
+{
     turntable_base();
 
     // Platter dropped over the spindle. The race_clear lift is a display gap

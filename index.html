@@ -296,18 +296,6 @@
       padding: 0.5rem 0.25rem 2rem;
       background-image: radial-gradient(circle at 20% 0%, rgba(100,181,246,0.10), transparent 45%);
     }
-    .landing-title {
-      font-family: var(--display);
-      font-size: clamp(1.6rem, 4vw, 2.4rem);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-    }
-    .landing-sub {
-      color: var(--text-dim);
-      font-size: 0.95rem;
-      margin: 0.35rem 0 1.25rem;
-      max-width: 52ch;
-    }
     .landing-grid {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -935,8 +923,6 @@
     </aside>
     <main id="stage">
       <section id="landing" hidden aria-label="Model gallery">
-        <h2 class="landing-title">Browse the collection</h2>
-        <p class="landing-sub">Interactive 3D previews of every printable model. Newest and most involved projects first.</p>
         <div id="landing-grid" class="landing-grid"></div>
       </section>
       <div class="stage-toolbar">
@@ -1288,19 +1274,15 @@
         const loaded = await Promise.all(entries.map(async (entry) => {
           if (entry.composite && entry.composite.length) {
             const geometries = await Promise.all(entry.composite.map(p => loadSTL(p.url)));
-            if (entry.viewerRotateX) {
-              for (const g of geometries) g.rotateX(-Math.PI / 2);
-            }
+            for (const g of geometries) g.rotateX(-Math.PI / 2);
             return geometries.map((geometry, i) => ({ geometry, color: entry.composite[i].color }));
           }
           const geometry = await loadSTL(entry.stlUrl);
-          // Print-oriented models keep OpenSCAD's native Z-up in the STL (so the
-          // download stays correctly oriented for slicing); when the source
-          // can't apply a Z-up -> Y-up rotate() without misprinting, meta.json's
-          // viewer_rotate_x asks for that same correction here instead, purely
-          // for display. Must happen before the bounding-box math below so the
-          // cross-section/camera framing operate on the corrected axes.
-          if (entry.viewerRotateX) geometry.rotateX(-Math.PI / 2);
+          // OpenSCAD exports Z-up; Three.js is Y-up. Every STL gets this same
+          // conversion — sources stay in native OpenSCAD coordinates so
+          // thumbnails and print orientation stay correct. Must happen before
+          // the bounding-box maths below.
+          geometry.rotateX(-Math.PI / 2);
           return [{ geometry, color: null }];
         }));
 
@@ -1375,6 +1357,9 @@
       // single-model pane; reuses the existing material (and therefore the
       // active filament colour and clipping planes) when there is one.
       function replaceGeometry(geometry) {
+        // Same Z-up -> Y-up conversion the default STL path applies, so a
+        // customizer-rendered mesh matches the orientation it replaces.
+        geometry.rotateX(-Math.PI / 2);
         geometry.center();
         geometry.computeBoundingBox();
         const group = root.children.length === 1 ? root.children[0] : null;
@@ -1557,7 +1542,6 @@
             name,
             composite,
             stlUrl: `${model.stl}${cacheBust}`,
-            viewerRotateX: !!projectData.viewer_rotate_x,
             haystack: `${projectName} ${name} ${(projectData.tags || []).join(' ')}`.toLowerCase(),
           });
         }
@@ -2474,7 +2458,7 @@
       const names = refs.map(r => r.name).join(', ');
       try {
         const bbox = await pane.viewer.setModels(
-          refs.map(r => ({ stlUrl: r.stlUrl, composite: r.composite, viewerRotateX: r.viewerRotateX })), token);
+          refs.map(r => ({ stlUrl: r.stlUrl, composite: r.composite })), token);
         if (bbox === null) return;
 
         pane.clipBBox = bbox;
@@ -2753,24 +2737,42 @@
     }
     // __HASH_ROUTING_END__
 
-    // Incoming URLs are never rewritten: `updateHash()` stays inert until the
-    // initial route has been fully applied, so arriving at `#toothbrush` from
-    // the README leaves the address bar (and the Plausible hash pageview)
-    // exactly as it was.
+    // Incoming URLs are never rewritten: hash writes stay inert while a route
+    // is being applied, so arriving at `#toothbrush` from the README leaves
+    // the address bar (and the Plausible hash pageview) exactly as it was.
+    //
+    // Route changes the user made (tree click, add-to-scene, remove chip,
+    // layout change, "All models") push a session-history entry so browser
+    // Back/Forward walks the browsing trail (issue #383). Only the initial
+    // PR-preview autoload replaces instead of pushing.
     let applyingHash = false;
+    let replaceNextWrite = false;
     let lastWrittenHash = null;
 
     function currentSpec() {
       return panes.map(pane => pane.models.map(ref => ({ p: ref.projectSlug, m: ref.modelSlug })));
     }
 
+    // __HASH_WRITE_START__
+    // How a freshly computed hash should be committed to session history:
+    //   'skip'    — already the current URL; writing would duplicate an entry
+    //   'replace' — same logical route (initial autoload); no new entry
+    //   'push'    — a route the user navigated to; Back must return to the old one
+    function hashWriteMode(nextHash, currentHash, replace) {
+      if (nextHash === currentHash) return 'skip';
+      return replace ? 'replace' : 'push';
+    }
+    // __HASH_WRITE_END__
+
     function updateHash() {
       if (applyingHash) return;
       const hash = formatHash(currentSpec());
+      const mode = hashWriteMode(hash, window.location.hash.slice(1), replaceNextWrite);
       lastWrittenHash = hash;
-      history.replaceState(null, '', hash
-        ? `#${hash}`
-        : window.location.pathname + window.location.search);
+      if (mode === 'skip') return;
+      const url = hash ? `#${hash}` : window.location.pathname + window.location.search;
+      if (mode === 'replace') history.replaceState(null, '', url);
+      else history.pushState(null, '', url);
     }
 
     async function applyHash() {
@@ -2818,8 +2820,21 @@
       if (!anyLoaded) syncDescToggles();
     }
 
+    // Clearing three panes would otherwise write three hashes (one per
+    // setPaneModels) and cost three Back presses to undo — batch them into
+    // one entry.
+    async function clearAllPanes() {
+      applyingHash = true;
+      try {
+        await Promise.all(panes.map(p => setPaneModels(p, [])));
+      } finally {
+        applyingHash = false;
+      }
+    }
+
     async function showLanding() {
-      await Promise.all(panes.map(p => setPaneModels(p, [])));
+      await clearAllPanes();
+      updateHash();
       announce('Showing the model gallery');
       landingEl.scrollTop = 0;
     }
@@ -2915,12 +2930,16 @@
     });
 
     window.addEventListener('hashchange', () => {
-      if (window.location.hash.slice(1) === lastWrittenHash) return;
-      // Navigating back to the bare URL returns to the gallery rather than
-      // leaving the last-loaded model on screen. This path deliberately does
-      // not suppress updateHash() — emptying the panes writes the now-empty
-      // hash back to lastWrittenHash, so a forward-navigation still routes.
-      if (!window.location.hash.slice(1)) {
+      const raw = window.location.hash.slice(1);
+      if (raw === lastWrittenHash) return;
+      // Keep this in sync on every traversal, not just on our own writes —
+      // a stale value makes a Forward step back onto the last-written hash
+      // silently no-op while the panes still show the previous route (#383).
+      lastWrittenHash = raw;
+      // Back to the bare URL returns to the gallery rather than leaving the
+      // last-loaded model on screen. showLanding()'s own updateHash() is a
+      // no-op here: the computed hash is already the current one.
+      if (!raw) {
         showLanding().catch(err => console.warn('Failed to show the gallery', err));
         return;
       }
@@ -3000,7 +3019,12 @@
         }
         if (firstRef) {
           revealInTree(firstRef);
-          await setPaneModels(panes[0], [firstRef]);
+          replaceNextWrite = true;
+          try {
+            await setPaneModels(panes[0], [firstRef]);
+          } finally {
+            replaceNextWrite = false;
+          }
         }
       }
 

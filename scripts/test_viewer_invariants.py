@@ -62,6 +62,32 @@ class BuildMarkerTests(unittest.TestCase):
             "__HASH_ROUTING_START__ must precede __HASH_ROUTING_END__",
         )
 
+    def test_hash_history_markers(self):
+        """Route changes push history entries so Back/Forward work (#383)."""
+        html = read(INDEX_HTML)
+        for marker in ("__HASH_WRITE_START__", "__HASH_WRITE_END__"):
+            self.assertEqual(
+                html.count(marker),
+                1,
+                f"index.html must contain exactly one {marker!r} "
+                "(scripts/test_hash_history.mjs slices between them)",
+            )
+        self.assertLess(
+            html.index("__HASH_WRITE_START__"),
+            html.index("__HASH_WRITE_END__"),
+            "__HASH_WRITE_START__ must precede __HASH_WRITE_END__",
+        )
+        self.assertIn(
+            "history.pushState(",
+            html,
+            "route changes must push a history entry, not just replace (#383)",
+        )
+        self.assertNotIn(
+            "window.addEventListener('popstate'",
+            html,
+            "a popstate listener alongside hashchange would double-apply routes",
+        )
+
 
 class LandingPageTests(unittest.TestCase):
     """Issue #345: index.html opens on a gallery of every project."""
@@ -170,6 +196,39 @@ class ViewerChromeTests(unittest.TestCase):
     def test_index_disclosures_start_closed(self):
         html = read(INDEX_HTML)
         self.assertNotIn("det.open = true", html)
+
+
+class ViewerRotationTests(unittest.TestCase):
+    """Issue #382 — the Z-up -> Y-up conversion is universal, not opt-in."""
+
+    def test_no_viewer_rotate_x_flag(self):
+        for path in RENDER_SOURCES:
+            text = read(path)
+            for token in ("viewer_rotate_x", "viewerRotateX", "VIEWER_ROTATE_X"):
+                self.assertNotIn(
+                    token,
+                    text,
+                    f"{path.name} still references {token}; the rotation is "
+                    "unconditional and the meta.json flag is gone",
+                )
+
+    def test_rotation_is_unconditional(self):
+        for path in RENDER_SOURCES:
+            lines = [
+                line for line in read(path).splitlines()
+                if "rotateX(-Math.PI / 2)" in line
+            ]
+            self.assertTrue(
+                lines,
+                f"{path.name} must apply rotateX(-Math.PI / 2) — OpenSCAD "
+                "exports Z-up and the viewers are Y-up",
+            )
+            for line in lines:
+                self.assertFalse(
+                    line.strip().startswith("if ("),
+                    f"{path.name} guards the Z-up -> Y-up rotation with a "
+                    f"condition ({line.strip()!r}); every mesh gets it",
+                )
 
 
 class RenderBudgetTests(unittest.TestCase):

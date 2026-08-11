@@ -12,8 +12,6 @@ peg_x2 = base_length/2 - plate_center_x + grip_spacing/2;
 tray_center_x = (peg_x1 + peg_x2) / 2;
 
 // ---- Assembly ----
-// Rotate to Y-up for Three.js viewer
-rotate([-90, 0, 0])
 union() {
     toothbrush_holder();
 

@@ -5,7 +5,6 @@
   "version": "3.0.0",
   "difficulty": "intermediate",
   "complex_interior": true,
-  "viewer_rotate_x": true,
   "mating_pairs": [
     ["drawer_bin_5x5.stl", "drawer_baseplate_5x5.stl"],
     ["drawer_bin_10x5_half.stl", "drawer_baseplate_5x5.stl"]

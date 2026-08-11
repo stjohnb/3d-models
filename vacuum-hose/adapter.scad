@@ -57,7 +57,6 @@ module inner_bore() {
 }
 
 // ---- Assembly ----
-rotate([-90, 0, 0])
 difference() {
     outer_shell();
     translate([0, 0, -0.1]) inner_bore();

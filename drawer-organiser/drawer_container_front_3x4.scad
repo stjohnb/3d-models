@@ -10,7 +10,7 @@
 // — see layout.md, "Container layout".
 //
 // Sits away from both drawer walls, so no wall flares.
-// No rotate(): the project sets viewer_rotate_x in meta.json.
+// No rotate(): sources stay OpenSCAD Z-up; the viewer applies the Z-up -> Y-up conversion itself.
 
 include <_drawer_organiser.scad>
 

@@ -62,9 +62,7 @@ Gridfinity-compatible drawer organiser sized for a 630×424×69mm drawer
 measurement). The floor is a 15×10 grid (630×420mm, 42mm cell pitch) tiled as
 3 columns × 2 rows of 5×5 tiles, plus bins, a full-drawer assembly preview,
 and a printable, bed-splittable STL for every container in that preview.
-`complex_interior: true` (extra orthographic views) and `viewer_rotate_x:
-true` (viewer-only Z-up→Y-up rotation, since the STLs must stay Z-up for
-correct slicing) are both set in `meta.json`. Full geometry derivation,
+`complex_interior: true` (extra orthographic views) is set in `meta.json`. Full geometry derivation,
 measured tolerances, print/glue order, and the print list live in
 [`drawer-organiser/layout.md`](../drawer-organiser/layout.md) — this section
 is a summary.
@@ -90,7 +88,7 @@ is a summary.
 | `drawer_container_front_1x1.scad` | Renderable — single-cell container behind the 1×3 (flared on its outer/+X wall); fits the bed whole, and a 1-cell axis cannot split, so it calls `container()` directly with no `split_parts` |
 | `drawer_assembly.scad` | Renderable — full-drawer preview: the whole 15×10 baseplate floor plus nine seated, coloured containers (four of which flare outward to follow the drawer's 630→670mm flare); the back-centre container's front half carries the five-plate divider bank of `drawer_container_back_4x6_half_divided`; a **viewing aid, not a printable part** — not tiled for the print bed; renders at `$fn = 32` like `nz-ski-fields/assembly.scad` |
 | `<basename>.parameters.json` | In-browser customizer manifests for every renderable above |
-| `meta.json` | Project metadata: `complex_interior`, `viewer_rotate_x`, `mating_pairs` (bin↔baseplate pairs), extensive `printing_notes` (seam assembly, split/glue instructions per part) |
+| `meta.json` | Project metadata: `complex_interior`, `mating_pairs` (bin↔baseplate pairs), extensive `printing_notes` (seam assembly, split/glue instructions per part) |
 | `dependency-graph.md` | Auto-generated `include` dependency graph — every renderable includes `_drawer_organiser.scad` |
 | `layout.md` | Full design reference: grid arithmetic, Gridfinity profile constants, interlocking-seam derivation and history (issues #304/#305/#309/#310), edge fillers, container layout and flare math, bed-splitting tables, print list |
 
@@ -122,8 +120,7 @@ the board's bundled touchscreen stylus. A rear shell clears the back-side
 components (ESP32, USB, JST connectors) and carries two saddle clips for the
 stylus on one exterior long wall; a front bezel with a display window snaps
 over the shell's exterior via a skirt, sandwiching the board between them.
-Both parts print upright (Z-up) with no viewer rotation — symmetric/upright
-model, like `hex-connector` and `sink-tray`.
+Both parts print upright, base-down, like `hex-connector` and `sink-tray`.
 
 | File | Role |
 |------|------|
@@ -188,7 +185,7 @@ call and applies `rotate([0, 0, 30])` to orient flat faces at top and bottom
 Vertical laptop dock: two swept arch ribbons joined at end-feet, with a central
 slot the closed laptop slides into edge-down. Slot floor is flat (XY face) so
 the laptop's bottom edge seats level between two vertical side walls. Symmetric /
-upright model — no viewer rotation; prints base-down without supports. Ships in
+upright model; prints base-down without supports. Ships in
 two variants: the original single-slot stand and a dual-slot stand that holds
 two laptops side by side.
 
@@ -218,10 +215,10 @@ snow) that share the same footprint and stack back into the full model.
 | File | Role |
 |------|------|
 | `_ski_fields.scad` | Shared library — all parameters and geometry modules; no top-level geometry |
-| `lake.scad` | Renderable — Lake Wakatipu insert, fills lake footprint from model bottom to water surface; applies `rotate([-90, 0, 0])` for the web viewer |
-| `terrain.scad` | Renderable — lower terrain from base to snow line; applies `rotate([-90, 0, 0])` for the web viewer |
-| `snow.scad` | Renderable — snow caps above `snow_line_m`; applies `rotate([-90, 0, 0])` for the web viewer |
-| `assembly.scad` | Renderable — thumbnail-only preview stacking all three parts in colour (blue lake / grey terrain / white snow) via `color()`; renders Z-up (no viewer rotation, unlike the parts above) from a 128px heightmap downsample so the exported STL stays small. Viewers no longer load `assembly.stl` — they instead render `lake.stl`/`terrain.stl`/`snow.stl` together as a coloured composite, per `meta.json`'s `assembly` field (see [web-viewer.md](web-viewer.md#composite-multi-colour-assembly-previews)) |
+| `lake.scad` | Renderable — Lake Wakatipu insert, fills lake footprint from model bottom to water surface |
+| `terrain.scad` | Renderable — lower terrain from base to snow line |
+| `snow.scad` | Renderable — snow caps above `snow_line_m` |
+| `assembly.scad` | Renderable — thumbnail-only preview stacking all three parts in colour (blue lake / grey terrain / white snow) via `color()`; renders from a 128px heightmap downsample so the exported STL stays small. Viewers no longer load `assembly.stl` — they instead render `lake.stl`/`terrain.stl`/`snow.stl` together as a coloured composite, per `meta.json`'s `assembly` field (see [web-viewer.md](web-viewer.md#composite-multi-colour-assembly-previews)) |
 | `heightmap.png` | Committed binary asset — 512×512 8-bit grayscale heightmap (0..255 → `elev_min..elev_max` metres from `heightmap.json`) |
 | `lake_bed.png` | Committed binary asset — 128×128 8-bit grayscale bathymetry map (grey 255 = bed at water surface / shore; grey 0 = full depth at model bottom) baked by `scripts/generate_lake_bed.py` |
 | `heightmap_preview.png` | Committed binary asset — 128×128 downsample of `heightmap.png` (Pillow `LANCZOS`), used only by `assembly.scad` |
@@ -237,7 +234,9 @@ snow) that share the same footprint and stack back into the full model.
 no overlap and no gap. `terrain.scad` = `terrain_solid` minus the lake footprint
 minus everything above `snow_line_m`. `snow.scad` = `terrain_solid` intersected
 with everything above `snow_line_m`. `lake.scad` = lake insert up to the water
-surface. All three apply `rotate([-90, 0, 0])` at the top level.
+surface. All four files — like every source in the repo — stay in OpenSCAD's
+native Z-up, so the three parts remain co-registered and the thumbnail agrees
+with the client-side composite.
 
 **Composite assembly preview**: `assembly.scad` exists only to produce the
 gallery thumbnail PNG — a prior version tried to ship it as a real, viewer-
@@ -385,8 +384,8 @@ width, default sized to fit an iPhone 15 Pro bare or in a case).
 | `_scanning_rig.scad` | Shared library — `$fn = 64`, all parameters, modules `turntable_base()`, `turntable_platter()`, `stand_profile()`/`notch_profile()`/`phone_stand()`; no top-level geometry |
 | `turntable_base.scad` | Renderable — base plate with V-ridge race, centring spindle, and an index pointer on the exposed rim; prints as-is, Z-up, no supports |
 | `turntable_platter.scad` | Renderable — platter with underside V-groove, spindle clearance bore, rim finger-grip scallops, and rotation tick marks; prints as-is, top face up (groove-side down), no supports |
-| `phone_stand.scad` | Renderable — leaning phone cradle; single side profile `linear_extrude()`d along Z, no viewer rotation needed (see below) |
-| `scanning_rig_assembly.scad` | Renderable — preview-only assembly (platter dropped onto the base with a display-only gap, phone stand alongside); applies `rotate([-90, 0, 0])` (assembly-file convention) |
+| `phone_stand.scad` | Renderable — leaning phone cradle; single side profile `linear_extrude()`d along Z, print-oriented as authored (see below) |
+| `scanning_rig_assembly.scad` | Renderable — preview-only assembly (platter dropped onto the base with a display-only gap, phone stand alongside); the inner `rotate([90, 0, 0])` on `phone_stand()` stands the stand up and keeps the assembly internally Z-up-consistent |
 | `turntable_base.parameters.json` | Customizer manifest — `base_d`, `race_r`, `spindle_d` |
 | `turntable_platter.parameters.json` | Customizer manifest — `platter_d`, `race_r`, `spindle_d`, `race_clear`, `bore_clear`, `tick_count` |
 | `phone_stand.parameters.json` | Customizer manifest — `slot_w`, `lean`, `stand_w`, `backrest_h`, `lip_h`, `foot_rear` |
@@ -410,8 +409,8 @@ angular increments by hand.
 along Z (`stand_w`, the stand's width) — so every layer of the print is the
 identical cross-section and no part of the wedge/lip/backrest can overhang
 regardless of `lean`. Because the profile's "up" is already +Y, the exported
-STL needs no `rotate([-90, 0, 0])` to display upright in the Y-up viewer even
-though it's also already print-oriented (see
+STL is print-oriented (flat face on the bed) and already reads upright once
+the viewers apply their Z-up→Y-up conversion (see
 [OVERVIEW.md](OVERVIEW.md#viewer-rotation)) — a pattern worth reusing for
 future single-profile extruded parts. The cradle floor is carried above the
 foot plate by a `hull()`-based wedge (tilted floor strip to a shallow strip
@@ -439,10 +438,10 @@ vertical backplate, dovetail-attached clips, and a removable drip tray.
 | File | Role |
 |------|------|
 | `_toothbrush_holder.scad` | Shared library — all modules and parameters for the holder system (no top-level geometry) |
-| `Toothbrush holder.scad` | Renderable — full holder assembly, oriented for web viewer |
+| `Toothbrush holder.scad` | Renderable — full holder assembly in native Z-up |
 | `Toothbrush tray.scad` | Renderable — drip tray with alignment grooves; also `use`d by `Toothbrush assembly.scad` as a module |
 | `Toothbrush assembly.scad` | Renderable — assembly preview (holder + tray) |
-| `Toothbrush backplate.scad` | Renderable — backplate with dovetail rails, oriented for printing |
+| `Toothbrush backplate.scad` | Renderable — backplate with dovetail rails; the sole file in the repo keeping a top-level `rotate([-90, 0, 0])`, and it is a *print* orientation: `toothbrush_backplate()` stands upright in the library and this lays it on its back, flat on the bed (allowlisted in `scripts/test_scad_orientation.py`) |
 | `Toothbrush clip test.scad` | Renderable — single brush clip, oriented for test printing |
 | `Toothpaste clip test.scad` | Renderable — single paste clip, oriented for test printing |
 | `meta.json` | Project metadata (description, tags, difficulty) |
@@ -458,7 +457,27 @@ exactly under the clip axes, the same X as the alignment grooves) and
 rests on a point rather than in standing water (issue #374). The clip bore
 axis is at tray-local `y = −3.5`; `brush_spike_y` is pulled 2.7 mm behind it
 so the flared base clears the groove footprint (`y ∈ [−2.2, 2.2]`) — no post
-ever stands on the ~1.5 mm of floor above a groove.
+ever stands on the ~1.5 mm of floor above a groove. The tray is 100 × 65 × 10
+mm and grows forward only (issue #377): the base and its alignment pegs are
+already printed, so `base_depth` (55 mm) and `peg_y` (30 mm) are unchanged and
+`tray_shift_y` (7.5 mm) offsets the shell from the tray's local origin, which
+stays on the peg line. The grooves, the brush support spikes and `Toothbrush
+assembly.scad`'s placement are therefore unaffected, and the extra depth puts
+a head parked on a front spike ~6.9 mm clear of the handles hanging in the
+clips — at the cost of the tray's front 15 mm overhanging the base's front
+edge.
+
+**Rejected: reworking the clips themselves to grip the brush.** Issue #371
+also asked for a fix to the clips sliding brushes to the ground, and PR #373
+initially added a `brush_rest_shelf()` module — a C-shaped shelf across the
+bottom of each clip's bore with a drain hole — as a way to make the clip
+itself hold the brush. The owner rejected this mid-PR and had it reverted:
+"Keep the spikes on the tray but revert the changes to the toothbrush grips.
+That approach won't work." There is no `brush_rest_shelf` module in the repo
+today. The standing fix for "toothbrush falls out of / slides down the
+clips" is standoff spikes on the tray floor (above), not a modification to
+`c_clip()` or `brush_clip_piece()` — don't re-propose clip-side gripping
+geometry on the strength of #371 alone.
 
 See [OVERVIEW.md](OVERVIEW.md#dovetail-joint-system-toothbrush) for the
 dovetail joint system used between the backplate and clips.
@@ -470,8 +489,7 @@ headstock. A rounded mounting plate (50×70×6mm, two counterbored screw holes
 for #8/4-5mm wall screws) carries two capsule-section prongs that project
 forward and curl upward, forming an upward-opening cradle. Authored
 plate-upright (plate tall in +Z, prongs projecting in +Y) — an "upright"
-model like `hex-connector`/`sink-tray`, so it omits the `rotate([-90, 0, 0])`
-viewer rotation.
+model like `hex-connector`/`sink-tray`.
 
 | File | Role |
 |------|------|

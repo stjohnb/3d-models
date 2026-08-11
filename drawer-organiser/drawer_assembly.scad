@@ -30,10 +30,9 @@
 // text calls "3x3": the sketch draws it the full 4 rows deep, level with the
 // 5 x 4 beside it, and 3 x 4 is what tiles the grid exactly. See layout.md.
 //
-// No rotate() here: the project sets viewer_rotate_x in meta.json, so the
-// interactive viewer already tips the Z-up geometry upright. Adding a source
-// rotate would double it up (the other drawer_* files are Z-up for the same
-// reason).
+// No rotate() here: every source in this repo stays OpenSCAD Z-up. The
+// interactive viewers apply the Z-up -> Y-up conversion themselves, so a
+// source rotate would double it up.
 
 include <_drawer_organiser.scad>
 

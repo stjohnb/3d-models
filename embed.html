@@ -237,7 +237,6 @@
       let sourcePath = null;
       let projectName = null;
       let composite = null;
-      let viewerRotateX = false;
       let printingNotes = null;
       for (const [project, projectData] of Object.entries(models)) {
         if (slugify(project) !== projectSlug) continue;
@@ -257,7 +256,6 @@
                   .filter(p => typeof p.stl === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color))
                   .map(p => ({ url: `${p.stl}${cacheBust}`, color: p.color }))
               : null;
-            viewerRotateX = !!projectData.viewer_rotate_x;
             break;
           }
         }
@@ -401,9 +399,7 @@
         Promise.all(composite.map(p => new Promise((res, rej) =>
           new STLLoader().load(p.url, res, undefined, rej)
         ))).then((geometries) => {
-          if (viewerRotateX) {
-            for (const g of geometries) g.rotateX(-Math.PI / 2);
-          }
+          for (const g of geometries) g.rotateX(-Math.PI / 2);
           const union = new THREE.Box3();
           for (const g of geometries) {
             g.computeBoundingBox();
@@ -441,7 +437,10 @@
       } else {
         const loader = new STLLoader();
         loader.load(`${stlFile}${cacheBust}`, (geometry) => {
-          if (viewerRotateX) geometry.rotateX(-Math.PI / 2);
+          // OpenSCAD exports Z-up; Three.js is Y-up. Every STL gets this same
+          // conversion — sources stay in native OpenSCAD coordinates so
+          // thumbnails and print orientation stay correct.
+          geometry.rotateX(-Math.PI / 2);
           geometry.computeBoundingBox();
           const halfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
           geometry.center();

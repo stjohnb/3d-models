@@ -48,6 +48,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_generate_standalone.py  # Regression tests for _load_filament_colors_js HTML injection escaping
 │   ├── test_wasm_customizer.mjs  # Node.js integration test for the in-browser WASM customizer pipeline
 │   ├── test_hash_routing.mjs    # Node.js test for index.html's parseHash/formatHash URL grammar
+│   ├── test_hash_history.mjs    # Node.js test for index.html's hashWriteMode push/replace/skip decision
 │   ├── test_landing_order.mjs   # Node.js test for index.html's landing-gallery project ranking
 │   ├── test_viewer_invariants.py # Text-level checks on index.html/embed.html (build markers, slugify/PUBLIC_REPO parity, innerHTML)
 │   ├── test_build_workflow.py  # Text-level invariant checks on build.yml/flake.nix (ImageMagick font args, no-toolchain-setup-actions, no-Xvfb, EGL pinning); see ci-pipeline.md
@@ -180,13 +181,12 @@ from downstream consumption (models.json, structured data).
 | `relatedModels` | `array` of `string` | Directory names of related projects |
 | `mating_pairs` | `array` of 2-element `string` arrays | Pairs of STL filenames that must fit without geometric overlap (validated by `check_interference.py`) |
 | `complex_interior` | `boolean` | When `true`, CI renders three extra orthographic views (`_top`, `_bottom`, `_front`) to expose internal cavity geometry; used by `power-workshop` and `drawer-organiser` |
-| `hero` | `string` | Rendered STL basename featured as the project's landing-gallery and README thumbnail; defaults to the first STL alphabetically. Set on every project with a clear representative part (assembly previews, the namesake variant); deliberately absent for single-model projects and for projects whose parts are co-equal (`adjustable-bracket`, `vacuum-hose`) |
+| `hero` | `string` | Rendered STL basename featured as the project's landing-gallery and README thumbnail; defaults to the first STL alphabetically. When a new multi-model project ships, set `hero` explicitly on it if there's an obvious representative part (assembly previews, the namesake variant) rather than relying on alphabetical sort to pick the right one by luck — the owner's standing direction after `scanning-rig`'s thumbnail picked the wrong STL: "It should be specified for all projects where there's an obvious candidate, rather than getting lucky with sorting" (#372). Deliberately absent for single-model projects and for projects whose parts are co-equal (`adjustable-bracket`, `vacuum-hose`) |
 | `assembly` | `object` `{stl, parts}` | Declares that one project STL's viewer card is a coloured multi-part composite rather than a single mesh — see "Composite Multi-Colour Assembly Previews" below; currently only `nz-ski-fields` uses this |
-| `viewer_rotate_x` | `boolean` | When `true`, the interactive viewers (`index.html`, `embed.html`, standalone) rotate the loaded mesh -90° about X before framing — a display-only Z-up -> Y-up correction for print-oriented models whose STL must stay OpenSCAD Z-up for correct slicing (so the usual source-level `rotate([-90, 0, 0])` isn't an option); used by `drawer-organiser` |
 
 Metadata is merged into `models.json` at build time. Only viewer-relevant
 fields are propagated (`description`, `tags`, `difficulty`, `version`,
-`hardware`, `hero`, `assembly`, `viewer_rotate_x`, `printing_notes`). `license`, `relatedModels`, and
+`hardware`, `hero`, `assembly`, `printing_notes`). `license`, `relatedModels`, and
 `mating_pairs` are intentionally excluded from the manifest.
 
 **Directory structure, not metadata, drives UI grouping.** When the two
@@ -402,31 +402,39 @@ Binary assets referenced via `surface()` or `import()` (e.g.
 
 ### Viewer Rotation
 
-OpenSCAD uses Z-up coordinates; the Three.js viewer expects Y-up. Files
-intended for the web viewer apply `rotate([-90, 0, 0])` at the top-level
-assembly.
+OpenSCAD uses Z-up coordinates; the Three.js viewers expect Y-up. There is a
+single, unconditional rule for reconciling them (issue #382):
 
-This is applied selectively: dedicated assembly/preview files
-(`gate_assembly.scad`, `Toothbrush assembly.scad`, `scanning-rig/scanning_rig_assembly.scad`), tube-shaped models that
-look awkward in Z-up orientation (`vacuum-hose/adapter.scad`,
-`vacuum-hose/reducer.scad`), and terrain/surface models (`nz-ski-fields/lake.scad`,
-`nz-ski-fields/terrain.scad`, `nz-ski-fields/snow.scad`)
-apply it. `nz-ski-fields/assembly.scad` is the one exception among
-assembly/preview files: it deliberately renders Z-up (no rotation) because
-it is thumbnail-only — its STL is never loaded by a viewer, so only the
-default OpenSCAD camera angle for the PNG matters (see "Composite
-Multi-Colour Assembly Previews" above). Individual power-workshop attachment
-files (`flathead_attachment.scad`, `drill_bit.scad`, etc.) do **not** apply
-it — they are oriented peg-down
-(Z-up), matching their natural print orientation. Symmetric or upright models
-(`hex-connector`, `sink-tray`, `macbook-pro-laptop-stand`, `esp32-display-case`,
-`ukulele-wall-hook`, `scanning-rig/turntable_base.scad`,
-`scanning-rig/turntable_platter.scad`) also omit it. `scanning-rig/phone_stand.scad`
-omits it for a distinct reason worth reusing: it's a single side profile
-`linear_extrude()`d along Z with the profile drawn "+Y up", so the exported
-STL is simultaneously print-oriented (flat face on the bed) and upright in
-the Y-up viewer with no rotation needed at all — a model built this way never
-needs the print/viewer orientations to be reconciled in the first place.
+- **Every `.scad` source stays in native OpenSCAD Z-up.** Never add a top-level
+  `rotate([-90, 0, 0])` for the viewer's benefit.
+- **Every viewer applies `geometry.rotateX(-Math.PI / 2)` to every mesh** it
+  loads — `index.html` (both the single-mesh and composite paths, plus
+  `replaceGeometry()` for customizer output), `embed.html`, and the standalone
+  viewers generated by `scripts/generate-standalone.py`. It happens before the
+  bounding-box maths, so camera framing and the cross-section slider operate on
+  the corrected axes.
+
+Keeping sources Z-up means the PNG thumbnails CI renders with OpenSCAD's
+default (Z-up) camera and the STLs users download for slicing are both correct,
+while the viewers still show every model upright. Previously the rotation lived
+in nine sources, which stood them up in the viewer at the cost of tipping their
+thumbnails and downloaded STLs onto their back — and left every other project
+upright in the gallery but tipped in the viewer.
+
+The rule is pinned by `scripts/test_scad_orientation.py` (no top-level
+`rotate([-90, 0, 0])` outside its allowlist) and `test_viewer_invariants.py`'s
+`ViewerRotationTests` (the viewers' rotation is present and unguarded).
+
+The **one** allowlisted top-level `rotate([-90, 0, 0])` in the tree is
+`toothbrush/Toothbrush backplate.scad`, and it is a genuine *print*
+orientation, not a viewer hack: `toothbrush_backplate()` stands upright in the
+shared library and that file lays it on its back, flat on the bed.
+
+`scanning-rig/phone_stand.scad` illustrates a pattern worth reusing: it's a
+single side profile `linear_extrude()`d along Z with the profile drawn "+Y up",
+so the exported STL is simultaneously print-oriented (flat face on the bed) and
+sensible in the viewer — a model built this way never needs the print and
+viewer orientations reconciled at all.
 
 ## Iterative Design Helpers
 
@@ -456,10 +464,10 @@ Available `--view` presets: `iso` (default), `top`, `bottom`, `front`, `back`, `
 Pass `--camera=tx,ty,tz,rx,ry,rz,dist` to use an arbitrary angle; this implies `--view custom`.
 Additional options: `--imgsize WxH`, `--projection ortho|perspective`, `--no-viewall`, `-D VAR=VALUE` (repeatable).
 
-For files that apply `rotate([-90, 0, 0])` at the top level for the web viewer (see "Viewer Rotation" above —
-`gate_assembly.scad`, `Toothbrush assembly.scad`, `vacuum-hose/adapter.scad`, `vacuum-hose/reducer.scad`,
-`nz-ski-fields/lake.scad`, `nz-ski-fields/terrain.scad`, `nz-ski-fields/snow.scad`),
-pass `--y-up` so the named view presets refer to the correct semantic axes.
+`--y-up` switches the named view presets to a Y-up semantic axis table. No
+source in this repo currently needs it — every `.scad` here is Z-up (see
+"Viewer Rotation" above) — but the flag is retained for ad-hoc rendering of
+externally-sourced Y-up models.
 
 This script is **not** used by CI and produces no build artifacts.
 

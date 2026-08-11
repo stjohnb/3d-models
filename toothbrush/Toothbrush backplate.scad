@@ -6,5 +6,7 @@
 
 include <_toothbrush_holder.scad>
 
+// Print orientation, NOT a viewer hack: toothbrush_backplate() stands upright
+// in the library; this lays it on its back, flat on the bed. Keep it.
 rotate([-90, 0, 0])
     toothbrush_backplate();

@@ -35,15 +35,16 @@ migration. New rules should use the tokens.
 
 - **Display face**: Space Grotesk (weights 500 and 700), loaded from Google
   Fonts with `display=swap` and a `preconnect` to `fonts.gstatic.com`. Applied
-  to `header h1`, `.landing-title`, and `.landing-card-title` — headings only.
+  to `header h1` and `.landing-card-title` — headings only.
 - **Body face**: the existing system stack
   (`-apple-system, BlinkMacSystemFont, "Segoe UI", …`). Body copy is read at
   small sizes across many devices and the system face renders better there than
   a webfont at 0.75rem; it also means no font blocks the model list.
 
-The size/weight contrast is the point: `.landing-title` is
-`clamp(1.6rem, 4vw, 2.4rem)` at weight 700 with `-0.02em` tracking, against a
-0.95rem `--text-dim` subtitle and 0.75rem card metadata.
+The size/weight contrast is the point: `header h1` and the card titles carry
+the display face and weight, against 0.75rem `--text-dim` card metadata.
+The landing gallery has no page heading or subtitle (removed in #381); cards
+are the only headings on the page.
 
 **Standalone viewers deliberately do not load the web font.** `site/standalone/`
 pages are single self-contained files meant to work offline and off-network

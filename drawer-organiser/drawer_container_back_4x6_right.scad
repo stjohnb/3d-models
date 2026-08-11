@@ -12,7 +12,7 @@
 // height to follow the drawer (see side_flare() in _drawer_organiser.scad).
 // The two unflared back-row containers are the separate renderable
 // drawer_container_back_4x6.
-// No rotate(): the project sets viewer_rotate_x in meta.json.
+// No rotate(): sources stay OpenSCAD Z-up; the viewer applies the Z-up -> Y-up conversion itself.
 
 include <_drawer_organiser.scad>
 

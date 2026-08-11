@@ -10,7 +10,7 @@
 //
 // Stands against the drawer's left wall, so its -X wall leans outward with
 // height to follow the drawer (see side_flare() in _drawer_organiser.scad).
-// No rotate(): the project sets viewer_rotate_x in meta.json.
+// No rotate(): sources stay OpenSCAD Z-up; the viewer applies the Z-up -> Y-up conversion itself.
 
 include <_drawer_organiser.scad>
 

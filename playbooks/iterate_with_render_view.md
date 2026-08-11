@@ -43,13 +43,13 @@ python3 scripts/render_view.py power-workshop/drill_socket.scad --camera=0,0,0,7
 
 ## Files with Y-up orientation
 
-Some assemblies apply `rotate([-90, 0, 0])` at the top level for the web viewer. Pass `--y-up` so preset names refer to the correct semantic axes:
+Every `.scad` in this repo is OpenSCAD Z-up (issue #382) — the web viewers apply the Z-up→Y-up conversion themselves — so the default preset table is always the right one here and you never need `--y-up` for a repo file.
+
+The flag is retained for ad-hoc rendering of an externally-sourced Y-up model, where it switches the preset names to the correct semantic axes:
 
 ```bash
-python3 scripts/render_view.py blast-gate/gate_assembly.scad --view top --y-up -o /tmp/top.png
+python3 scripts/render_view.py /tmp/some-downloaded-model.scad --view top --y-up -o /tmp/top.png
 ```
-
-Affected files: `blast-gate/gate_assembly.scad`, `toothbrush/Toothbrush assembly.scad`, `vacuum-hose/adapter.scad`, `vacuum-hose/reducer.scad`.
 
 ## What CI checks that render_view.py does not
 

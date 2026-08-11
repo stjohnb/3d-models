@@ -97,7 +97,6 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
             composite_parts_js="[]",
-            viewer_rotate_x_js="false",
             source_link_html="",
             printing_notes_html="",
         )
@@ -136,7 +135,6 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             stl_base64="ZmFrZQ==",
             filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
             composite_parts_js="[]",
-            viewer_rotate_x_js="false",
             source_link_html="",
             printing_notes_html="",
         )

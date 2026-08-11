@@ -531,7 +531,7 @@ The `parameters` field is present on a file entry when a validated
 presence tells the viewer to show the ⚙ Customize button for that model.
 Manifests in `.param-failures` are excluded — the customizer never loads an
 invalid parameter set. Metadata fields (`description`, `tags`, `difficulty`,
-`version`, `hardware`, `assembly`, `viewer_rotate_x`, `printing_notes`) are
+`version`, `hardware`, `assembly`, `printing_notes`) are
 merged from `meta.json` if the file exists and passed schema validation.
 The `updated` field is the ISO-8601 committer date of the last commit touching
 the project directory, from `scripts/project_dates.py`. It is CI-derived — not

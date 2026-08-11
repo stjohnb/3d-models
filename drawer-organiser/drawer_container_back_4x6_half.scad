@@ -16,7 +16,7 @@
 //
 // Seat the pieces on the assembled baseplate first — the pads and sockets are
 // the alignment jig — then glue the flat faces with CA.
-// No rotate(): the project sets viewer_rotate_x in meta.json.
+// No rotate(): sources stay OpenSCAD Z-up; the viewer applies the Z-up -> Y-up conversion itself.
 
 include <_drawer_organiser.scad>
 

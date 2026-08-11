@@ -201,7 +201,9 @@ existing `applyHash()` route loads the model; keyboard activation, middle-click
 and "copy link address" all work with no extra code. The header's **← All
 models** button (`#home-btn`, hidden while the gallery is showing) calls
 `showLanding()`, which empties every pane; an empty hash — including one
-arrived at by pressing Back — does the same.
+arrived at by pressing Back — does the same. Back now reaches that empty hash
+in the first place because every tree/pane route push, rather than replaces,
+a history entry (issue #383).
 
 `refreshLanding()` is the single toggle: `#landing`, `#panes`,
 `.stage-toolbar` and `#home-btn` are shown or hidden purely on whether any pane
@@ -303,10 +305,9 @@ enforces it:
   picker for composite pages.
 
 `nz-ski-fields/assembly.scad` still exists, but only as the **thumbnail
-source** — it renders Z-up (no `rotate([-90, 0, 0])`, unlike the printable
-parts) from a downsampled 128px heightmap so OpenSCAD's default camera looks
-down onto the coloured terrain for the PNG. Its STL output is no longer
-loaded by any viewer.
+source** — it renders at a downsampled 128px heightmap resolution so OpenSCAD's
+default camera looks down onto the coloured terrain for the PNG without the
+cost of the full mesh. Its STL output is no longer loaded by any viewer.
 
 ### 3D Controls
 
@@ -430,9 +431,26 @@ implementation directly. `parseHash` splits on `+` then `,` and only then
 separator forge extra panes, and `URLSearchParams` would turn `+` into a
 space).
 
-Hash updates use `replaceState` (not `pushState`) to avoid polluting browser
-history. The `hashchange` event handles back/forward navigation and ignores
-events whose hash matches the last value the viewer itself wrote.
+Route changes the user makes (`updateHash()`, called from tree clicks,
+add-to-scene, pane-remove chips, layout changes and "All models") use
+`pushState` so browser Back/Forward walks the browsing trail (issue #383).
+`hashWriteMode(nextHash, currentHash, replace)` — between the
+`// __HASH_WRITE_START__` / `// __HASH_WRITE_END__` marker comments, tested by
+`scripts/test_hash_history.mjs` — decides how each write is committed: `'skip'`
+when the computed hash already equals the current one (a no-op layout change
+adds no entry), `'replace'` only for the initial PR-preview autoload (so
+arriving at a preview link doesn't leave a phantom bare-gallery entry behind
+it), and `'push'` otherwise. Writes are suppressed entirely while a route is
+being applied (`applyingHash`), and `showLanding()` batches its per-pane
+clears through `clearAllPanes()` into a single entry rather than one per pane.
+
+The `hashchange` event alone drives Back/Forward — there is no `popstate`
+listener, since traversing between two same-document entries whose URLs
+differ only in fragment already fires `hashchange`, and adding `popstate` too
+would double-apply routes. The handler ignores events whose hash matches the
+last value the viewer itself wrote, and otherwise refreshes `lastWrittenHash`
+on every traversal (not just on the viewer's own writes) so a stale value
+can't make a later Forward step silently no-op.
 
 ### QR Codes
 

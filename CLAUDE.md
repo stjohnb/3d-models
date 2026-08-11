@@ -35,7 +35,7 @@ The runners are NixOS and provide only a baseline (nix, git, docker). Every tool
 - **Resolution**: `$fn = 64` in all `.scad` sources (set once per project, typically in the shared library file that renderable files include). Exception: `hex-connector` has no circular geometry, so it sets per-cylinder `$fn = 6` overrides on its hexagonal prisms instead of a global `$fn = 64`.
 - **Dimensions**: all dimensions declared as named variables at the top of each file, in mm.
 - **Beveled transitions**: use `hull()` between thin extrusions (`0.01` mm) at different Z positions with different cross-sections.
-- **Viewer rotation**: OpenSCAD is Z-up; Three.js expects Y-up. Assembly/preview files and tube-shaped models apply `rotate([-90, 0, 0])` at the top level. Symmetric/upright models and individual print-oriented files omit it.
+- **Viewer rotation**: all `.scad` sources stay in OpenSCAD's native Z-up. Never add a top-level `rotate([-90, 0, 0])` for the viewer's benefit — `index.html`, `embed.html` and standalone viewers apply the Z-up→Y-up conversion to every mesh unconditionally. Pinned by `scripts/test_scad_orientation.py`.
 
 ## Filename safety
 

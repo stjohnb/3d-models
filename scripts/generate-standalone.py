@@ -376,11 +376,6 @@ HTML_TEMPLATE = """\
     // entry is {{ stl_b64, color }}. When empty, the single STL_BASE64 loads.
     const COMPOSITE_PARTS = {composite_parts_js};
 
-    // meta.json's viewer_rotate_x: true for print-oriented models whose STL
-    // must stay OpenSCAD Z-up for slicing but need a Z-up -> Y-up correction
-    // for this Y-up viewer's camera/cross-section framing to read correctly.
-    const VIEWER_ROTATE_X = {viewer_rotate_x_js};
-
     const FILAMENT_COLORS = {filament_colors_js};
 
     const container = document.getElementById('viewer');
@@ -460,9 +455,7 @@ HTML_TEMPLATE = """\
       // Coloured multi-part composite: each already-co-registered part STL as
       // its own mesh/material in one Group (issue #275).
       const geometries = COMPOSITE_PARTS.map(p => b64ToGeometry(p.stl_b64));
-      if (VIEWER_ROTATE_X) {{
-        for (const g of geometries) g.rotateX(-Math.PI / 2);
-      }}
+      for (const g of geometries) g.rotateX(-Math.PI / 2);
       const union = new THREE.Box3();
       for (const g of geometries) {{
         g.computeBoundingBox();
@@ -498,7 +491,10 @@ HTML_TEMPLATE = """\
     }} else {{
       // Decode STL from base64
       const geometry = b64ToGeometry(STL_BASE64);
-      if (VIEWER_ROTATE_X) geometry.rotateX(-Math.PI / 2);
+      // OpenSCAD exports Z-up; Three.js is Y-up. Every STL gets this same
+      // conversion — sources stay in native OpenSCAD coordinates so
+      // thumbnails and print orientation stay correct.
+      geometry.rotateX(-Math.PI / 2);
       geometry.computeBoundingBox();
       const clipHalfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
       clipBounds = {{ minY: -clipHalfSizeY, maxY: clipHalfSizeY }};
@@ -813,7 +809,6 @@ def main():
         composite_js = build_composite_js(stl)
         project_dir = stl_to_dir.get(stl, "")
         meta = load_meta(project_dir)
-        viewer_rotate_x_js = "true" if meta.get("viewer_rotate_x") else "false"
         notes_html = _printing_notes_html(meta.get("printing_notes"))
 
         html = HTML_TEMPLATE.format(
@@ -824,7 +819,6 @@ def main():
             stl_base64=stl_b64,
             filament_colors_js=filament_colors_js,
             composite_parts_js=composite_js,
-            viewer_rotate_x_js=viewer_rotate_x_js,
             source_link_html=_source_link_html(stl_to_source.get(stl, "")),
             printing_notes_html=notes_html,
         )

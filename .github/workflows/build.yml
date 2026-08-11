@@ -503,6 +503,7 @@ jobs:
           node scripts/test_wasm_customizer.mjs
           node scripts/test_hash_routing.mjs
           node scripts/test_landing_order.mjs
+          node scripts/test_hash_history.mjs
 
       - name: Check mating part interference
         id: interference
@@ -790,7 +791,7 @@ jobs:
                       meta = {}
                   # Only propagate viewer-relevant fields to the manifest.
                   # license, relatedModels, and mating_pairs are intentionally excluded.
-                  for field in ('description', 'tags', 'difficulty', 'version', 'hardware', 'hero', 'assembly', 'viewer_rotate_x', 'printing_notes'):
+                  for field in ('description', 'tags', 'difficulty', 'version', 'hardware', 'hero', 'assembly', 'printing_notes'):
                       if field in meta:
                           entry[field] = meta[field]
               if openscad_version:

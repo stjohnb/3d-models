@@ -1,17 +1,23 @@
 // =====================================
 // Fully Rounded Drip Tray with Alignment Grooves
-// Tray: 100 x 50 x 10 mm, sits on holder base via alignment notches
+// Tray: 100 x 65 x 10 mm, sits on holder base via alignment notches; front edge overhangs the base by 15mm (issue #377)
 // =====================================
 
 include <_toothbrush_holder.scad>
 
 // ---- Tray Dimensions (mm) ----
 tray_length = 100;
-tray_width  = 50;
+tray_width  = 65;   // front-to-back; grown forward only (issue #377)
 tray_height = 10;
 
 wall_thickness   = 2;
 bottom_thickness = 2;
+
+// The tray grows forward only (issue #377): the base and its alignment pegs
+// are already printed, so the tray's local origin stays on the peg line at
+// world y = peg_y and only the shell is offset forward.
+tray_back_gap = 5;                                       // backplate plane to tray back edge
+tray_shift_y  = tray_back_gap + tray_width / 2 - peg_y;  // 7.5
 
 outer_corner_radius = 8;
 
@@ -31,7 +37,9 @@ spike_base_d  = 4;    // diameter where the spike meets the floor
 spike_tip_d   = 3;    // diameter at the tip
 spike_flare   = 1.5;  // beveled flare at the base for strength
 spike_spacing = 30;   // centre-to-centre X spacing
-spike_y       = 15;   // Y offset — forward of the alignment grooves at y = 0
+// Parked heads sit 5mm clear of the front inner wall; the extra depth also
+// puts them ~6.9mm clear of the handles hanging in the clips (issue #377).
+spike_y       = tray_shift_y + tray_width / 2 - wall_thickness - 13;   // 25
 
 // ---- Brush Support Spike Parameters (mm) ----
 // Two extra spikes directly under the toothbrush clips, so a parked brush
@@ -100,13 +108,14 @@ module head_spike() {
 module drip_tray() {
     union() {
         difference() {
-            // Tray shell
+            // Tray shell, offset forward from the peg line
+            translate([0, tray_shift_y, 0])
             difference() {
                 outer_shell();
                 inner_cavity();
             }
 
-            // Alignment grooves recessed into bottom, centered on tray
+            // Alignment grooves recessed into bottom, on the peg line
             for (xoff = [-groove_spacing_x, groove_spacing_x])
                 translate([xoff, 0, -outer_bottom_radius - 0.01])
                     cube([groove_length, groove_width, groove_depth], center = true);
