@@ -31,23 +31,39 @@ groove_width     = peg_width  + 2 * groove_clearance;
 groove_depth     = 4;          // deeper than peg for easy entry
 groove_spacing_x = grip_spacing / 2;
 
-// ---- Head Spike Parameters (mm) ----
-spike_height  = 20;   // total height above the tray floor, including the domed tip
-spike_base_d  = 4;    // diameter where the spike meets the floor
-spike_tip_d   = 3;    // diameter at the tip
-spike_flare   = 1.5;  // beveled flare at the base for strength
-spike_spacing = 30;   // centre-to-centre X spacing
-// Parked heads sit 5mm clear of the front inner wall; the extra depth also
-// puts them ~6.9mm clear of the handles hanging in the clips (issue #377).
-spike_y       = tray_shift_y + tray_width / 2 - wall_thickness - 13;   // 25
+// ---- Head Peg Parameters (mm) ----
+// Posts for parking detached brush heads (issue #371). Enlarged to an 8mm
+// shaft tapering to a flat, rounded tip, and moved to the tray's front
+// corners so a parked head can't clash with the brushes hanging in the
+// clips (issue #388).
+head_peg_d       = 8;     // shaft diameter
+head_peg_height  = 30;    // total height above the tray floor
+head_peg_taper   = 10;    // top section, tapering from head_peg_d to head_peg_tip_d
+head_peg_tip_d   = 6;     // flat tip diameter (3mm radius, PR #389 review)
+head_peg_flare   = 1.5;   // beveled flare where the shaft meets the floor
+head_peg_gap     = 1;     // clearance from the flared base to the cavity corner
+head_peg_outer_r = head_peg_d / 2 + head_peg_flare;   // 5.5 — flare radius
+head_r           = 11;    // external radius of a parked toothbrush head at its
+                           // base — larger than the peg itself, so it's the
+                           // controlling clearance to the tray wall (PR #389 review)
+
+// Front corners of the inner cavity, inset by head_r (the parked head's own
+// radius, not just the peg's flare) plus head_peg_gap so the head clears the
+// corner fillet and side walls.
+head_peg_x = tray_length / 2 - wall_thickness - head_r - head_peg_gap;  // 36
+head_peg_y = tray_shift_y + tray_width / 2
+             - wall_thickness - head_r - head_peg_gap;                  // 26
 
 // ---- Brush Support Spike Parameters (mm) ----
-// Two extra spikes directly under the toothbrush clips, so a parked brush
-// rests on a point instead of standing in water on the tray floor (issue #374).
+// Two spikes directly under the toothbrush clips, so a parked brush rests on a
+// point instead of standing in water on the tray floor (issue #374).
 // X matches the clip centres exactly — same value the alignment grooves use.
 // Y is pulled back from the clip bore axis (tray-local y = -3.5) just far
-// enough that the flared base clears the alignment groove footprint, keeping
-// the ~1.5mm of floor above a groove free of any post, as the head spikes do.
+// enough that the flared base clears the alignment groove footprint.
+spike_height  = 30;   // 10mm taller than the original 20mm (issue #388)
+spike_base_d  = 4;
+spike_tip_d   = 3;
+spike_flare   = 1.5;
 brush_spike_spacing = grip_spacing;   // 40 — clip centre-to-centre
 brush_spike_y       = -(groove_width / 2 + spike_base_d / 2 + spike_flare + 0.5);  // -6.2
 
@@ -89,10 +105,25 @@ module inner_cavity() {
 }
 
 
-// ---- Vertical spike for parking a detached brush head (issue #371) ----
-// Origin at the tray's inner floor plane; base is sunk 0.5mm into the floor so
-// the union is unambiguous rather than coplanar.
-module head_spike() {
+// ---- Corner peg for parking a detached brush head (issues #371, #388) ----
+// Origin at the tray's inner floor plane; base sunk 0.5mm into the floor so the
+// union is unambiguous rather than coplanar. Straight 8mm shaft for the lower
+// 20mm, then a cone tapering to a flat 3mm-radius tip over the top 10mm.
+module head_peg() {
+    hull() {
+        translate([0, 0, -0.5])
+            cylinder(d = head_peg_d + 2 * head_peg_flare, h = 0.01);
+        translate([0, 0, head_peg_flare])
+            cylinder(d = head_peg_d, h = 0.01);
+    }
+    cylinder(d = head_peg_d, h = head_peg_height - head_peg_taper);
+    translate([0, 0, head_peg_height - head_peg_taper])
+        cylinder(d1 = head_peg_d, d2 = head_peg_tip_d, h = head_peg_taper);
+}
+
+// ---- Support spike under each clip (issue #374) ----
+// Origin at the tray's inner floor plane; base sunk 0.5mm into the floor.
+module support_spike() {
     hull() {
         translate([0, 0, -0.5])
             cylinder(d = spike_base_d + 2 * spike_flare, h = 0.01);
@@ -121,15 +152,15 @@ module drip_tray() {
                     cube([groove_length, groove_width, groove_depth], center = true);
         }
 
-        // Brush-head parking spikes, rising from the inner floor
-        for (xoff = [-spike_spacing / 2, spike_spacing / 2])
-            translate([xoff, spike_y, bottom_thickness])
-                head_spike();
+        // Brush-head parking pegs, at the tray's front corners (issue #388)
+        for (xoff = [-head_peg_x, head_peg_x])
+            translate([xoff, head_peg_y, bottom_thickness])
+                head_peg();
 
         // Brush support spikes, directly under each toothbrush clip (issue #374)
         for (xoff = [-brush_spike_spacing / 2, brush_spike_spacing / 2])
             translate([xoff, brush_spike_y, bottom_thickness])
-                head_spike();
+                support_spike();
     }
 }
 

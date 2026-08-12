@@ -447,25 +447,33 @@ vertical backplate, dovetail-attached clips, and a removable drip tray.
 | `meta.json` | Project metadata (description, tags, difficulty) |
 | `dependency-graph.md` | Auto-generated `include`/`use` dependency graph |
 
-**Key parameters**: `Toothbrush tray.scad` carries four `head_spike()` posts
-(`spike_base_d` 4 mm → `spike_tip_d` 3 mm, `spike_height` 20 mm total including
-a domed tip, flared at the base). Two sit at `x = ±spike_spacing/2`,
-`y = spike_y` and park a detached brush head upright while it dries (issue
-#371). Two more sit at `x = ±brush_spike_spacing/2` (= `±grip_spacing/2`,
-exactly under the clip axes, the same X as the alignment grooves) and
-`y = brush_spike_y` (−6.2 mm), acting as standoffs so a parked toothbrush
-rests on a point rather than in standing water (issue #374). The clip bore
-axis is at tray-local `y = −3.5`; `brush_spike_y` is pulled 2.7 mm behind it
-so the flared base clears the groove footprint (`y ∈ [−2.2, 2.2]`) — no post
-ever stands on the ~1.5 mm of floor above a groove. The tray is 100 × 65 × 10
-mm and grows forward only (issue #377): the base and its alignment pegs are
-already printed, so `base_depth` (55 mm) and `peg_y` (30 mm) are unchanged and
-`tray_shift_y` (7.5 mm) offsets the shell from the tray's local origin, which
-stays on the peg line. The grooves, the brush support spikes and `Toothbrush
-assembly.scad`'s placement are therefore unaffected, and the extra depth puts
-a head parked on a front spike ~6.9 mm clear of the handles hanging in the
-clips — at the cost of the tray's front 15 mm overhanging the base's front
-edge.
+**Key parameters**: `Toothbrush tray.scad` carries two `head_peg()` posts and
+two `support_spike()` posts (module names changed in issue #388;
+`head_spike()` no longer exists). The head pegs are an 8 mm shaft
+(`head_peg_d`), 30 mm tall total (`head_peg_height`), tapering over the top
+10 mm (`head_peg_taper`) to a flat 6 mm-diameter tip (`head_peg_tip_d`, a
+3 mm radius per PR #389 review, not a sharp point), with a 1.5 mm flare at
+the base (`head_peg_flare`); they park a detached brush head upright while
+it dries (issue #371) and sit at tray-local `(±head_peg_x, head_peg_y)` = `(±36,
+26)`, the tray's front inner corners, inset by `head_r` (11 mm, the parked
+head's own base radius — the controlling clearance, larger than the peg's
+own flare radius) plus `head_peg_gap` (1 mm) so the parked head clears the
+corner fillet and side walls. They were moved there in issue #388 so a
+parked head can't clash with the brushes hanging in the clips. The two `support_spike()` posts keep the
+unchanged 4 mm → 3 mm domed profile but are now 30 mm tall (`spike_height`,
+10 mm taller, issue #388), still at `x = ±brush_spike_spacing/2` (=
+`±grip_spacing/2`, exactly under the clip axes, the same X as the alignment
+grooves) and `y = brush_spike_y` (−6.2 mm), acting as standoffs so a parked
+toothbrush rests on a point rather than in standing water (issue #374). The
+clip bore axis is at tray-local `y = −3.5`; `brush_spike_y` is pulled 2.7 mm
+behind it so the flared base clears the groove footprint (`y ∈ [−2.2, 2.2]`)
+— no post ever stands on the ~1.5 mm of floor above a groove. The tray is
+100 × 65 × 10 mm and grows forward only (issue #377): the base and its
+alignment pegs are already printed, so `base_depth` (55 mm) and `peg_y`
+(30 mm) are unchanged and `tray_shift_y` (7.5 mm) offsets the shell from the
+tray's local origin, which stays on the peg line. The grooves and `Toothbrush
+assembly.scad`'s placement are therefore unaffected, at the cost of the
+tray's front 15 mm overhanging the base's front edge.
 
 **Rejected: reworking the clips themselves to grip the brush.** Issue #371
 also asked for a fix to the clips sliding brushes to the ground, and PR #373
@@ -485,7 +493,7 @@ dovetail joint system used between the backplate and clips.
 ### ukulele-wall-hook/
 
 Single-piece wall-mounted yoke that cradles a ukulele neck behind the
-headstock. A rounded mounting plate (50×70×6mm, two counterbored screw holes
+headstock. A rounded mounting plate (50×70×8mm, two counterbored screw holes
 for #8/4-5mm wall screws) carries two capsule-section prongs that project
 forward and curl upward, forming an upward-opening cradle. Authored
 plate-upright (plate tall in +Z, prongs projecting in +Y) — an "upright"
@@ -494,16 +502,20 @@ model like `hex-connector`/`sink-tray`.
 | File | Role |
 |------|------|
 | `ukulele_hook.scad` | Renderable — single file, no library split, no inter-file dependencies (no `dependency-graph.md`, same as `sink-tray`/`hex-connector`) |
-| `ukulele_hook.parameters.json` | In-browser customizer manifest (`plate_w`, `plate_h`, `prong_len`, `screw_spacing`) |
-| `meta.json` | Project metadata (description, tags: household/organizer/wall-mount, difficulty: beginner, hardware BOM: 2 wall screws) |
+| `ukulele_hook.parameters.json` | In-browser customizer manifest (`plate_w`, `plate_h`, `prong_len`, `screw_spacing`, `root_r`) |
+| `meta.json` | Project metadata (description, tags: household/organizer/wall-mount, difficulty: beginner, hardware BOM: 2 wall screws, `printing_notes`) |
 
 **Key parameters**: `tip_gap` (56mm, center-to-center of prong tips) sets the
 neck-cradle clear width (`tip_gap - 2*prong_r` = 42mm). A ukulele neck narrows
 to ~36mm at the nut (confirmed via PR #294 review comment), so `tip_gap` is
-kept several mm above that so the neck drops in without binding. `prong_root_y`
-(prong root sphere's Y offset) must stay `>= prong_r` so the root capsule's
-back pole never punches through the Y=0 wall-facing face while still
-overlapping the plate for a manifold union.
+kept several mm above that so the neck drops in without binding. The prong
+root is flared (`root_r = 9.5` tapering to `prong_r = 7` over `flare_len = 20`
+mm along the prong axis) because a constant-radius capsule met the plate in a
+sharp corner and one arm snapped there (issue #390); `prong_root_y` is
+derived as `root_r + 0.5` so the root sphere's back pole never crosses the
+Y=0 wall face at any customizer value; `root_r` above 10 pushes the root past
+the plate outline at the default `plate_w = 50`; and screw holes are
+differenced from the whole part so a flare can never fill a counterbore.
 
 ### vacuum-hose/
 

@@ -3,6 +3,7 @@
     { "name": "plate_w", "label": "Plate width (mm)", "type": "number", "min": 40, "max": 80, "step": 1, "default": 50 },
     { "name": "plate_h", "label": "Plate height (mm)", "type": "number", "min": 55, "max": 110, "step": 1, "default": 70 },
     { "name": "prong_len", "label": "Prong length (mm)", "type": "number", "min": 40, "max": 80, "step": 1, "default": 55 },
-    { "name": "screw_spacing", "label": "Screw hole spacing (mm)", "type": "number", "min": 25, "max": 90, "step": 1, "default": 45 }
+    { "name": "screw_spacing", "label": "Screw hole spacing (mm)", "type": "number", "min": 25, "max": 90, "step": 1, "default": 45 },
+    { "name": "root_r", "label": "Prong root thickness (mm)", "type": "number", "min": 7, "max": 12, "step": 0.5, "default": 9.5 }
   ]
 }

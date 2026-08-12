@@ -10,7 +10,7 @@ $fn = 64;
 // ---- Parameters (mm) ----
 plate_w      = 50;   // plate width (X)
 plate_h      = 70;   // plate height (Z)
-plate_t      = 6;    // plate thickness (Y)
+plate_t      = 8;    // plate thickness (Y)
 corner_r     = 5;    // rounded plate-corner radius
 
 screw_r      = 2.6;  // wall-screw shaft clearance (~#8 / 5mm screw)
@@ -28,6 +28,12 @@ root_gap     = 30;   // center-to-center of prong roots (X)
 // several mm above that so the neck drops in without binding.
 tip_gap      = 56;   // center-to-center of prong tips (X)
 prong_root_z = plate_h * 0.4;  // Z of prong roots on the plate
+
+// Prong root flare — the arm/plate junction is the load-bearing section and
+// the failure point (issue #390). root_r > prong_r widens that section and
+// blends the sharp corner where the capsule met the flat plate face.
+root_r       = 9.5;  // prong radius where it meets the plate
+flare_len    = 20;   // distance along the prong axis over which root_r tapers to prong_r
 
 // ---- Derived ----
 screw_z_lo = plate_h/2 - screw_spacing/2;
@@ -55,35 +61,43 @@ module screw_hole(z) {
             cylinder(r = screw_head_r, h = screw_cbore + 0.1);
 }
 
-module capsule(p0, p1) {
+module capsule(p0, p1, r0 = prong_r, r1 = prong_r) {
     hull() {
-        translate(p0) sphere(r = prong_r);
-        translate(p1) sphere(r = prong_r);
+        translate(p0) sphere(r = r0);
+        translate(p1) sphere(r = r1);
     }
 }
 
-// Root sphere center's Y offset: must be >= prong_r so the sphere's back pole
-// never crosses Y=0 (the wall-facing mounting surface) — a smaller offset lets
-// the 7mm-radius sphere punch a bump through the back face. Still overlaps
-// rounded_plate (Y in [0, plate_t]) for a manifold union.
-prong_root_y = prong_r + 0.5;
+// Root sphere center's Y offset: must be >= root_r so the root sphere's back
+// pole never crosses Y=0 (the wall-facing mounting surface) — a smaller offset
+// lets it punch a bump through the back face. Still overlaps rounded_plate
+// (Y in [0, plate_t]) for a manifold union. Derived from root_r, not a literal,
+// so a customizer -Droot_r=... override cannot break the back face.
+prong_root_y = root_r + 0.5;
 
 module prong(sx) {
     // sx = +1 or -1 (which side). Root embedded in plate for a manifold union.
     root  = [sx * root_gap/2, prong_root_y,       prong_root_z];
     elbow = [sx * tip_gap/2,  plate_t + prong_len, prong_root_z + prong_rise];
     tip   = [sx * tip_gap/2,  plate_t + prong_len, prong_root_z + prong_rise + tip_up];
-    capsule(root, elbow);
+    axis  = elbow - root;
+    flare_end = root + axis / norm(axis) * flare_len;
+    capsule(root, flare_end, root_r, prong_r);  // flared root — see issue #390
+    capsule(flare_end, elbow);
     capsule(elbow, tip);
 }
 
 // ---- Assembly ----
-union() {
-    difference() {
+// Screw holes are differenced from the WHOLE part, not just the plate: at
+// customizer extremes (small plate_h with small screw_spacing, or a raised
+// root_r) a flared root can reach the upper/lower counterbore, and cutting
+// the plate first would let the prong union fill it back in.
+difference() {
+    union() {
         rounded_plate();
-        screw_hole(screw_z_lo);
-        screw_hole(screw_z_hi);
+        prong(1);
+        prong(-1);
     }
-    prong(1);
-    prong(-1);
+    screw_hole(screw_z_lo);
+    screw_hole(screw_z_hi);
 }

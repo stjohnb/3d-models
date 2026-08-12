@@ -30,6 +30,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_capped_openscad.py # Tests for capped-openscad.sh (mem/timeout cap behavior, exit code propagation)
 │   ├── generate-standalone.py  # Generates self-contained single-file HTML viewers
 │   ├── generate-gallery.py     # Generates README model gallery from models.json
+│   ├── test_generate_gallery.py  # Tests for generate-gallery's pick_thumbnail hero-selection logic (issue #372)
 │   ├── oembed_helpers.py       # Shared Python helpers (slugify, parse_scad_map, load_meta_failures, etc.)
 │   ├── test_oembed_helpers.py  # Tests for oembed_helpers
 │   ├── check_interference.py   # Geometric overlap detection for mating part pairs (meta.json mating_pairs)

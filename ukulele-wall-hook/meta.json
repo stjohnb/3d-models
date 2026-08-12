@@ -1,9 +1,17 @@
 {
   "description": "Wall-mounted hook that cradles a ukulele by its neck, behind the headstock.",
   "tags": ["household", "organizer", "wall-mount"],
-  "version": "1.0.0",
+  "version": "1.1.0",
   "difficulty": "beginner",
   "hardware": [
     { "item": "Wall screw (#8 or 4-5mm)", "quantity": 2, "notes": "Countersunk/pan head; length to suit wall type. Use wall anchors for drywall." }
+  ],
+  "printing_notes": [
+    "Orientation matters more than infill: lay the flat wall-facing back of the plate on the bed with the prongs pointing up. The exported STL stands the plate on its bottom edge, so re-orient it in the slicer (Bambu Studio's auto-orient picks this face).",
+    "Spend the print budget on walls, not infill. The bending load at the prong root is carried by the perimeters — set wall loops to 5-6 and top/bottom shells to 5, with 40% gyroid sparse infill. Jumping to 100% infill without raising the wall count costs a lot of time for much less strength.",
+    "In this orientation the prong roots are loaded across the layer lines, so tune for interlayer bonding: 0.15-0.16 mm layers, nozzle temperature near the top of the filament's range (about +10 C), and part-cooling fan reduced to roughly 30-50% on the walls.",
+    "PLA creeps under sustained load — an instrument left hanging for months will slowly bend the prongs. PETG, PLA+/Tough PLA, ASA or a PC blend are better choices for a permanent wall hook.",
+    "The upturned prong tips are horizontal cylinders in this orientation and their undersides may droop slightly. Supports (build-plate-only) give a cleaner tip; the droop is cosmetic and away from the load-bearing root.",
+    "Drive both wall screws and use anchors in drywall. A hook hanging on one screw can rotate and put the whole instrument's weight on a single prong."
   ]
 }
