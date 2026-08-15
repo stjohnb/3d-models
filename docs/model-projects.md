@@ -22,6 +22,58 @@ washers.
 | `bracket.md` | Design notes |
 | `sketch.jpg` | Reference sketch |
 
+### bench-dog-blank/
+
+Flush plug for the countersunk 18mm bench dog holes in an 18mm plywood
+workbench top (issue #393). A 45°-tapered head fills the top 2.5mm of the
+countersink (26.5mm surface diameter) and a straight shaft fills the 18mm
+bore below it.
+
+| File | Role |
+|------|------|
+| `bench_dog_blank.scad` | Renderable — single self-contained file, no library split, no inter-file dependencies (same pattern as `sink-tray/tray_foot.scad`) |
+| `bench_dog_blank.parameters.json` | In-browser customizer manifest (`hole_d`, `top_d`, `taper_depth`, `ply_thickness`, `clearance`) |
+| `meta.json` | Project metadata (description, tags: workshop/workbench, difficulty: beginner, `printing_notes`) |
+
+**Key parameters**: the head is modeled as two frustums plus a shaft, all
+diametrically shrunk by `clearance` (0.3mm) for an easy push fit:
+`top_d`→`head_base_d` (= `top_d - 2*taper_depth`) over `taper_depth`, then a
+constant-diameter `shaft_d` (= `hole_d - clearance`) down to a small `lead_in`
+insertion chamfer at the free end. Two `assert()`s guard customizer overrides:
+`head_base_d - clearance >= shaft_d` (the taper can't pinch narrower than the
+shaft) and a notch-reach check (below) against `shaft_d`.
+
+**Removal feature — pliers grip recess.** The blanks can't be pushed out from
+below (they sit flush in a countersink with nothing underneath to press
+against), so the model has nothing standing proud of the bench surface;
+instead two rectangular notches (`notch_w` 3.5mm × `notch_len` 7mm ×
+`notch_depth` 3.5mm) are sunk into the top face, flanking a central 3mm
+(`bar_w`) bar whose top stays flush with the bench. Needle-nose plier jaws
+drop into the two notches and close on the bar to pull the blank straight
+out — pliers must close on material, so a single notch alone gives them
+nothing to grip; the bar between two notches is the minimal pliers-grippable
+geometry (issue #393 maintainer feedback: "a small notch that a needle nose
+plyers can catch might be the easiest"). `notch_reach` (the farthest corner
+of a notch from center) is asserted `<= shaft_d/2 - 1.2` so the recess can
+never breach the shaft wall.
+
+**Print orientation and the `top_trim` fix.** The part is modeled top-face
+down (bar sits on the bed; each notch is a blind pocket whose roof is a
+trivial bridge), so it prints support-free as exported — `printing_notes`
+says so explicitly. The first printed batch sat slightly proud of the bench
+surface; PR #394 review fixed this by shaving `top_trim` (0.5mm) off the
+head frustum's bed-side face rather than changing `taper_depth` or `top_d` —
+`head_h` and `head_top_d` are derived from `top_trim` so the taper's slope is
+preserved and only its trimmed tip changes.
+
+**Measurement note (do not "fix"):** the four caliper measurements (⌀18 bore,
+⌀26.5 top, 45°, 2.5mm) describe a head that is a 45° frustum over only the
+top 2.5mm — ⌀26.5 at the surface down to ⌀21.5 at its base, then a step to
+the ⌀18-nominal shaft — not a full ⌀26.5→⌀18 cone (which would be 4.25mm
+deep). A full-depth cone could bind and sit proud in a shallower countersink;
+the shaft-plus-shallow-taper shape seats flush on any true 45° countersink at
+least 2.5mm deep.
+
 ### blast-gate/
 
 Inline sliding blast gate for 51mm OD PVC workshop vacuum lines. A sliding
