@@ -277,5 +277,65 @@ class ThumbnailRenderTests(unittest.TestCase):
         )
 
 
+class ProjectDisplayNameTests(unittest.TestCase):
+    """One dir→display-name implementation, consumed everywhere (issue #399)."""
+
+    def test_no_inline_python_copies(self):
+        self.assertNotIn(
+            ".replace('-', ' ').replace('_', ' ').title()",
+            code_lines(read(BUILD_YML)),
+            "build.yml must call scripts.oembed_helpers.project_display_name "
+            "instead of re-implementing the transform inline",
+        )
+
+    def test_manifest_step_uses_helper(self):
+        body = step_body(read(BUILD_YML), "Generate models manifest")
+        self.assertIn("project_name = project_display_name(project_dir)", body)
+
+    def test_changed_projects_step_uses_helper(self):
+        body = step_body(read(BUILD_YML), "Generate changed projects list (PR only)")
+        self.assertIn("from scripts.oembed_helpers import project_display_name", body)
+        self.assertIn("project_display_name(d)", body)
+
+    def test_pr_comment_reads_canonical_names(self):
+        body = step_body(read(BUILD_YML), "Comment on PR with thumbnails")
+        self.assertIn("site/models.json", body)
+        self.assertIn("dirToProject", body)
+        self.assertNotIn(
+            "toUpperCase",
+            body,
+            "the PR-comment step must read display names from models.json, "
+            "not re-derive them in JS",
+        )
+
+
+class QrSlugifyTests(unittest.TestCase):
+    """Issue #398: the QR step imports slugify(); it never re-derives it.
+
+    A Bash re-implementation is invisible to test_viewer_invariants.py's
+    slugify-parity check, so it can drift and emit stale deep links.
+    """
+
+    def test_qr_step_imports_canonical_slugify(self):
+        body = step_body(read(BUILD_YML), "Generate QR codes")
+        self.assertIn("from scripts.oembed_helpers import", body)
+        self.assertIn("slugify", body)
+
+    def test_qr_step_has_no_shell_slug_pipeline(self):
+        body = code_lines(step_body(read(BUILD_YML), "Generate QR codes"))
+        for token in ("[:upper:]", "[:lower:]", "sed 's/[_ ]"):
+            self.assertNotIn(
+                token, body,
+                f"QR step re-implements slugify in shell ({token!r}); "
+                "import it from scripts.oembed_helpers instead",
+            )
+
+    def test_no_shell_slug_pipeline_anywhere(self):
+        self.assertNotIn(
+            "tr '[:upper:]' '[:lower:]'", code_lines(read(BUILD_YML)),
+            "build.yml must not lowercase-slug in shell; use slugify()",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -9,7 +9,7 @@ import os
 import tempfile
 import unittest
 
-from oembed_helpers import slugify, display_name, thumbnail_name, parse_scad_map, public_source_url
+from oembed_helpers import slugify, display_name, thumbnail_name, parse_scad_map, public_source_url, project_display_name
 
 
 class TestSlugify(unittest.TestCase):
@@ -71,6 +71,27 @@ class TestDisplayName(unittest.TestCase):
 
     def test_no_extension(self):
         self.assertEqual(display_name('some-name'), 'some name')
+
+
+class TestProjectDisplayName(unittest.TestCase):
+    """Canonical directory → display-name transform (issue #399)."""
+
+    CASES = [
+        ("hex-connector", "Hex Connector"),
+        ("toothbrush_holder", "Toothbrush Holder"),
+        ("nz-ski-fields", "Nz Ski Fields"),
+        ("esp32-display-case", "Esp32 Display Case"),
+        ("2x4-jig", "2X4 Jig"),
+        ("d20-tray", "D20 Tray"),
+        ("ESP32-case", "Esp32 Case"),
+        ("mixed-CASE_dir name", "Mixed Case Dir Name"),
+        ("", ""),
+    ]
+
+    def test_cases(self):
+        for raw, expected in self.CASES:
+            with self.subTest(raw=raw):
+                self.assertEqual(project_display_name(raw), expected)
 
 
 class TestThumbnailName(unittest.TestCase):

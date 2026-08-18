@@ -65,7 +65,7 @@ ${{ github.workspace }}#default --command bash -euo pipefail {0}` (the
 job-level `defaults.run.shell`), which resolves the `default` devShell from
 this repo's `flake.nix`. That devShell — not the runner host — is what
 actually provides `openscad`, `admesh`, `python3`, `node`, `imagemagick`,
-`zip`/`unzip`, `qrencode`, and `aws`. There are no more `command -v`
+`zip`, `qrencode`, and `aws`. There are no more `command -v`
 preflight steps for any of these (the old "Check build dependencies", "Check
 ADMesh", and "Check AWS CLI" steps, and the Xvfb-preparation step, are gone
 entirely): if a tool is missing from `flake.nix`, `nix develop` still
@@ -439,8 +439,12 @@ failing the build.
 Generates a QR code PNG per model at `site/qr/<name>.png` using `qrencode`.
 Each QR encodes the model's deep link URL
 (`https://www.bstjohn.net/3d-models/#<project-slug>/<model-slug>`). The
-slugify logic replicates the JS `slugify()` in Bash. QR images use the site's
-dark theme colors (`--foreground=E0E0E0 --background=1A1A2E`), module size 8,
+slugs come from the canonical `slugify()` in `scripts/oembed_helpers.py` — the
+step shells into `python3` to emit a `name<TAB>url` table into `$RUNNER_TEMP`,
+then loops over it in Bash to call `qrencode`. There is no Bash
+re-implementation of `slugify()` (issue #398);
+`scripts/test_build_workflow.py::QrSlugifyTests` enforces this. QR images use
+the site's dark theme colors (`--foreground=E0E0E0 --background=1A1A2E`), module size 8,
 and margin 2. QR codes are stored in a separate `site/qr/` directory to avoid
 polluting the `site/*.png` glob used by the OG hero image step. Failures
 emit a warning but don't break the build (same pattern as thumbnails).
@@ -521,7 +525,8 @@ A Python script reads `site/.scad-map` and produces `site/models.json`:
 ```
 
 Project names are derived from directory names (hyphens/underscores → spaces,
-title-cased). The `zip` field is only present when a zip bundle was generated
+title-cased) by `project_display_name()` in `scripts/oembed_helpers.py`. The
+`zip` field is only present when a zip bundle was generated
 (projects with 2+ files). The `sourceZip` field is present for every project
 that has tracked source files; it references the per-project source zip
 produced by step 8.5. The `estimated_minutes` field is merged from
@@ -599,7 +604,9 @@ The slugify logic is imported from `scripts/oembed_helpers.py` and matches
 Diffs the PR commit to find changed `.scad` files, extracts their top-level
 directories, and writes `site/changed.json` — an array of project names.
 The viewer uses this to auto-expand sections for changed models and collapse
-unchanged ones.
+unchanged ones. Project names come from the same `project_display_name()`
+helper that keys `models.json`, and the PR-comment step reads its group
+headers back out of `models.json`, so the three never disagree.
 
 ### 17. Copy Static Assets and Inject Data
 
@@ -657,7 +664,13 @@ race condition doesn't fail the entire workflow.
 
 Posts or updates a bot comment on the PR with:
 - A link to the interactive preview deployment
-- PNG thumbnails of models changed in the PR, grouped by project
+- PNG thumbnails of models changed in the PR, grouped by project. Group
+  headers come from a `dir → project name` map built by reading
+  `site/models.json` (each entry's `dir` field), not from a JS
+  re-implementation of the directory→display-name transform — a prior JS
+  copy diverged from Python's `str.title()` on inputs like `2x4-jig` (issue
+  #399). If `models.json` is missing or unparseable, group headers fall back
+  to the raw directory name.
 - A mesh validation table (model name, triangle count, volume, pass/fail)
 - **File size and triangle count** for each changed model, displayed next to
   the model name (e.g., "45.2 KB · 3,456 triangles"). Triangle count is
@@ -865,10 +878,16 @@ run independently — if multiple fail, all errors are visible.
   `models.json` records the actual version used for each build, serving as
   diagnostic documentation when reported parts don't fit.
 - **Shared Python helpers**: `scripts/oembed_helpers.py` centralizes
-  `slugify()`, `display_name()`, `thumbnail_name()`, `parse_scad_map()`, and
-  `load_meta_failures()` used by multiple CI steps (structured data, OEmbed,
-  link tag injection, interference check). This prevents slug logic drift and
-  ensures `.meta-failures` loading is consistent across all consumers.
+  `slugify()`, `display_name()`, `project_display_name()`, `thumbnail_name()`,
+  `parse_scad_map()`, and `load_meta_failures()` used by multiple CI steps
+  (structured data, OEmbed, link tag injection, interference check, QR
+  generation, models manifest, changed-projects list). This prevents slug and
+  display-name logic drift and ensures `.meta-failures` loading is consistent
+  across all consumers. `display_name()` converts an STL filename to a human
+  name; `project_display_name()` converts a project *directory* name to its
+  canonical display name (hyphens/underscores → spaces, title-cased) — the
+  two are distinct transforms with distinct call sites, not duplicates of
+  each other.
 - **Three.js version consistency across viewers**: `generate-standalone.py`'s
   `_check_threejs_version()` validates both `index.html` and `embed.html`
   against `THREEJS_VERSION`. Both files hardcode CDN URLs independently, so a

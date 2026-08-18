@@ -42,6 +42,17 @@ def display_name(filename):
     return re.sub(r'\.stl$', '', filename, flags=re.I).replace('-', ' ').replace('_', ' ')
 
 
+def project_display_name(project_dir):
+    """Convert a project directory name to its canonical display name.
+
+    Hyphens/underscores become spaces, then Python title-casing. This name is
+    the models.json group key and the changed.json project name (issue #399);
+    build.yml's PR-comment step reads it back out of models.json rather than
+    re-deriving it, so this is the only implementation.
+    """
+    return project_dir.replace('-', ' ').replace('_', ' ').title()
+
+
 def thumbnail_name(stl):
     """Derive PNG thumbnail filename from an STL filename (case-insensitive)."""
     return re.sub(r'\.stl$', '.png', stl, flags=re.I)
@@ -65,6 +76,6 @@ def parse_scad_map(path):
                 continue
             if stl in scad_map:
                 print(f'WARNING: {path}:{lineno}: duplicate key {stl!r}, overwriting', file=sys.stderr)
-            project_name = project_dir.replace('-', ' ').replace('_', ' ').title()
+            project_name = project_display_name(project_dir)
             scad_map[stl] = {'project': project_name, 'dir': project_dir, 'source': source}
     return scad_map

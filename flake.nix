@@ -83,8 +83,7 @@
               python3 # venvs + every inline python3 step
               nodejs_22 # WASM customizer smoke tests (scripts/*.mjs)
               imagemagick # montage/convert/identify for og-hero.png
-              zip
-              unzip
+              zip # per-project STL + source bundles (build.yml)
               qrencode
               awscli2 # S3 deploy + PR previews
             ]);

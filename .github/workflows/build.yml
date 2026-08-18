@@ -17,7 +17,7 @@ concurrency:
 
 # The org's CI runs on self-hosted NixOS runners, and every tool this
 # workflow shells out to — openscad (EGL-headless wrapper), admesh, python3,
-# node, imagemagick, zip/unzip, qrencode, aws — comes from this repo's own
+# node, imagemagick, zip, qrencode, aws — comes from this repo's own
 # flake.nix via `nix develop`, isolated in the nix store from whatever other
 # repos put on the same runners. Do NOT add actions/setup-node,
 # actions/setup-python, sudo/apt-get, or ask for packages on the runner
@@ -629,20 +629,30 @@ jobs:
       - name: Generate QR codes
         run: |
           mkdir -p site/qr
-          BASE_URL="https://www.bstjohn.net/3d-models"
-          while IFS="$(printf '\t')" read -r stl dir src; do
-            name="${stl%.stl}"
-            # Replicate JS slugify: project slug from dir (underscores/spaces→hyphens, lowercase)
-            project_slug="$(echo "$dir" | sed 's/[_ ]\{1,\}/-/g' | tr '[:upper:]' '[:lower:]')"
-            # Model slug: strip .stl, collapse underscores/spaces→single hyphen, lowercase
-            model_slug="$(echo "$name" | sed 's/[_ ]\{1,\}/-/g' | tr '[:upper:]' '[:lower:]')"
-            url="${BASE_URL}/#${project_slug}/${model_slug}"
+          # Slugs come from the canonical slugify() in scripts/oembed_helpers.py
+          # (the same one index.html, embed.html and generate-gallery.py use).
+          # There is deliberately no Bash re-derivation here: a shell copy has
+          # no parity test and would silently drift (issue #398).
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import slugify, parse_scad_map, BASE_URL
+
+          scad_map = parse_scad_map('site/.scad-map')
+          with open(sys.argv[1], 'w') as out:
+              for stl, info in sorted(scad_map.items()):
+                  name = stl[:-4] if stl.endswith('.stl') else stl
+                  url = BASE_URL + '/#' + slugify(info['dir']) + '/' + slugify(stl)
+                  out.write(name + '\t' + url + '\n')
+          " "$RUNNER_TEMP/qr-urls.tsv"
+
+          while IFS="$(printf '\t')" read -r name url; do
             echo "QR: $url -> site/qr/${name}.png"
             qrencode -o "site/qr/${name}.png" -s 8 -m 2 \
               --foreground=E0E0E0 --background=1A1A2E \
               "$url" \
               || echo "::warning::Failed to generate QR for $name"
-          done < site/.scad-map
+          done < "$RUNNER_TEMP/qr-urls.tsv"
 
       - name: Generate OG hero image
         run: |
@@ -706,7 +716,7 @@ jobs:
           python3 -c "
           import json, os, sys
           sys.path.insert(0, '.')
-          from scripts.oembed_helpers import load_meta_failures
+          from scripts.oembed_helpers import load_meta_failures, project_display_name
           from scripts.project_dates import project_updated
 
           # Load OpenSCAD version used for this render
@@ -744,8 +754,7 @@ jobs:
                   if not line:
                       continue
                   stl, project_dir, source = line.split('\t', 2)
-                  # Title-case: replace hyphens/underscores with spaces
-                  project_name = project_dir.replace('-', ' ').replace('_', ' ').title()
+                  project_name = project_display_name(project_dir)
                   groups.setdefault(project_name, {'dir': project_dir, 'files': []})
                   file_entry = {'stl': stl, 'source': source}
                   qr_path = f\"site/qr/{stl.replace('.stl', '.png')}\"
@@ -963,8 +972,10 @@ jobs:
             sed 's|/.*||' | sort -u | \
             python3 -c "
           import json, sys
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import project_display_name
           dirs = [d.strip() for d in sys.stdin if d.strip()]
-          projects = [d.replace('-', ' ').replace('_', ' ').title() for d in dirs]
+          projects = [project_display_name(d) for d in dirs]
           with open('site/changed.json', 'w') as f:
               json.dump(projects, f)
           print('Changed projects:', projects)
@@ -1110,14 +1121,29 @@ jobs:
               pull_number: prNumber,
             }));
 
+            // Canonical project display names come from models.json, whose keys
+            // the "Generate models manifest" step derives with
+            // scripts/oembed_helpers.py::project_display_name(). Read them here
+            // instead of re-deriving in JS — a JS re-implementation silently
+            // diverged from Python str.title() on inputs like '2x4-jig' and
+            // 'ESP32-case' (issue #399).
+            const dirToProject = new Map();
+            try {
+              const models = JSON.parse(fs.readFileSync('site/models.json', 'utf8'));
+              for (const [project, entry] of Object.entries(models)) {
+                if (entry && entry.dir) dirToProject.set(entry.dir, project);
+              }
+            } catch (e) {
+              console.log('No models.json found; falling back to raw directory names');
+            }
+
             // Build a map of changed SCAD files: png-name → project-name
             const changedModels = new Map();
             for (const f of files) {
               if (!f.filename.endsWith('.scad')) continue;
               const png = path.basename(f.filename, '.scad') + '.png';
               const dir = f.filename.split('/')[0];
-              const project = dir.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-              changedModels.set(png, project);
+              changedModels.set(png, dirToProject.get(dir) || dir);
             }
 
             // Read validation results

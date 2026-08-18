@@ -26,7 +26,7 @@ Never use `ubuntu-latest`, `ubuntu-22.04`, `windows-latest`, `windows-2022`, or 
 
 ## CI dependencies come from flake.nix
 
-The runners are NixOS and provide only a baseline (nix, git, docker). Every tool a workflow shells out to — openscad, admesh, python3, node, imagemagick, zip/unzip, qrencode, aws, gh — comes from this repo's `flake.nix` devShells, entered via the job-level `defaults.run.shell: nix ... develop ...` (see `.github/workflows/build.yml`). If CI needs a new tool, add it to the matching devShell; never `sudo apt-get install` (no apt or sudo on the runners), never `actions/setup-node`/`actions/setup-python` (their prebuilt toolchains don't work on NixOS), never ask for the tool on the runner host. The flake's `openscad` is a headless EGL/llvmpipe wrapper — no Xvfb anywhere. Bumping `flake.lock` can bump OpenSCAD, which invalidates the render cache and forces a slow full re-render; update `.openscad-version` when it does. `scripts/test_build_workflow.py` enforces these invariants.
+The runners are NixOS and provide only a baseline (nix, git, docker). Every tool a workflow shells out to — openscad, admesh, python3, node, imagemagick, zip, qrencode, aws, gh — comes from this repo's `flake.nix` devShells, entered via the job-level `defaults.run.shell: nix ... develop ...` (see `.github/workflows/build.yml`). If CI needs a new tool, add it to the matching devShell; never `sudo apt-get install` (no apt or sudo on the runners), never `actions/setup-node`/`actions/setup-python` (their prebuilt toolchains don't work on NixOS), never ask for the tool on the runner host. The flake's `openscad` is a headless EGL/llvmpipe wrapper — no Xvfb anywhere. Bumping `flake.lock` can bump OpenSCAD, which invalidates the render cache and forces a slow full re-render; update `.openscad-version` when it does. `scripts/test_build_workflow.py` enforces these invariants.
 
 ## OpenSCAD conventions
 
@@ -61,6 +61,8 @@ The `slugify()` function — strip `.stl`, replace `[_\s]+` with `-`, lowercase 
 - `scripts/generate-gallery.py`
 
 If you change one, change all four in the same PR.
+
+`.github/workflows/build.yml`'s "Generate QR codes" step consumes `slugify()` by importing it from `scripts/oembed_helpers.py`. Never re-derive slugs with `sed`/`tr` in a workflow step — a shell copy is invisible to the parity tests. Pinned by `scripts/test_build_workflow.py::QrSlugifyTests`.
 
 ## Public source links
 
