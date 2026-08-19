@@ -7,90 +7,18 @@ No external dependencies — works from file:// or any static host.
 """
 
 import base64
-import hashlib
 import html as html_mod
 import json
 import os
 import re
 import sys
-import urllib.request
 
 from oembed_helpers import display_name, load_meta_failures, public_source_url
-
-# Three.js version — must match index.html importmap
-THREEJS_VERSION = "0.170.0"
-
-THREEJS_ASSETS = {
-    "three": {
-        "url": f"https://cdn.jsdelivr.net/npm/three@{THREEJS_VERSION}/build/three.module.min.js",
-        "sha256": "08fd7545d13d2c7fb65ab691530a802dafefd638596501854f267d0fb13c39e7",
-    },
-    "STLLoader": {
-        "url": f"https://cdn.jsdelivr.net/npm/three@{THREEJS_VERSION}/examples/jsm/loaders/STLLoader.js",
-        "sha256": "a0a83c88b269c94e25b690fae770d350c4728c81853195186976be7af0f8a3b3",
-    },
-    "OrbitControls": {
-        "url": f"https://cdn.jsdelivr.net/npm/three@{THREEJS_VERSION}/examples/jsm/controls/OrbitControls.js",
-        "sha256": "80efaadea4f8a636a65fb0bd08bfef62f3d93a0bb94e2e7500f23176c5c07f4e",
-    },
-}
+from threejs_assets import THREEJS_ASSETS, THREEJS_VERSION, fetch_url
 
 FILAMENT_COLORS_JSON = "filament-colors.json"
 SCAD_MAP = "site/.scad-map"
 OUTPUT_DIR = "site/standalone"
-CACHE_DIR = ".cache/threejs"
-
-
-def _cache_path(url: str) -> str:
-    """Return a deterministic local cache path for a URL."""
-    url_hash = hashlib.sha256(url.encode()).hexdigest()[:16]
-    basename = url.rsplit("/", 1)[-1]
-    return os.path.join(CACHE_DIR, f"{url_hash}_{basename}")
-
-
-def fetch_url(url: str, expected_sha256: str | None = None) -> bytes:
-    """Download a URL with a single retry, SHA-256 verification, and local cache fallback."""
-    cache_file = _cache_path(url)
-
-    for attempt in range(2):
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                data = resp.read()
-        except Exception as e:
-            if attempt == 0:
-                print(f"  Retry {url}: {e}")
-                continue
-            # Both attempts failed — try cache fallback
-            if os.path.isfile(cache_file):
-                print(f"  CDN unreachable, using cached copy: {cache_file}")
-                with open(cache_file, "rb") as f:
-                    data = f.read()
-                # Still verify the cached data
-                if expected_sha256:
-                    actual = hashlib.sha256(data).hexdigest()
-                    if actual != expected_sha256:
-                        raise ValueError(
-                            f"Cached file SHA-256 mismatch for {url}\n"
-                            f"  expected: {expected_sha256}\n"
-                            f"  got:      {actual}"
-                        )
-                return data
-            raise
-        if expected_sha256:
-            actual = hashlib.sha256(data).hexdigest()
-            if actual != expected_sha256:
-                raise ValueError(
-                    f"SHA-256 mismatch for {url}\n"
-                    f"  expected: {expected_sha256}\n"
-                    f"  got:      {actual}"
-                )
-        # Cache the verified data for future runs
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        with open(cache_file, "wb") as f:
-            f.write(data)
-        return data
-    raise RuntimeError(f"Failed to fetch {url}")
 
 
 def b64_data_uri(data: bytes, mime: str) -> str:
@@ -679,24 +607,33 @@ HTML_TEMPLATE = """\
 
 
 def _check_threejs_version():
-    """Verify THREEJS_VERSION matches the version in index.html's and embed.html's importmaps."""
+    """Verify THREEJS_VERSION matches the vendored version in both viewers' importmaps.
+
+    The viewers must resolve Three.js from the same-origin ./vendor/three/<version>/
+    tree staged by fetch_threejs.py — a missing vendor path means someone has
+    reverted to a CDN URL, which is a hard failure (issue #403).
+    """
     for html_file in ("index.html", "embed.html"):
         if not os.path.isfile(html_file):
             continue  # Skip check if file not available (e.g. running standalone)
         with open(html_file) as f:
             content = f.read()
-        versions = re.findall(r"cdn\.jsdelivr\.net/npm/three@([\d.]+)/", content)
+        versions = re.findall(r"vendor/three/([\d\.]+)/", content)
         if not versions:
-            print(f"Warning: could not extract Three.js version from {html_file}")
-            continue
+            print(
+                f"Error: {html_file} import map does not reference "
+                "./vendor/three/<version>/ — the viewer must load Three.js "
+                "same-origin (issue #403), not from a CDN."
+            )
+            sys.exit(1)
         file_version = versions[0]
         if file_version != THREEJS_VERSION:
-            width = max(len("generate-standalone.py"), len(html_file))
+            width = max(len("threejs_assets.py"), len(html_file))
             print(
                 f"Error: Three.js version mismatch\n"
-                f"  {'generate-standalone.py':<{width}}: {THREEJS_VERSION}\n"
+                f"  {'threejs_assets.py':<{width}}: {THREEJS_VERSION}\n"
                 f"  {html_file:<{width}}: {file_version}\n"
-                f"Update THREEJS_VERSION in this script to match {html_file}."
+                f"Update THREEJS_VERSION in scripts/threejs_assets.py to match {html_file}."
             )
             sys.exit(1)
         print(f"Three.js version {THREEJS_VERSION} matches {html_file}")

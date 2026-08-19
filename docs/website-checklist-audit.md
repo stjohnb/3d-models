@@ -66,7 +66,7 @@ Audit of [specification.website/checklist](https://specification.website/checkli
 | X-Frame-Options | 🏗️ Infra-scope | Response header |
 | Referrer-Policy | 🏗️ Infra-scope | Response header |
 | Permissions-Policy | 🏗️ Infra-scope | Response header |
-| SRI for Three.js CDN | ⚠️ | Three.js loaded via import map in index.html without SRI — import-map SRI support is limited across browsers. Standalone viewers inline Three.js as base64 (no CDN dependency at runtime). Known gap; tracked for future work. |
+| SRI for Three.js CDN | ⚠️ → ✅ | Resolved by #403: Three.js is no longer loaded from a CDN. `scripts/fetch_threejs.py` stages it same-origin under `site/vendor/three/<version>/` with SHA-256 verification before deploy, and `index.html`/`embed.html` import maps point at the relative vendor path. Standalone viewers still inline the same verified bytes as base64. |
 | No innerHTML for user data | ✅ | All dynamic DOM uses createElement/textContent/setAttribute; innerHTML only for static SVG icons and gesture hint overlays |
 | DNS CAA / DNSSEC | 🏗️ Infra-scope | DNS configuration |
 
@@ -106,7 +106,7 @@ Audit of [specification.website/checklist](https://specification.website/checkli
 | Privacy policy | N/A | Plausible is cookieless and stores no personal data — no consent banner or policy required |
 | Cookie consent | N/A | Plausible is cookieless and does not use local storage |
 | GPC (Global Privacy Control) | N/A | No cookies or tracking |
-| Third-party scripts | ✅ | Three.js from CDN plus self-hosted Plausible at `plausible.bstjohn.net` (no ads, no cross-site tracking) |
+| Third-party scripts | ✅ | Three.js served same-origin from `./vendor/three/<version>/` (staged and SHA-256-verified at build time by `scripts/fetch_threejs.py`, #403) plus self-hosted Plausible at `plausible.bstjohn.net` (no ads, no cross-site tracking, no remaining third-party runtime dependency) |
 
 ## Resilience
 

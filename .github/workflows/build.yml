@@ -229,7 +229,7 @@ jobs:
       - name: Run Python unit tests for build scripts
         run: |
           cd scripts
-          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow -v
+          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow -v
 
       # The flake's `openscad` is a wrapper around openscad-unstable that
       # forces the EGL/llvmpipe software-GL path (QT_QPA_PLATFORM=offscreen,
@@ -421,6 +421,9 @@ jobs:
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f'failed={str(has_failure).lower()}\n')
           "
+
+      - name: Vendor Three.js runtime
+        run: python3 scripts/fetch_threejs.py
 
       - name: Bundle openscad-wasm and sources for in-browser customizer
         run: |

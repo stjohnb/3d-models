@@ -553,7 +553,7 @@ model like `hex-connector`/`sink-tray`.
 
 | File | Role |
 |------|------|
-| `ukulele_hook.scad` | Renderable — single file, no library split, no inter-file dependencies (no `dependency-graph.md`, same as `sink-tray`/`hex-connector`) |
+| `ukulele_hook.scad` | Renderable — single file, no library split, no inter-file dependencies (no `dependency-graph.md`, same as `sink-tray`) |
 | `ukulele_hook.parameters.json` | In-browser customizer manifest (`plate_w`, `plate_h`, `prong_len`, `screw_spacing`, `root_r`) |
 | `meta.json` | Project metadata (description, tags: household/organizer/wall-mount, difficulty: beginner, hardware BOM: 2 wall screws, `printing_notes`) |
 

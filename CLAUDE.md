@@ -51,6 +51,16 @@ For standalone HTML viewers, `scripts/generate-standalone.py` embeds filament co
 
 Both layers are required. Do not regress either. Covered by `scripts/test_generate_standalone.py`.
 
+## Third-party runtime JS
+
+The deployed viewers must load Three.js from `./vendor/three/<version>/` —
+staged same-origin and SHA-256-verified by `scripts/fetch_threejs.py` (issue
+#403). Never reintroduce a CDN URL into the import maps in `index.html` or
+`embed.html`; `_check_threejs_version()` hard-fails the build if either import
+map stops referencing the vendor path. The pinned version and the three asset
+hashes live in exactly one place — `scripts/threejs_assets.py` — and
+`scripts/generate-standalone.py` inlines the same verified bytes.
+
 ## Slugify invariant
 
 The `slugify()` function — strip `.stl`, replace `[_\s]+` with `-`, lowercase — must remain identical across all four locations:

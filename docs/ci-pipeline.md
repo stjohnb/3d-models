@@ -279,6 +279,22 @@ pass/fail). If any model fails validation, the main-branch deploy is skipped
 and the job exits with failure after the PR comment is posted — ensuring
 reviewers see the full report.
 
+### 6.2. Vendor Three.js Runtime
+
+Runs `scripts/fetch_threejs.py`, which downloads the three Three.js assets
+declared in `scripts/threejs_assets.py` (`three.module.min.js`, `STLLoader.js`,
+`OrbitControls.js`), verifies each against its pinned SHA-256, and writes them
+to `site/vendor/three/<version>/` alongside a `VERSION` file. The import maps
+in `index.html` and `embed.html` resolve `three` and `three/addons/` to this
+same-origin tree, so no visitor ever executes unverified third-party script on
+`www.bstjohn.net` (issue #403). A hash mismatch or an unreachable CDN with a
+cold `.cache/threejs/` fails the step immediately — this is deliberately *not*
+part of the deferred-enforcement pattern.
+
+The version directory in the path means `aws s3 sync --delete` prunes the old
+tree on the next main deploy, and a returning visitor's cached
+`three.module.min.js` can never be paired with addons from a different release.
+
 ### 6.3. Bundle openscad-wasm and Sources for In-Browser Customizer
 
 Stages all assets the in-browser WASM customizer needs to function:
@@ -358,13 +374,16 @@ actually physically overlap — impossible to assemble in the real world.
 Runs `scripts/generate-standalone.py`, which produces one self-contained
 HTML file per model at `site/standalone/<name>.html`. The script:
 
-- Downloads Three.js 0.170.0 assets from jsDelivr CDN (once for all models)
+- Downloads the Three.js 0.170.0 assets declared in `scripts/threejs_assets.py`
+  (once for all models) — the same URLs and pinned hashes the "Vendor Three.js
+  runtime" step uses, so a build fetches each file at most once
 - Verifies SHA-256 hashes of downloaded assets; caches verified copies in
   `.cache/threejs/` with a local cache fallback if the CDN is unreachable
-- Cross-checks the Three.js version against both `index.html` and `embed.html`
-  import maps via `_check_threejs_version()` — exits with error if either file
-  uses a different version than `THREEJS_VERSION` (prevents silent version drift
-  between the two viewers)
+- Cross-checks the vendored Three.js version parsed from both `index.html` and
+  `embed.html` import maps via `_check_threejs_version()` — exits with error if
+  either file uses a different version than `THREEJS_VERSION`, or references no
+  `./vendor/three/<version>/` path at all (prevents silent version drift and
+  reversion to a CDN URL)
 - Base64-encodes both JS libraries and STL data into the HTML via import map
   data URIs, producing files that work from `file://` with zero dependencies
 
@@ -837,10 +856,14 @@ run independently — if multiple fail, all errors are visible.
   OEmbed, consuming platforms should be configured with explicit endpoint
   URLs. A dedicated `embed.html` provides a minimal iframe-friendly viewer
   without the full gallery UI.
-- **Standalone viewer SHA-256 verification**: Three.js assets downloaded for
-  standalone HTML generation are verified against pinned SHA-256 hashes to
-  prevent supply-chain attacks from the CDN. A local cache (`.cache/threejs/`)
-  avoids re-downloading on subsequent runs, with the cached copy also verified.
+- **Three.js SHA-256 verification**: every Three.js asset — both the copies
+  staged same-origin under `site/vendor/three/<version>/` for `index.html` /
+  `embed.html` and the copies inlined into standalone HTML — is verified
+  against the SHA-256 hashes pinned in `scripts/threejs_assets.py` to prevent
+  supply-chain attacks from the CDN. A local cache (`.cache/threejs/`) avoids
+  re-downloading on subsequent runs, with the cached copy also verified. A
+  mismatch is a hard failure, deliberately outside the deferred-enforcement
+  pattern — a tampered runtime must never reach S3 (issue #403).
 - **QR codes in separate directory**: QR PNGs are stored in `site/qr/` rather
   than alongside model thumbnails in `site/` to avoid being picked up by the
   OG hero image `montage` glob (`site/*.png`).
@@ -889,9 +912,11 @@ run independently — if multiple fail, all errors are visible.
   two are distinct transforms with distinct call sites, not duplicates of
   each other.
 - **Three.js version consistency across viewers**: `generate-standalone.py`'s
-  `_check_threejs_version()` validates both `index.html` and `embed.html`
-  against `THREEJS_VERSION`. Both files hardcode CDN URLs independently, so a
-  version bump in one without the other would silently run mismatched versions.
+  `_check_threejs_version()` parses `vendor/three/<version>/` out of both
+  `index.html` and `embed.html` import maps and validates each against
+  `THREEJS_VERSION`. Both files hardcode the vendored path independently, so a
+  version bump in one without the other would silently run mismatched versions;
+  an import map with no vendor path at all hard-fails the build.
 - **Mating part interference checking**: `check_interference.py` uses
   `trimesh` and `manifold3d` to perform boolean intersection on STL pairs
   declared in `meta.json`'s `mating_pairs` field. This catches design errors

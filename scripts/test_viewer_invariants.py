@@ -12,9 +12,12 @@ can check statically:
 Run with: python3 -m unittest test_viewer_invariants
 """
 
+import json
 import pathlib
 import re
 import unittest
+
+from threejs_assets import IMPORTMAP_PREFIX, THREEJS_ASSETS
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 INDEX_HTML = REPO_ROOT / "index.html"
@@ -151,6 +154,48 @@ class CopiedInvariantTests(unittest.TestCase):
                 read(path),
                 f"{path.name} must declare PUBLIC_REPO identically",
             )
+
+
+class ThreeJsVendorTests(unittest.TestCase):
+    """Three.js must load same-origin from the staged vendor tree (issue #403)."""
+
+    IMPORTMAP_RE = re.compile(
+        r'<script type="importmap">(.*?)</script>', re.DOTALL
+    )
+
+    def test_no_cdn_script_sources(self):
+        for path in VIEWERS:
+            html = read(path)
+            for host in ("cdn.jsdelivr.net", "unpkg.com"):
+                self.assertNotIn(
+                    host,
+                    html,
+                    f"{path.name} must not load third-party JS from {host}",
+                )
+
+    def test_importmap_points_at_vendored_three(self):
+        expected = (
+            f'"three": "{IMPORTMAP_PREFIX}{THREEJS_ASSETS["three"]["path"]}"',
+            f'"three/addons/": "{IMPORTMAP_PREFIX}addons/"',
+        )
+        for path in VIEWERS:
+            html = read(path)
+            for entry in expected:
+                self.assertIn(
+                    entry,
+                    html,
+                    f"{path.name} import map must contain {entry}",
+                )
+
+    def test_importmaps_are_identical(self):
+        maps = []
+        for path in VIEWERS:
+            match = self.IMPORTMAP_RE.search(read(path))
+            self.assertIsNotNone(match, f"{path.name} must declare an import map")
+            maps.append(json.loads(match.group(1)))
+        self.assertEqual(
+            maps[0], maps[1], "index.html and embed.html import maps must match"
+        )
 
 
 class XssConventionTests(unittest.TestCase):

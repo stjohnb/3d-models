@@ -478,7 +478,8 @@ This script is **not** used by CI and produces no build artifacts.
 ## Web Viewer (index.html)
 
 A single-page application (no build tools, no framework, ES module JS,
-Three.js from a CDN via import map) that fetches `models.json` and presents
+Three.js loaded same-origin from `./vendor/three/<version>/` via import map)
+that fetches `models.json` and presents
 a tree browser of every project and model alongside a stage of one to three
 viewer panes. With nothing loaded — the default on arrival, and after the
 header's **← All models** button or a Back-navigation to the bare URL — the
@@ -643,7 +644,7 @@ comment.
 | S3 bucket path | `s3://www.bstjohn.net/3d-models/` | Production deployment target |
 | PR preview path | `s3://…/pr-preview/pr-{N}/{SHA}/` | Per-PR, per-commit previews |
 | Source zip naming | `site/<dir>-source.zip` | Per-project zip of git-tracked source files; referenced as `sourceZip` in `models.json` |
-| Three.js version | `0.170.0` (CDN import map in `index.html`) | STLLoader + OrbitControls; also pinned in `generate-standalone.py` with SHA-256 verification |
+| Three.js version | `0.170.0` (`scripts/threejs_assets.py`; staged same-origin to `site/vendor/three/0.170.0/` by `scripts/fetch_threejs.py`, import maps in `index.html`/`embed.html`) | STLLoader + OrbitControls; all three assets SHA-256 verified before staging, and `generate-standalone.py` inlines the same verified bytes |
 | Viewer max pixel ratio | `MAX_PIXEL_RATIO = 1.5` in `index.html`, `embed.html`, `generate-standalone.py` | Caps Retina drawing-buffer cost; MSAA (`antialias: true`) kept |
 | Viewer render policy | On-demand (`invalidate()` / `needsRender`); rAF loop suspends after ~90 idle frames; `powerPreference: 'low-power'` | Issue #341 — continuous rAF rendering overheated client laptops. Any external scene/material mutation must call `viewer.invalidate()` (see [web-viewer.md](web-viewer.md#render-budget)) |
 | OpenSCAD resolution | `$fn = 64` | Set per-file in `.scad` sources |
@@ -661,7 +662,7 @@ comment.
 | Print-time heuristic | 0.2mm layers, 50mm/s, 5x multiplier | Conservative defaults; volume fallback for flat models |
 | Metadata schema | `meta.schema.json` (JSON Schema draft 2020-12) | Validated in CI; `description` required, all others optional |
 | README gallery markers | `<!-- gallery:start -->` / `<!-- gallery:end -->` | Auto-replaced by `scripts/generate-gallery.py` |
-| Standalone viewer cache | `.cache/threejs/` | Local cache for Three.js CDN assets |
+| Standalone viewer cache | `.cache/threejs/` | Local cache for the upstream Three.js downloads, shared by `fetch_threejs.py` and `generate-standalone.py` |
 | Render cache | `$HOME/.cache/3d-models/render` (override `RENDER_CACHE_DIR`, disable `RENDER_CACHE_DISABLED=1`) | Host-level content-addressed STL cache; key = SHA-256 over transitive include/use chain + binary assets + OpenSCAD version + `CACHE_VERSION` via `scripts/render_cache.py`; pruned at 30 days by mtime |
 | Interference check | `mating_pairs` in `meta.json` | Pairs of STL filenames validated by `check_interference.py` using `trimesh` + `manifold3d` |
 | Interference threshold | overlap volume > 0 | Any geometric overlap between mating parts is a failure |
