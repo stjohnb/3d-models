@@ -34,9 +34,9 @@ import map.
 - Uses a `__BUILD_HASH__` placeholder replaced at build time with the commit
   SHA for cache busting
 - Includes Open Graph, Twitter Card meta tags, and Schema.org JSON-LD
-  structured data (`CollectionPage` with `3DModel` items) for SEO — the
-  JSON-LD is injected at build time via a `<!-- __STRUCTURED_DATA__ -->`
-  placeholder
+  structured data (`@graph` of `Organization`/`WebSite`/`CollectionPage` with
+  `3DModel` items) for SEO — the JSON-LD is injected at build time via a
+  `<!-- __STRUCTURED_DATA__ -->` placeholder
 - OEmbed `<link rel="alternate">` discovery tags are injected at build time
   via a `<!-- __OEMBED_LINKS__ -->` placeholder
 - Head includes `<link rel="canonical">`, `<meta name="theme-color">`,
@@ -539,6 +539,13 @@ which downloads Three.js 0.170.0 once from the shared URL/hash table in
 as the main viewer. The inlined bytes are byte-identical to those
 `scripts/fetch_threejs.py` stages for the deployed viewers. Includes a filament color picker and
 fullscreen button.
+
+Each generated page also carries a meta description (from the project's
+`meta.json` `description`, with a generated fallback), a self-referential
+`<link rel="canonical">`, Open Graph/Twitter Card tags pointing at the hosted
+copy and the model's PNG thumbnail, and a Schema.org `3DModel` JSON-LD block
+linked to the root `CollectionPage` via `isPartOf`. These absolute URLs in the
+head do not break `file://` use, since every page asset stays inlined.
 
 ## Public Source Links
 

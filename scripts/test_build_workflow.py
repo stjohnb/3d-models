@@ -34,6 +34,7 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD_YML = REPO_ROOT / ".github" / "workflows" / "build.yml"
 NOTIFY_YML = REPO_ROOT / ".github" / "workflows" / "notify-failures.yml"
 FLAKE_NIX = REPO_ROOT / "flake.nix"
+SCRIPTS_DIR = REPO_ROOT / "scripts"
 OG_FONT = "Liberation-Sans"
 
 
@@ -264,8 +265,9 @@ class ThumbnailRenderTests(unittest.TestCase):
         self.assertLess(
             text.index(deploy),
             text.index(enforce),
-            "deferred enforcement: the site must still deploy before the "
-            "thumbnail failure blocks the build",
+            "deferred enforcement: the pipeline must reach the deploy step "
+            "(and produce PR comment / validation.json) before the thumbnail "
+            "failure exits non-zero",
         )
 
     def test_invalid_thumbnails_are_deleted(self):
@@ -275,6 +277,29 @@ class ThumbnailRenderTests(unittest.TestCase):
             body,
             "an invalid PNG must be deleted so the S3 sync cannot ship it",
         )
+
+    def test_deploy_is_gated_on_thumbnail_success(self):
+        """A thumbnail regression must not reach production (#406).
+
+        Invalid PNGs are deleted above and the main deploy runs
+        `aws s3 sync --delete`, so deploying after a thumbnail failure
+        strips the last good thumbnails off the live site — the exact
+        #359 symptom.
+        """
+        body = step_body(read(BUILD_YML), "Deploy to S3 (main)")
+        for output in (
+            "validate",
+            "metadata",
+            "interference",
+            "param_meta",
+            "thumbnails",
+        ):
+            self.assertIn(
+                f"steps.{output}.outputs.failed != 'true'",
+                body,
+                f"the main S3 deploy must be gated on steps.{output}",
+            )
+        self.assertIn("--delete", body)
 
 
 class ProjectDisplayNameTests(unittest.TestCase):
@@ -335,6 +360,84 @@ class QrSlugifyTests(unittest.TestCase):
             "tr '[:upper:]' '[:lower:]'", code_lines(read(BUILD_YML)),
             "build.yml must not lowercase-slug in shell; use slugify()",
         )
+
+
+class StructuredDataTests(unittest.TestCase):
+    """Issue #409: the @graph payload is built by the shared helper, not inline."""
+
+    def test_structured_data_step_uses_helper(self):
+        body = step_body(read(BUILD_YML), "Generate structured data")
+        self.assertIn("build_structured_data", body)
+        self.assertNotIn("'@type': 'Organization'", body)
+
+    def test_sitemap_step_uses_helper(self):
+        body = step_body(read(BUILD_YML), "Generate sitemap.xml")
+        self.assertIn("standalone_url", body)
+        self.assertNotIn(r"re.sub(r'\.stl$'", body)
+
+    def test_injection_preserves_script_escapes(self):
+        body = step_body(
+            read(BUILD_YML),
+            "Copy index.html and embed.html to site with cache-busting hash and injected data",
+        )
+        for escape in (r"\\u0026", r"\\u003c", r"\\u003e"):
+            self.assertIn(escape, body)
+
+
+UNIT_TEST_STEP = "Run Python unit tests for build scripts"
+
+# test_*.py modules deliberately NOT in the fast unit-test step, with why.
+EXCLUDED_TEST_MODULES = {
+    "test_check_interference":
+        "runs in its own venv (trimesh/manifold3d) in the "
+        "'Check mating part interference' step",
+    "test_fetch_terrain_heightmap":
+        "needs numpy/PIL/requests, which are not in the flake devShell",
+    "test_sync_public_snapshot":
+        "integration-style: drives real git subprocesses in temp repos",
+    "test_scan_masks":
+        "needs numpy/opencv4/rembg, which live in the scan devShell, not default",
+    "test_scan_mesh":
+        "needs numpy/trimesh, which live in the scan devShell, not default",
+}
+
+
+class UnitTestStepCoverageTests(unittest.TestCase):
+    """Issue #407: every scripts/test_*.py must run somewhere, or be
+    explicitly excluded with a reason. Three modules silently never ran."""
+
+    def _listed_modules(self):
+        body = step_body(read(BUILD_YML), UNIT_TEST_STEP)
+        return set(re.findall(r"\btest_[a-z0-9_]+\b", body))
+
+    def test_every_test_module_is_listed_or_excluded(self):
+        on_disk = {p.stem for p in SCRIPTS_DIR.glob("test_*.py")}
+        missing = sorted(on_disk - self._listed_modules()
+                         - set(EXCLUDED_TEST_MODULES))
+        self.assertEqual(
+            missing, [],
+            f"{missing} exist in scripts/ but run nowhere in CI; add them "
+            f"to the {UNIT_TEST_STEP!r} step or to EXCLUDED_TEST_MODULES",
+        )
+
+    def test_listed_modules_all_exist(self):
+        for mod in sorted(self._listed_modules()):
+            self.assertTrue(
+                (SCRIPTS_DIR / f"{mod}.py").is_file(),
+                f"build.yml runs {mod}, but scripts/{mod}.py does not exist",
+            )
+
+    def test_exclusions_are_not_stale(self):
+        for mod in sorted(EXCLUDED_TEST_MODULES):
+            self.assertTrue(
+                (SCRIPTS_DIR / f"{mod}.py").is_file(),
+                f"stale exclusion: scripts/{mod}.py no longer exists",
+            )
+
+    def test_newly_added_modules_are_listed(self):
+        for mod in ("test_generate_standalone", "test_scad_orientation",
+                    "test_generate_gallery"):
+            self.assertIn(mod, self._listed_modules())
 
 
 if __name__ == "__main__":

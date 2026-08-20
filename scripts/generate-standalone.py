@@ -12,8 +12,16 @@ import json
 import os
 import re
 import sys
+from urllib.parse import quote
 
-from oembed_helpers import display_name, load_meta_failures, public_source_url
+from oembed_helpers import (
+    BASE_URL,
+    display_name,
+    load_meta_failures,
+    public_source_url,
+    strip_stl_ext,
+    thumbnail_name,
+)
 from threejs_assets import THREEJS_ASSETS, THREEJS_VERSION, fetch_url
 
 FILAMENT_COLORS_JSON = "filament-colors.json"
@@ -71,11 +79,44 @@ def _printing_notes_html(notes) -> str:
     )
 
 
-def strip_stl_ext(filename: str) -> str:
-    """Remove .stl extension case-insensitively."""
-    if filename.lower().endswith(".stl"):
-        return filename[:-4]
-    return filename
+def _seo_fields(stl: str, name: str, meta: dict) -> dict:
+    """Return pre-escaped SEO head values for one model's HTML_TEMPLATE.
+
+    Every returned value is ready for direct interpolation: the three URL/text
+    fields are HTML-escaped (quote=True) for attribute context, and
+    structured_data is _js_escape()d JSON so a '<' in a meta.json description
+    cannot close the <script> block.
+    """
+    base_name = strip_stl_ext(stl)
+    canonical_url = f"{BASE_URL}/standalone/{quote(base_name)}.html"
+    thumbnail_url = f"{BASE_URL}/{quote(thumbnail_name(stl))}"
+    content_url = f"{BASE_URL}/{quote(stl)}"
+
+    desc = meta.get("description") if isinstance(meta, dict) else None
+    if not isinstance(desc, str) or not desc.strip():
+        desc = f"3D printable {name} — download the STL or view it in your browser."
+    else:
+        desc = desc.strip()
+
+    jsonld = {
+        "@context": "https://schema.org",
+        "@type": "3DModel",
+        "@id": f"{canonical_url}#model",
+        "name": name.title(),
+        "description": desc,
+        "url": canonical_url,
+        "contentUrl": content_url,
+        "encodingFormat": "model/stl",
+        "thumbnailUrl": thumbnail_url,
+        "isPartOf": {"@type": "CollectionPage", "@id": f"{BASE_URL}/#collection"},
+    }
+
+    return {
+        "meta_description": html_mod.escape(desc, quote=True),
+        "canonical_url": html_mod.escape(canonical_url, quote=True),
+        "thumbnail_url": html_mod.escape(thumbnail_url, quote=True),
+        "structured_data": _js_escape(json.dumps(jsonld)),
+    }
 
 
 def _load_filament_colors_js() -> str:
@@ -114,6 +155,18 @@ HTML_TEMPLATE = """\
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{title}</title>
+  <meta name="description" content="{meta_description}">
+  <link rel="canonical" href="{canonical_url}">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="{canonical_url}">
+  <meta property="og:title" content="{title}">
+  <meta property="og:description" content="{meta_description}">
+  <meta property="og:image" content="{thumbnail_url}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{title}">
+  <meta name="twitter:description" content="{meta_description}">
+  <meta name="twitter:image" content="{thumbnail_url}">
+  <script type="application/ld+json">{structured_data}</script>
   <style>
     * {{ margin: 0; padding: 0; box-sizing: border-box; }}
     body {{
@@ -747,6 +800,7 @@ def main():
         project_dir = stl_to_dir.get(stl, "")
         meta = load_meta(project_dir)
         notes_html = _printing_notes_html(meta.get("printing_notes"))
+        seo = _seo_fields(stl, name, meta)
 
         html = HTML_TEMPLATE.format(
             title=html_mod.escape(name),
@@ -758,9 +812,10 @@ def main():
             composite_parts_js=composite_js,
             source_link_html=_source_link_html(stl_to_source.get(stl, "")),
             printing_notes_html=notes_html,
+            **seo,
         )
 
-        with open(out_path, "w") as f:
+        with open(out_path, "w", encoding="utf-8") as f:
             f.write(html)
 
         stl_kb = len(stl_data) / 1024

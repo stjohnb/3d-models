@@ -43,11 +43,21 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── generate_lake_bed.py        # One-off generator: bake lakebed bathymetry PNG from heightmap for nz-ski-fields; not used by CI
 │   ├── render_view.py          # Render an arbitrary OpenSCAD view to PNG (developer/agent tool, not used by CI)
 │   ├── test_render_view.py     # Tests for render_view
+│   ├── scan_pipeline.py        # Photogrammetry CLI: scanning-rig capture video → scaled STL (operator tool, not used by CI)
+│   ├── test_scan_pipeline.py   # Tests for scan_pipeline (stage selection, argument defaults)
+│   ├── scan_frames.py          # Frame extraction (ffmpeg) and sharpness-binned frame selection for scan_pipeline
+│   ├── test_scan_frames.py     # Tests for scan_frames' select_sharp_frames binning
+│   ├── scan_masks.py           # Platter-ellipse + salient-object masking for scan_pipeline (COLMAP mask PNGs)
+│   ├── test_scan_masks.py      # Tests for scan_masks; needs the `scan` devShell, so excluded from CI's unit-test step
+│   ├── scan_colmap.py          # COLMAP/OpenMVS command lines for scan_pipeline (CPU-only: never patch_match_stereo)
+│   ├── test_scan_colmap.py     # Tests for scan_colmap's argv builders and sparse-model selection; also validates option names against a real colmap when one is on PATH
+│   ├── scan_mesh.py            # Platter-plane fit, mm scaling, cropping and STL export for scan_pipeline
+│   ├── test_scan_mesh.py       # Tests for scan_mesh; needs the `scan` devShell, so excluded from CI's unit-test step
 │   ├── render_cache.py         # Content-addressed render cache key computation (used by CI render step)
 │   ├── test_render_cache.py    # Tests for render_cache
 │   ├── project_dates.py        # Per-project last-commit dates (models.json `updated`; landing-page recency ordering)
 │   ├── test_project_dates.py   # Tests for project_dates
-│   ├── test_generate_standalone.py  # Regression tests for _load_filament_colors_js HTML injection escaping
+│   ├── test_generate_standalone.py  # Regression tests for standalone-viewer HTML injection escaping (filament colors, SEO head fields, JSON-LD)
 │   ├── test_wasm_customizer.mjs  # Node.js integration test for the in-browser WASM customizer pipeline
 │   ├── test_hash_routing.mjs    # Node.js test for index.html's parseHash/formatHash URL grammar
 │   ├── test_hash_history.mjs    # Node.js test for index.html's hashWriteMode push/replace/skip decision
@@ -60,7 +70,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── README.public.md      # Hand-maintained readme text for the public snapshot (stjohnb/3d-models); see public-snapshot.md
 ├── filament-colors.json  # Shared color palette (single source of truth)
 ├── .openscad-version     # Committed expected OpenSCAD version baseline; CI warns on drift
-├── flake.nix             # Repo-owned CI/dev toolchain (default/scripts devShells); see ci-pipeline.md
+├── flake.nix             # Repo-owned CI/dev toolchain (default/scripts/scan devShells); see ci-pipeline.md
 ├── flake.lock            # Pinned nixpkgs revision consumed by flake.nix
 ├── index.html            # Single-page 3D viewer: tree browser + 1–3 model panes (deployed to S3)
 ├── embed.html            # Minimal single-model viewer for iframe/OEmbed embedding
@@ -78,7 +88,8 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │       ├── issue-implementer.md  # Subagent: implements approved plans while preserving CI invariants
 │       └── pr-reviewer.md        # Subagent: reviews PR diffs against CI-enforced invariants
 ├── playbooks/
-│   └── iterate_with_render_view.md  # How to use render_view.py for iterative local design
+│   ├── iterate_with_render_view.md  # How to use render_view.py for iterative local design
+│   └── scan_a_capture.md            # How to run the photogrammetry pipeline on a scanning-rig capture video
 ├── .github/
 │   ├── dependabot.yml         # Weekly grouped Dependabot updates for the github-actions ecosystem only
 │   ├── actions/
@@ -544,6 +555,12 @@ Reusable how-to guides for common development tasks live in `playbooks/`.
   Covers view presets, the `--y-up` flag for assemblies, and an explicit list of
   what `render_view.py` does _not_ do (mesh validation, interference checks,
   bounding-box extraction — those are CI-only gates).
+- **`playbooks/scan_a_capture.md`** — how to run `scan_pipeline.py` over a
+  scanning-rig capture video to reconstruct a mesh. Covers the `nix develop
+  .#scan` shell, the two-step platter-ellipse confirmation via
+  `roi-preview.jpg`, the six pipeline stages and their wall-clock cost, the
+  `--mask-mode roi` no-ML fallback, how the platter's known 150 mm diameter
+  sets the exported scale, and capture guidance (the camera must not move).
 
 ## AI Agent Configuration
 

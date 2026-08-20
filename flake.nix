@@ -105,6 +105,26 @@
               gh
             ];
           };
+
+          # Operator-run photogrammetry pipeline (scripts/scan_pipeline.py).
+          # NOT used by CI — same spirit as scripts/render_view.py. CPU-only:
+          # colmap here has no CUDA (nixpkgs' colmapWithCuda is not in the
+          # binary cache), so dense reconstruction goes through OpenMVS.
+          scan = pkgs.mkShell {
+            packages = with pkgs; [
+              colmap
+              openmvs
+              ffmpeg
+              (python3.withPackages (ps: with ps; [
+                numpy
+                opencv4
+                rembg
+                trimesh
+                scipy
+                networkx
+              ]))
+            ];
+          };
         });
     };
 }

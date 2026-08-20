@@ -1,4 +1,5 @@
-"""Regression tests for _load_filament_colors_js in generate-standalone.py."""
+"""Regression tests for _load_filament_colors_js and the SEO head fields
+(_seo_fields) in generate-standalone.py."""
 
 import html as html_mod
 import importlib.util
@@ -88,8 +89,8 @@ class TestHtmlTemplateFormat(unittest.TestCase):
     surface at build time.
     """
 
-    def _render(self):
-        return gs.HTML_TEMPLATE.format(
+    def _render(self, **overrides):
+        kwargs = dict(
             title="Test Model",
             three_uri="data:text/javascript;base64,AAAA",
             stlloader_uri="data:text/javascript;base64,BBBB",
@@ -99,7 +100,13 @@ class TestHtmlTemplateFormat(unittest.TestCase):
             composite_parts_js="[]",
             source_link_html="",
             printing_notes_html="",
+            meta_description="A test model",
+            canonical_url="https://www.bstjohn.net/3d-models/standalone/test.html",
+            thumbnail_url="https://www.bstjohn.net/3d-models/test.png",
+            structured_data='{"@type":"3DModel"}',
         )
+        kwargs.update(overrides)
+        return gs.HTML_TEMPLATE.format(**kwargs)
 
     def test_format_succeeds_and_includes_controls(self):
         html = self._render()
@@ -127,17 +134,7 @@ class TestHtmlTemplateFormat(unittest.TestCase):
         self.assertIn('function recomputeClip(', html)
 
     def test_title_html_escaping(self):
-        html = gs.HTML_TEMPLATE.format(
-            title=html_mod.escape('Evil <script>alert(1)</script>'),
-            three_uri="data:text/javascript;base64,AAAA",
-            stlloader_uri="data:text/javascript;base64,BBBB",
-            orbitcontrols_uri="data:text/javascript;base64,CCCC",
-            stl_base64="ZmFrZQ==",
-            filament_colors_js='[\n      { name: "Blue", hex: 0x64b5f6 },\n    ]',
-            composite_parts_js="[]",
-            source_link_html="",
-            printing_notes_html="",
-        )
+        html = self._render(title=html_mod.escape('Evil <script>alert(1)</script>'))
         self.assertIn('&lt;script&gt;', html)
         self.assertNotIn('<script>alert(1)</script>', html)
 
@@ -174,6 +171,72 @@ class TestCompositePartsJs(unittest.TestCase):
         self.assertIn('#64b5f6', result)
         # No escapable characters, so it stays valid JSON.
         self.assertEqual(json.loads(result), parts)
+
+
+class TestSeoFields(unittest.TestCase):
+    """_seo_fields must build correct URLs/JSON-LD and escape crafted input."""
+
+    def test_uses_meta_description(self):
+        result = gs._seo_fields("drill_bit.stl", "drill bit", {"description": "A bit."})
+        self.assertEqual(result["meta_description"], "A bit.")
+        self.assertEqual(json.loads(result["structured_data"])["description"], "A bit.")
+
+    def test_falls_back_when_description_missing(self):
+        for meta in ({}, {"description": "   "}, {"description": 123}):
+            result = gs._seo_fields("drill_bit.stl", "drill bit", meta)
+            self.assertIn("3D printable drill bit", result["meta_description"])
+
+    def test_canonical_and_thumbnail_urls(self):
+        result = gs._seo_fields("drill_bit.stl", "drill bit", {})
+        self.assertEqual(
+            result["canonical_url"],
+            "https://www.bstjohn.net/3d-models/standalone/drill_bit.html",
+        )
+        self.assertEqual(
+            result["thumbnail_url"],
+            "https://www.bstjohn.net/3d-models/drill_bit.png",
+        )
+
+    def test_space_in_filename_is_percent_encoded(self):
+        result = gs._seo_fields("Toothbrush assembly.stl", "toothbrush assembly", {})
+        self.assertIn("%20", result["canonical_url"])
+        self.assertIn("%20", result["thumbnail_url"])
+        self.assertNotIn(" ", result["canonical_url"])
+        self.assertNotIn(" ", result["thumbnail_url"])
+
+    def test_jsonld_shape(self):
+        result = gs._seo_fields("drill_bit.stl", "drill bit", {})
+        data = json.loads(result["structured_data"])
+        self.assertEqual(data["@type"], "3DModel")
+        self.assertEqual(data["encodingFormat"], "model/stl")
+        self.assertTrue(data["contentUrl"].endswith("/drill_bit.stl"))
+        self.assertTrue(data["@id"].endswith(".html#model"))
+        self.assertEqual(
+            data["isPartOf"]["@id"], "https://www.bstjohn.net/3d-models/#collection"
+        )
+        self.assertEqual(data["name"], "Drill Bit")
+
+    def test_escapes_crafted_description(self):
+        payload = '</script><script>alert(1)</script> "quoted" & <b>'
+        result = gs._seo_fields("drill_bit.stl", "drill bit", {"description": payload})
+
+        self.assertNotIn('</script>', result["structured_data"])
+        self.assertNotIn('<', result["structured_data"])
+        self.assertIn('\\u003c', result["structured_data"])
+        self.assertEqual(json.loads(result["structured_data"])["description"], payload)
+
+        self.assertNotIn('"', result["meta_description"])
+        self.assertNotIn('<', result["meta_description"])
+        self.assertIn('&quot;', result["meta_description"])
+
+    def test_rendered_page_contains_no_script_break(self):
+        seo = gs._seo_fields("x.stl", "x", {"description": '</script><img src=x>'})
+        html = TestHtmlTemplateFormat()._render(
+            structured_data=seo["structured_data"],
+            meta_description=seo["meta_description"],
+        )
+        self.assertNotIn('</script><img', html)
+        self.assertNotIn('<img src=x>', html)
 
 
 class TestSourceLinkHtml(unittest.TestCase):

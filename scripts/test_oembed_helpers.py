@@ -5,11 +5,25 @@ slugify must stay in sync with the JS implementations in index.html and
 embed.html — these tests document the expected edge-case behaviour.
 """
 
+import json
 import os
 import tempfile
 import unittest
 
-from oembed_helpers import slugify, display_name, thumbnail_name, parse_scad_map, public_source_url, project_display_name
+from oembed_helpers import (
+    slugify,
+    display_name,
+    thumbnail_name,
+    parse_scad_map,
+    public_source_url,
+    project_display_name,
+    build_structured_data,
+    standalone_url,
+    strip_stl_ext,
+    ORG_ID,
+    SITE_ID,
+    COLLECTION_ID,
+)
 
 
 class TestSlugify(unittest.TestCase):
@@ -197,6 +211,123 @@ class TestPublicSourceUrl(unittest.TestCase):
         url = public_source_url('power-workshop/drill_bit.scad')
         self.assertIn('stjohnb/3d-models', url)
         self.assertNotIn('St-John-Software', url)
+
+
+class TestStripStlExt(unittest.TestCase):
+
+    def test_lowercase(self):
+        self.assertEqual(strip_stl_ext('a.stl'), 'a')
+
+    def test_uppercase(self):
+        self.assertEqual(strip_stl_ext('A.STL'), 'A')
+
+    def test_mixed_case(self):
+        self.assertEqual(strip_stl_ext('w.Stl'), 'w')
+
+    def test_no_extension(self):
+        self.assertEqual(strip_stl_ext('no-ext'), 'no-ext')
+
+    def test_double_extension(self):
+        self.assertEqual(strip_stl_ext('a.stl.stl'), 'a.stl')
+
+    def test_bare_stl_word(self):
+        self.assertEqual(strip_stl_ext('stl'), 'stl')
+
+
+class TestStandaloneUrl(unittest.TestCase):
+
+    def test_basic(self):
+        self.assertEqual(
+            standalone_url('drill-bit.stl'),
+            'https://www.bstjohn.net/3d-models/standalone/drill-bit.html',
+        )
+
+    def test_space_in_name(self):
+        self.assertIn('%20', standalone_url('my part.stl'))
+
+    def test_uppercase_extension_stripped(self):
+        self.assertEqual(
+            standalone_url('Widget.STL'),
+            'https://www.bstjohn.net/3d-models/standalone/Widget.html',
+        )
+
+
+class TestBuildStructuredData(unittest.TestCase):
+
+    def _scad_map(self):
+        return {
+            'a.stl': {'project': 'Power Workshop', 'dir': 'power-workshop', 'source': 'power-workshop/a.scad'},
+            'b part.stl': {'project': 'Toothbrush', 'dir': 'toothbrush', 'source': 'toothbrush/b part.scad'},
+        }
+
+    def test_top_level_shape(self):
+        data = build_structured_data(self._scad_map(), {})
+        self.assertEqual(data['@context'], 'https://schema.org')
+        types = [node['@type'] for node in data['@graph']]
+        self.assertEqual(types, ['Organization', 'WebSite', 'CollectionPage'])
+
+    def test_organization_node(self):
+        data = build_structured_data(self._scad_map(), {})
+        org = data['@graph'][0]
+        self.assertEqual(org['@id'], ORG_ID)
+        self.assertEqual(
+            org['sameAs'],
+            ['https://github.com/St-John-Software', 'https://github.com/stjohnb'],
+        )
+
+    def test_website_and_collection_references(self):
+        data = build_structured_data(self._scad_map(), {})
+        website = data['@graph'][1]
+        collection = data['@graph'][2]
+        self.assertEqual(website['@id'], SITE_ID)
+        self.assertEqual(website['publisher'], {'@id': ORG_ID})
+        self.assertEqual(collection['@id'], COLLECTION_ID)
+        self.assertEqual(collection['isPartOf'], {'@id': SITE_ID})
+        self.assertEqual(collection['creator'], {'@id': ORG_ID})
+
+    def test_items_reference_org_not_inline(self):
+        data = build_structured_data(self._scad_map(), {})
+        collection = data['@graph'][2]
+        items = collection['mainEntity']['itemListElement']
+        for entry in items:
+            self.assertEqual(entry['item']['creator'], {'@id': ORG_ID})
+        # Only the @id reference to the org should appear below mainEntity,
+        # never an inline {'@type': 'Organization', ...} object.
+        self.assertNotIn('"@type": "Organization"', json.dumps(collection))
+
+    def test_item_ids_unique_and_match_standalone_url(self):
+        scad_map = self._scad_map()
+        data = build_structured_data(scad_map, {})
+        items = data['@graph'][2]['mainEntity']['itemListElement']
+        ids = [entry['item']['@id'] for entry in items]
+        self.assertEqual(len(ids), len(set(ids)))
+        for stl, entry in zip(sorted(scad_map), items):
+            self.assertEqual(entry['item']['@id'], f'{standalone_url(stl)}#model')
+            self.assertTrue(entry['item']['@id'].endswith('#model'))
+
+    def test_positions_in_sorted_order(self):
+        data = build_structured_data(self._scad_map(), {})
+        items = data['@graph'][2]['mainEntity']['itemListElement']
+        self.assertEqual([entry['position'] for entry in items], [1, 2])
+
+    def test_content_size_present_only_when_given(self):
+        scad_map = self._scad_map()
+        data = build_structured_data(scad_map, {}, stl_sizes={'a.stl': 123})
+        items = {entry['item']['@id']: entry['item'] for entry in data['@graph'][2]['mainEntity']['itemListElement']}
+        a_item = items[f'{standalone_url("a.stl")}#model']
+        b_item = items[f'{standalone_url("b part.stl")}#model']
+        self.assertEqual(a_item['contentSize'], '123 B')
+        self.assertNotIn('contentSize', b_item)
+
+    def test_description_fallback(self):
+        data = build_structured_data(self._scad_map(), {})
+        item = data['@graph'][2]['mainEntity']['itemListElement'][0]['item']
+        self.assertEqual(item['description'], '3D printable part from the Power Workshop collection')
+
+    def test_description_from_project_descriptions(self):
+        data = build_structured_data(self._scad_map(), {'power-workshop': 'Custom description'})
+        item = data['@graph'][2]['mainEntity']['itemListElement'][0]['item']
+        self.assertEqual(item['description'], 'Custom description')
 
 
 if __name__ == '__main__':

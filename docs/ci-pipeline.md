@@ -118,12 +118,16 @@ step:
 ### 2.6. Run Python Unit Tests for Build Scripts
 
 Runs `python3 -m unittest test_render_view test_oembed_helpers
-test_fetch_openscad_wasm test_render_cache test_capped_openscad
-test_viewer_invariants test_project_dates test_build_workflow -v` from
-within the `scripts/` directory. These are fast unit tests that mock
-external I/O (network, filesystem) and run on every push. They guard the
-helper functions used throughout the CI pipeline against
-regressions.
+test_fetch_openscad_wasm test_fetch_threejs test_render_cache
+test_capped_openscad test_viewer_invariants test_project_dates
+test_build_workflow test_generate_standalone test_scad_orientation
+test_generate_gallery -v` from within the `scripts/` directory. These are
+fast unit tests that mock external I/O (network, filesystem) and run on
+every push. They guard the helper functions used throughout the CI
+pipeline against regressions. `test_generate_standalone` guards the two
+escaping layers in `generate-standalone.py`'s `_load_filament_colors_js`,
+`test_scad_orientation` pins the no-top-level-`rotate([-90,0,0])` source
+rule, and `test_generate_gallery` covers `pick_thumbnail` hero selection.
 
 ### 3. Verify Headless OpenSCAD Rendering
 
@@ -434,9 +438,7 @@ Individual thumbnail failures — including a cap hit — emit a GitHub Actions
 warning and do not fail the step. Instead the step records `failed=true` to
 `$GITHUB_OUTPUT` (`id: thumbnails`) and the separate **Enforce thumbnail
 rendering** step at the end of the pipeline fails the build, listing
-`.thumb-failures`. Because that step runs after the S3 sync, the site still
-deploys — minus the deleted broken PNGs — while the build goes red. See the
-deferred enforcement pattern below.
+`.thumb-failures`. The main-branch S3 deploy is also gated on `steps.thumbnails.outputs.failed` (issue #406): because an invalid PNG is deleted and the sync runs with `--delete`, deploying after a thumbnail failure would strip the last good thumbnails off the live site. The enforcement step still runs at the end of the pipeline, so the PR comment, `validation.json` and `interference.json` are all produced before the build exits non-zero.
 
 ### 9.5. Render Extra Orthographic Views for Complex-Interior Models
 
@@ -594,12 +596,20 @@ to catch breakage without modifying the PR.
 ### 14. Generate Structured Data
 
 A Python script reads `site/.scad-map` and `site/validation.json` to produce
-`site/structured-data.json` — a Schema.org JSON-LD object using
-`CollectionPage` with an `ItemList` of `3DModel` entries. Each model gets
-`contentUrl`, `encodingFormat` (model/stl), `thumbnailUrl`, `contentSize`,
-`isPartOf` (project grouping), and `creator`. Project descriptions from
-`meta.json` are used when available (skipping files in `.meta-failures`).
-Absolute URLs are required by JSON-LD spec. Uses shared helpers from
+`site/structured-data.json` — a Schema.org JSON-LD `@graph` with three
+hash-addressed nodes: an `Organization` (`https://www.bstjohn.net/#organization`,
+with a `sameAs` list of the project's GitHub profiles), a `WebSite`
+(`https://www.bstjohn.net/#website`, whose `publisher` references the
+`Organization` by `@id`), and a `CollectionPage`
+(`{BASE_URL}/#collection`, whose `isPartOf` references the `WebSite` and whose
+`creator` references the `Organization`, both by `@id`) holding an `ItemList`
+of `3DModel` entries. Each `3DModel` gets its own `@id`
+(`<standalone viewer URL>#model`) plus `contentUrl`, `encodingFormat`
+(model/stl), `thumbnailUrl`, `contentSize`, `isPartOf` (project grouping), and
+a `creator` that references the `Organization` node by `@id` rather than
+inlining it. Project descriptions from `meta.json` are used when available
+(skipping files in `.meta-failures`). Absolute URLs are required by JSON-LD
+spec. The whole payload is built by `build_structured_data()` in
 `scripts/oembed_helpers.py`.
 
 ### 15. Generate OEmbed JSON Files
@@ -663,8 +673,7 @@ STS assume-role to succeed (a v4→v6 upgrade broke this silently; fixed by
 passing `github-actions-${{ github.run_id }}`, #291).
 
 - **Main branch**: `aws s3 sync ./site s3://www.bstjohn.net/3d-models/ --delete`
-  (excludes `pr-preview/`). Gated on mesh validation **and** metadata
-  validation passing — broken meshes or invalid metadata never reach production.
+  (excludes `pr-preview/`). Gated on mesh validation, metadata validation, the interference check, parameters-manifest validation, and thumbnail rendering all passing — broken meshes, invalid metadata, overlapping parts, bad manifests, and missing thumbnails never reach production. Not gated on the dependency-graph check: `dependency-graph.md` is a repo doc, not a deployed artifact.
 - **Pull requests**: `aws s3 sync ./site s3://…/pr-preview/pr-{N}/{SHA}/`.
   PR deploys are not gated on validation so reviewers can inspect broken
   models in the 3D viewer.
@@ -966,11 +975,13 @@ run independently — if multiple fail, all errors are visible.
   emscripten's `exit()` call at the end of `callMain` corrupts the module's
   internal FS state. A new instance per render is more expensive but reliable.
 - **Unit tests run in CI**: `python3 -m unittest test_render_view
-  test_oembed_helpers test_fetch_openscad_wasm test_render_cache
-  test_capped_openscad test_viewer_invariants test_project_dates
-  test_build_workflow` runs on every push (step 2.6) before any heavy tools
-  are invoked. These tests mock I/O and finish in seconds, catching
-  regressions in build-script helpers before rendering begins.
+  test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs
+  test_render_cache test_capped_openscad test_viewer_invariants
+  test_project_dates test_build_workflow test_generate_standalone
+  test_scad_orientation test_generate_gallery` runs on every push (step 2.6)
+  before any heavy tools are invoked. These tests mock I/O and finish in
+  seconds, catching regressions in build-script helpers before rendering
+  begins.
 - **site/sources/ layout**: All `.scad` source files, validated
   `*.parameters.json` manifests, and binary render assets (`.png` files whose
   basename appears in a sibling `.scad`) are staged under

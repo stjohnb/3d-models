@@ -229,7 +229,7 @@ jobs:
       - name: Run Python unit tests for build scripts
         run: |
           cd scripts
-          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow -v
+          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow test_generate_standalone test_scad_orientation test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap -v
 
       # The flake's `openscad` is a wrapper around openscad-unstable that
       # forces the EGL/llvmpipe software-GL path (QT_QPA_PLATFORM=offscreen,
@@ -556,9 +556,14 @@ jobs:
       # a real one (issue #359: every thumbnail on the live site was empty, so
       # the landing gallery rendered as bare text). Only a file starting with
       # the 8-byte PNG signature counts as rendered — same check as the
-      # gl_smoke probe above. Failures are recorded here and block the build
-      # in the "Enforce thumbnail rendering" step at the end (deferred
-      # enforcement, after the S3 deploy, like the other Enforce steps).
+      # gl_smoke probe above. Failures are recorded here; they skip the S3
+      # deploy (steps.thumbnails.outputs.failed is one of the conjuncts on
+      # the "Deploy to S3 (main)" if:) and hard-fail the build in the
+      # "Enforce thumbnail rendering" step at the end — the same deferred
+      # enforcement shape as mesh/metadata/interference/parameters. Skipping
+      # the deploy matters because a broken PNG is deleted above and the sync
+      # runs with --delete, so deploying would strip the last good thumbnails
+      # off the live site (issue #359).
       - name: Render PNG thumbnails
         id: thumbnails
         env:
@@ -821,14 +826,12 @@ jobs:
       - name: Generate sitemap.xml
         run: |
           python3 -c "
-          import re, sys
-          from urllib.parse import quote
+          import sys
           sys.path.insert(0, '.')
-          from scripts.oembed_helpers import parse_scad_map, BASE_URL
+          from scripts.oembed_helpers import parse_scad_map, standalone_url, BASE_URL
           urls = [f'{BASE_URL}/']
           for stl in sorted(parse_scad_map('site/.scad-map')):
-              name = re.sub(r'\.stl$', '', stl, flags=re.I)
-              urls.append(f'{BASE_URL}/standalone/{quote(name)}.html')
+              urls.append(standalone_url(stl))
           body = ''.join(f'  <url><loc>{u}</loc></url>\n' for u in urls)
           with open('site/sitemap.xml', 'w') as f:
               f.write('<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n')
@@ -855,66 +858,34 @@ jobs:
         run: |
           python3 -c "
           import json, os, sys
-          from urllib.parse import quote
           sys.path.insert(0, '.')
-          from scripts.oembed_helpers import display_name, load_meta_failures, thumbnail_name, parse_scad_map, BASE_URL
+          from scripts.oembed_helpers import build_structured_data, load_meta_failures, parse_scad_map
 
           scad_map = parse_scad_map('site/.scad-map')
-
           failed_meta = load_meta_failures()
 
-          # Load project descriptions from meta.json files (skipping invalid ones)
           project_descriptions = {}
           for stl, info in scad_map.items():
               project_dir = info['dir']
-              if project_dir not in project_descriptions:
-                  meta_path = os.path.join(project_dir, 'meta.json')
-                  if os.path.isfile(meta_path) and meta_path not in failed_meta:
-                      try:
-                          with open(meta_path) as mf:
-                              meta = json.load(mf)
-                      except json.JSONDecodeError:
-                          meta = {}
-                      if 'description' in meta:
-                          project_descriptions[project_dir] = meta['description']
+              if project_dir in project_descriptions:
+                  continue
+              meta_path = os.path.join(project_dir, 'meta.json')
+              if os.path.isfile(meta_path) and meta_path not in failed_meta:
+                  try:
+                      with open(meta_path) as mf:
+                          meta = json.load(mf)
+                  except json.JSONDecodeError:
+                      meta = {}
+                  if 'description' in meta:
+                      project_descriptions[project_dir] = meta['description']
 
-          items = []
-          for i, (stl, info) in enumerate(sorted(scad_map.items()), start=1):
-              name = display_name(stl).title()
-              png = thumbnail_name(stl)
-              desc = project_descriptions.get(info['dir'], f'3D printable part from the {info[\"project\"]} collection')
-              item = {
-                  '@type': '3DModel',
-                  'name': name,
-                  'description': desc,
-                  'contentUrl': f'{BASE_URL}/{quote(stl)}',
-                  'encodingFormat': 'model/stl',
-                  'thumbnailUrl': f'{BASE_URL}/{quote(png)}',
-                  'isPartOf': {'@type': 'CreativeWork', 'name': info['project']},
-                  'creator': {
-                      '@type': 'Organization',
-                      'name': 'St. John Software',
-                      'url': 'https://github.com/St-John-Software',
-                  },
-              }
+          stl_sizes = {}
+          for stl in scad_map:
               stl_path = f'site/{stl}'
               if os.path.isfile(stl_path):
-                  item['contentSize'] = f'{os.path.getsize(stl_path)} B'
-              items.append({'@type': 'ListItem', 'position': i, 'item': item})
+                  stl_sizes[stl] = os.path.getsize(stl_path)
 
-          jsonld = {
-              '@context': 'https://schema.org',
-              '@type': 'CollectionPage',
-              'name': '3D Printable Models',
-              'description': 'Interactive 3D viewer for printable OpenSCAD models — browse, rotate, and download STL files.',
-              'url': f'{BASE_URL}/',
-              'creator': {
-                  '@type': 'Organization',
-                  'name': 'St. John Software',
-                  'url': 'https://github.com/St-John-Software',
-              },
-              'mainEntity': {'@type': 'ItemList', 'itemListElement': items},
-          }
+          jsonld = build_structured_data(scad_map, project_descriptions, stl_sizes)
 
           with open('site/structured-data.json', 'w') as f:
               json.dump(jsonld, f, indent=2)
@@ -1039,7 +1010,7 @@ jobs:
           role-session-name: github-actions-${{ github.run_id }}
 
       - name: Deploy to S3 (main)
-        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.validate.outputs.failed != 'true' && steps.metadata.outputs.failed != 'true' && steps.interference.outputs.failed != 'true' && steps.param_meta.outputs.failed != 'true'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.validate.outputs.failed != 'true' && steps.metadata.outputs.failed != 'true' && steps.interference.outputs.failed != 'true' && steps.param_meta.outputs.failed != 'true' && steps.thumbnails.outputs.failed != 'true'
         run: aws s3 sync ./site s3://www.bstjohn.net/3d-models/ --delete --exclude "pr-preview/*"
 
       - name: Commit README gallery update
