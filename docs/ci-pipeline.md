@@ -87,8 +87,9 @@ no external dependencies (pure Bash + grep) and runs instantly.
 
 ### 2. Validate Project Metadata
 
-Validates all `*/meta.json` files against `meta.schema.json` using Python's
-`jsonschema` library (installed into an isolated venv `.venv-meta`). The step:
+Validates all `*/meta.json` files against `meta.schema.json` using the
+`jsonschema` library from the flake's `default` devShell (pinned by
+`flake.lock`, issue #423). The step:
 
 - Handles both JSON parse errors and schema validation errors
 - Records failed file paths to `.meta-failures` so downstream steps
@@ -100,7 +101,7 @@ Validates all `*/meta.json` files against `meta.schema.json` using Python's
 ### 2.5. Validate Parameters Manifests
 
 Validates all `*/*.parameters.json` files against `parameters.schema.json`
-using the same `.venv-meta` venv as step 2 (already has `jsonschema`). The
+using the same flake-provided `jsonschema` as step 2. The
 step:
 
 - Performs schema validation (only `number` and `boolean` types permitted)
@@ -121,13 +122,21 @@ Runs `python3 -m unittest test_render_view test_oembed_helpers
 test_fetch_openscad_wasm test_fetch_threejs test_render_cache
 test_capped_openscad test_viewer_invariants test_project_dates
 test_build_workflow test_generate_standalone test_scad_orientation
-test_generate_gallery -v` from within the `scripts/` directory. These are
+test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap
+test_scan_mesh -v` from within the `scripts/` directory. These are
 fast unit tests that mock external I/O (network, filesystem) and run on
 every push. They guard the helper functions used throughout the CI
 pipeline against regressions. `test_generate_standalone` guards the two
 escaping layers in `generate-standalone.py`'s `_load_filament_colors_js`,
 `test_scad_orientation` pins the no-top-level-`rotate([-90,0,0])` source
 rule, and `test_generate_gallery` covers `pick_thumbnail` hero selection.
+The four `test_scan_*` modules (added for issue #407, which turned "every
+`scripts/test_*.py` must run somewhere or be explicitly excluded" into a
+guarded invariant — see `UnitTestStepCoverageTests` in
+`scripts/test_build_workflow.py`) can run here because `numpy`/`trimesh`
+now ship in the `default` devShell (issue #423); `test_scan_masks` stays
+excluded because `scan_masks.py` needs `opencv4`/`rembg`, which only the
+`scan` devShell provides.
 
 ### 3. Verify Headless OpenSCAD Rendering
 
@@ -196,9 +205,14 @@ the full-res 512 px `nz-ski-fields` part renders, which take tens of minutes
 each on a cold cache on the 32 GB ryzen runner) so a pathological render — heavy
 CSG, a cold cache, an under-provisioned runner — fails the step cleanly
 instead of freezing the self-hosted runner (see issue #272). Output is
-captured to a log file (`> /tmp/scad.log 2>&1`) so OpenSCAD's exit code is
-preserved (earlier versions piped through `tee`, which masked the exit
-code). The log is replayed via `cat` for CI visibility.
+captured to a log file (`> "$RUNNER_TEMP/scad.log" 2>&1`) so OpenSCAD's exit
+code is preserved (earlier versions piped through `tee`, which masked the
+exit code). The log is replayed via `cat` for CI visibility. The log lives
+in the per-job `$RUNNER_TEMP` rather than a fixed `/tmp` path because the
+runners are long-lived, self-hosted, and shared across the org's repos: a
+fixed `/tmp/scad.log` was both a symlink-clobber primitive and a way for
+another principal to forge the contents the library-detection heuristic
+below trusts, silently dropping a model from the deploy (issue #424).
 
 Before any render attempt, the filename is validated against an allow-list
 regex (`^[A-Za-z0-9._ -]+$`). Files whose basename contains characters
@@ -358,8 +372,8 @@ After mesh validation, pairs of STL files declared in `meta.json`'s
 `mating_pairs` field are checked for geometric overlap using
 `scripts/check_interference.py`. This step:
 
-- Creates an isolated venv (`.venv-interference`) and installs `trimesh>=4.0,<5`
-  and `manifold3d>=2.3,<4`
+- Uses `trimesh` + `manifold3d` from the flake's `default` devShell — no pip,
+  no PyPI fetch on the credentialed runner (issue #423)
 - For each mating pair, loads both STL files and performs a boolean
   intersection using `manifold3d` to detect overlap volume
 - Records results to `site/interference.json` with per-pair data:
@@ -790,8 +804,11 @@ run independently — if multiple fail, all errors are visible.
   time, (3) a fallback heuristic catches edge cases where OpenSCAD exits
   non-zero with no real output (≤84 bytes). These tiers only run after the
   render-cap check above rules out a timeout/OOM exit. Output is captured
-  via file redirect (`> /tmp/scad.log 2>&1`) rather than piped through
-  `tee`, so OpenSCAD's exit code is preserved for the error-handling logic.
+  via file redirect (`> "$RUNNER_TEMP/scad.log" 2>&1`) rather than piped
+  through `tee`, so OpenSCAD's exit code is preserved for the error-handling
+  logic. `$RUNNER_TEMP` (not a fixed `/tmp` path) because the shared,
+  long-lived self-hosted runners make `/tmp` writable by other principals
+  (issue #424).
 - **CI-generated zip bundles**: Zip files are pre-built in CI and deployed
   as static assets alongside STLs, rather than generated client-side. This
   fits the project's fully-static architecture — no new client-side
@@ -978,10 +995,13 @@ run independently — if multiple fail, all errors are visible.
   test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs
   test_render_cache test_capped_openscad test_viewer_invariants
   test_project_dates test_build_workflow test_generate_standalone
-  test_scad_orientation test_generate_gallery` runs on every push (step 2.6)
-  before any heavy tools are invoked. These tests mock I/O and finish in
-  seconds, catching regressions in build-script helpers before rendering
-  begins.
+  test_scad_orientation test_generate_gallery test_scan_frames
+  test_scan_pipeline test_scan_colmap test_scan_mesh` runs on every push
+  (step 2.6) before any heavy tools are invoked. These tests mock I/O and
+  finish in seconds, catching regressions in build-script helpers before
+  rendering begins. `test_build_workflow.py`'s own `UnitTestStepCoverageTests`
+  fails the build if any `scripts/test_*.py` module is added but never listed
+  here or in its `EXCLUDED_TEST_MODULES` (issue #407).
 - **site/sources/ layout**: All `.scad` source files, validated
   `*.parameters.json` manifests, and binary render assets (`.png` files whose
   basename appears in a sibling `.scad`) are staged under

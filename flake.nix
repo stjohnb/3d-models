@@ -71,16 +71,26 @@
           # Everything build.yml shells out to. mkShell's stdenv already
           # puts a C compiler, make, and the usual coreutils/grep/sed/awk/
           # find on PATH; git and systemd-run (capped-openscad.sh) are
-          # runner-baseline. The pip venvs the workflow creates (jsonschema,
-          # trimesh, manifold3d) stay — python itself comes from here, and
-          # the manylinux wheels resolve their shared libs via the runner's
-          # nix-ld set.
+          # runner-baseline.
           default = pkgs.mkShell {
             packages = [
               openscadHeadless
               admesh
             ] ++ (with pkgs; [
-              python3 # venvs + every inline python3 step
+              # python3 plus every third-party module build.yml's inline
+              # python and scripts/*.py import. These used to be pip-installed
+              # from unpinned PyPI ranges into throwaway venvs on the runner
+              # that holds the deploy AWS role and a write-scoped
+              # GITHUB_TOKEN (issue #423). Taking them from nixpkgs makes
+              # flake.lock the pin — hash-verified like every other CI tool.
+              (python3.withPackages (ps: with ps; [
+                jsonschema # meta.json / *.parameters.json schema validation
+                trimesh # scripts/check_interference.py boolean intersection
+                manifold3d # trimesh's boolean engine
+                numpy # trimesh dep; imported directly by test_check_interference
+                networkx # trimesh graph/repair optional backend
+                scipy # trimesh graph/repair optional backend
+              ]))
               nodejs_22 # WASM customizer smoke tests (scripts/*.mjs)
               imagemagick # montage/convert/identify for og-hero.png
               zip # per-project STL + source bundles (build.yml)

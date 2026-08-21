@@ -82,12 +82,13 @@ def check_pair(project, part_a, part_b, site_dir="site"):
         # issue that the STL validation step is responsible for catching.  Skip
         # rather than fail so the interference step doesn't block on mesh defects
         # that are orthogonal to physical part interference.
-        # NOTE: The string "not all meshes are volumes" is the error message emitted
-        # by manifold3d >=2.3,<4 when a non-manifold mesh is passed for Boolean ops.
-        # The version pin 'manifold3d>=2.3,<4' is set in
-        # .github/workflows/build.yml (the "Check mating part interference" step).
-        # If the upper bound is raised, verify this string still matches before
-        # releasing, and update it here if manifold3d changes the wording.
+        # NOTE: The substring "not all meshes are volumes" matches the
+        # ValueError trimesh's own boolean_manifold() raises when a mesh
+        # fails its is_volume check (trimesh 4.x and 5.x both word it
+        # "Not all meshes are volumes!"). trimesh/manifold3d versions are
+        # pinned by flake.lock via the `default` devShell in flake.nix
+        # (issue #423) — there is no pip range any more. If flake.lock is
+        # bumped, re-check this string still matches.
         if "not all meshes are volumes" in str(exc).lower():
             print(f"  SKIP: {project} — {part_a} / {part_b} — non-manifold mesh, cannot check ({exc})")
             return _make_result(project, part_a, part_b, skipped=True, error=f"Skipped: {msg}")

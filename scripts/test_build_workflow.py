@@ -15,6 +15,8 @@ against edits that reintroduce runner-provided tooling:
 * OpenSCAD PNG rendering must stay on the flake's EGL/llvmpipe headless
   wrapper. The old Xvfb + NVIDIA-EGL-pinning workarounds (issue #361;
   St-John-Software/nixos-config#110, #111) are gone and must not creep back.
+* Temp files must live in per-job $RUNNER_TEMP, not world-writable /tmp, to
+  prevent symlink-clobber attacks and untrusted content injection (#424).
 
 ImageMagick from the flake ships no distro ``type.xml``, so every
 text-capable invocation in ``build.yml`` — ``montage`` (which labels tiles
@@ -174,6 +176,28 @@ class NixDevShellTests(unittest.TestCase):
             "RENDER_MEM_MAX is calibrated against that host's RAM",
         )
 
+    def test_no_pip_installs(self):
+        """Issue #423: no unpinned PyPI code on the credentialed runner."""
+        for forbidden in ("pip install", "python3 -m venv", "-m virtualenv"):
+            for path in (BUILD_YML, NOTIFY_YML):
+                self.assertNotIn(
+                    forbidden,
+                    code_lines(read(path)),
+                    f"{path.name} must not use {forbidden!r} — the build job "
+                    "holds the deploy AWS role and a write-scoped "
+                    "GITHUB_TOKEN. Python deps come from flake.nix's "
+                    "python3.withPackages, pinned by flake.lock (#423).",
+                )
+
+    def test_default_devshell_provides_python_deps(self):
+        flake = read(FLAKE_NIX)
+        self.assertIn("python3.withPackages", flake)
+        default = flake[flake.index("default = pkgs.mkShell"):
+                        flake.index("scripts = pkgs.mkShell")]
+        for pkg in ("jsonschema", "trimesh", "manifold3d", "numpy"):
+            self.assertIn(pkg, default,
+                          f"the default devShell must provide {pkg} (#423)")
+
 
 class HeadlessRenderTests(unittest.TestCase):
     """Rendering must stay on the flake's EGL-offscreen openscad wrapper."""
@@ -219,6 +243,33 @@ class HeadlessRenderTests(unittest.TestCase):
                 f"flake.nix's openscad wrapper must set {needle!r} so PNG "
                 "export works with no X server (issue #361)",
             )
+
+
+class ScratchPathTests(unittest.TestCase):
+    """Temp files must live in the per-job $RUNNER_TEMP, not shared /tmp (#424).
+
+    The runners are long-lived, self-hosted and shared between the org's
+    repos, so a fixed /tmp path is both a symlink-clobber primitive and a
+    way to forge the OpenSCAD log the render step's "library, no top-level
+    geometry" branch trusts — which silently drops a model from the deploy.
+    """
+
+    def test_render_log_uses_runner_temp(self):
+        body = step_body(read(BUILD_YML), "Render STL files")
+        self.assertEqual(
+            body.count('"$RUNNER_TEMP/scad.log"'),
+            3,
+            "the render step must redirect, cat and grep the OpenSCAD log "
+            'via "$RUNNER_TEMP/scad.log"',
+        )
+
+    def test_no_fixed_tmp_paths_in_workflow(self):
+        self.assertNotIn(
+            "/tmp/",
+            code_lines(read(BUILD_YML)),
+            "build.yml must not name a fixed /tmp path — use $RUNNER_TEMP, "
+            "which the runner creates per job (issue #424)",
+        )
 
 
 class ThumbnailRenderTests(unittest.TestCase):
@@ -389,16 +440,14 @@ UNIT_TEST_STEP = "Run Python unit tests for build scripts"
 # test_*.py modules deliberately NOT in the fast unit-test step, with why.
 EXCLUDED_TEST_MODULES = {
     "test_check_interference":
-        "runs in its own venv (trimesh/manifold3d) in the "
-        "'Check mating part interference' step",
+        "runs in the 'Check mating part interference' step, immediately "
+        "before check_interference.py itself",
     "test_fetch_terrain_heightmap":
         "needs numpy/PIL/requests, which are not in the flake devShell",
     "test_sync_public_snapshot":
         "integration-style: drives real git subprocesses in temp repos",
     "test_scan_masks":
         "needs numpy/opencv4/rembg, which live in the scan devShell, not default",
-    "test_scan_mesh":
-        "needs numpy/trimesh, which live in the scan devShell, not default",
 }
 
 

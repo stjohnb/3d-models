@@ -52,7 +52,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── scan_colmap.py          # COLMAP/OpenMVS command lines for scan_pipeline (CPU-only: never patch_match_stereo)
 │   ├── test_scan_colmap.py     # Tests for scan_colmap's argv builders and sparse-model selection; also validates option names against a real colmap when one is on PATH
 │   ├── scan_mesh.py            # Platter-plane fit, mm scaling, cropping and STL export for scan_pipeline
-│   ├── test_scan_mesh.py       # Tests for scan_mesh; needs the `scan` devShell, so excluded from CI's unit-test step
+│   ├── test_scan_mesh.py       # Tests for scan_mesh; only imports numpy/trimesh, both in the `default` devShell, so runs in CI's unit-test step
 │   ├── render_cache.py         # Content-addressed render cache key computation (used by CI render step)
 │   ├── test_render_cache.py    # Tests for render_cache
 │   ├── project_dates.py        # Per-project last-commit dates (models.json `updated`; landing-page recency ordering)

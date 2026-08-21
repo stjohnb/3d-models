@@ -1,10 +1,11 @@
 """Unit tests for scan_mesh.py.
 
-Needs numpy and trimesh, which live in the `scan` devShell rather than
-`default` — so this module is deliberately excluded from CI's unit-test step.
-Run with:
-
-    nix develop .#scan --command python3 -m unittest scripts/test_scan_mesh.py
+Exercises the pure geometry-fitting functions against synthetic point
+clouds — no colmap/openmvs/ffmpeg invocation and no scan hardware, so
+unlike scan_pipeline.py this needs numpy and trimesh directly rather than
+via stubs. Both now live in the flake's `default` devShell (issue #423),
+so this runs in CI's "Run Python unit tests for build scripts" step
+alongside the other scripts/test_*.py modules.
 """
 
 import pathlib

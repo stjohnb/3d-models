@@ -159,8 +159,9 @@ class TestNonManifoldMeshSkipped(unittest.TestCase):
 
     This test guards against regressions if the manifold3d error string changes:
     a broken string match would promote a SKIP to a FAIL, blocking the build.
-    The version pin 'manifold3d>=2.3,<4' in .github/workflows/build.yml is the
-    other half of this guard — see check_interference.py for the note.
+    trimesh/manifold3d are pinned by flake.lock via the `default` devShell in
+    flake.nix (issue #423) — see check_interference.py for the other half of
+    this guard.
     """
 
     def test_non_manifold_returns_skipped(self):

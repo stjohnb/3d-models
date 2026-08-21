@@ -82,9 +82,7 @@ jobs:
       - name: Validate project metadata
         id: metadata
         run: |
-          python3 -m venv .venv-meta
-          .venv-meta/bin/pip install --quiet 'jsonschema>=4.0,<5'
-          .venv-meta/bin/python3 -c "
+          python3 -c "
           import json, glob, os, sys
           from jsonschema import validate, ValidationError
 
@@ -140,7 +138,7 @@ jobs:
       - name: Validate parameters manifests
         id: param_meta
         run: |
-          .venv-meta/bin/python3 -c "
+          python3 -c "
           import glob, json, os, sys
           from jsonschema import validate, ValidationError
 
@@ -229,7 +227,7 @@ jobs:
       - name: Run Python unit tests for build scripts
         run: |
           cd scripts
-          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow test_generate_standalone test_scad_orientation test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap -v
+          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow test_generate_standalone test_scad_orientation test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap test_scan_mesh -v
 
       # The flake's `openscad` is a wrapper around openscad-unstable that
       # forces the EGL/llvmpipe software-GL path (QT_QPA_PLATFORM=offscreen,
@@ -319,13 +317,17 @@ jobs:
             # the backend the 2021.01 renders used and produces clean meshes;
             # PNG previews below don't full-render, so only STL export needs
             # the flag.
-            bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" --backend=CGAL --export-format binstl -o "site/$name.stl" "$file" > /tmp/scad.log 2>&1 && rc=0 || rc=$?
-            cat /tmp/scad.log
+            # Log goes to $RUNNER_TEMP (per-job, not shared) — /tmp is
+            # world-writable on the shared self-hosted runners, and the
+            # "library, no top-level geometry" branch below trusts this
+            # file's contents (issue #424).
+            bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" --backend=CGAL --export-format binstl -o "site/$name.stl" "$file" > "$RUNNER_TEMP/scad.log" 2>&1 && rc=0 || rc=$?
+            cat "$RUNNER_TEMP/scad.log"
             if [ "$rc" -eq 124 ] || [ "$rc" -ge 128 ]; then
               echo "::error::render exceeded memory/time cap: $file (rc=$rc)"
               rm -f "site/$name.stl"
               exit 1
-            elif grep -qiE 'top level object is empty|nothing to export' /tmp/scad.log; then
+            elif grep -qiE 'top level object is empty|nothing to export' "$RUNNER_TEMP/scad.log"; then
               echo "  Skipping $file (library, no top-level geometry)"
               rm -f "site/$name.stl"
             elif [ $rc -ne 0 ] && { [ ! -s "site/$name.stl" ] || [ "$(stat -c%s "site/$name.stl" 2>/dev/null || echo 0)" -le 84 ]; }; then
@@ -436,7 +438,6 @@ jobs:
             -not -path './.github/*' \
             -not -path './site/*' \
             -not -path './.cache/*' \
-            -not -path './.venv-*' \
             | while read -r f; do
               rel="${f#./}"
               mkdir -p "site/sources/$(dirname "$rel")"
@@ -453,7 +454,6 @@ jobs:
           find . -name '*.parameters.json' \
             -not -path './site/*' \
             -not -path './.cache/*' \
-            -not -path './.venv-*' \
             | while read -r f; do
               rel="${f#./}"
               skip=0
@@ -473,7 +473,6 @@ jobs:
             -not -path './.github/*' \
             -not -path './site/*' \
             -not -path './.cache/*' \
-            -not -path './.venv-*' \
             | while read -r f; do
               dir="$(dirname "$f")"
               bn="$(basename "$f")"
@@ -511,10 +510,8 @@ jobs:
       - name: Check mating part interference
         id: interference
         run: |
-          python3 -m venv .venv-interference
-          .venv-interference/bin/pip install --quiet 'trimesh>=4.0,<5' 'manifold3d>=2.3,<4'
-          .venv-interference/bin/python3 -m unittest discover -s scripts -p "test_check_interference.py" -v
-          .venv-interference/bin/python3 scripts/check_interference.py
+          python3 -m unittest discover -s scripts -p "test_check_interference.py" -v
+          python3 scripts/check_interference.py
 
       - name: Generate standalone HTML viewers
         run: python3 scripts/generate-standalone.py
