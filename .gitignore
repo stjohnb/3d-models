@@ -1,4 +1,8 @@
 *.stl
+# Scan reference meshes are captured input data, not build output: they are not
+# reproducible from anything in this repo (same category as nz-ski-fields'
+# committed heightmap PNGs). #198 rejected committing *derived* STLs. (#439)
+!scans/**/*.stl
 .cache/
 .mcp-claws.json
 __pycache__/

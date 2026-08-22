@@ -1,14 +1,36 @@
 {
-  "description": "Photogrammetry 3D-scanning rig: a fully printed hand-rotated turntable whose platter locates on a 45-degree V-groove race and a centring spindle, with 15-degree rotation tick marks against an index pointer on the base rim, plus a generic leaning phone stand whose slot width is customizable (default fits an iPhone 15 Pro, bare or cased). No non-printed hardware required.",
-  "tags": ["photogrammetry", "scanning", "utility", "desk"],
-  "version": "1.0.0",
+  "description": "Photogrammetry 3D-scanning rig: a fully printed hand-rotated turntable whose platter locates on a 45-degree V-groove race and a centring spindle, with numbered 15-degree rotation tick marks against an index pointer on the base rim, plus a generic leaning phone stand whose slot width is customizable (default fits an iPhone 15 Pro, bare or cased). No non-printed hardware required. A separate link part collars the turntable base and docks the phone stand, so hand-turning cannot drag the base out from under the fixed masking ellipse, and the camera's distance and height repeat between captures. An optional boost plinth stands on the desk behind the link's dock and re-presents the same stand pocket 120mm further back, higher, and pitched nose-down, for objects that fill the frame at the rig's normal camera distance.",
+  "tags": [
+    "photogrammetry",
+    "scanning",
+    "utility",
+    "desk"
+  ],
+  "version": "1.2.0",
   "difficulty": "beginner",
   "printing_notes": [
     "All parts print support-free in their exported orientations: turntable base and platter flat on the bed, phone stand on its side face (every layer is the same cross-section).",
-    "The platter is exported groove-side down — slice it as-is so the V-groove's 45-degree walls stay self-supporting.",
+    "The platter is exported groove-side down \u2014 slice it as-is so the V-groove's 45-degree walls stay self-supporting.",
     "If the platter feels gritty to turn, work a little candle wax or PTFE lubricant into the V-groove and across the base plate's top face. Do not sand the 45-degree flanks; they set the concentricity.",
     "The 14mm phone slot fits most cased phones; use the customizer to narrow slot_w for a snug grip on a bare phone.",
-    "For landscape scanning, slide the phone along the slot so the camera-bump corner overhangs past the end of the stand rather than resting on the backrest."
+    "For landscape scanning, slide the phone along the slot so the camera-bump corner overhangs past the end of the stand rather than resting on the backrest.",
+    "The platter's tick numerals are engraved 0.5mm into the top face. Print them at 0.2mm layers or finer, and do not sand the top face \u2014 the numerals are what makes each angular sector unique to photogrammetry feature matching.",
+    "The rig link prints flat on the bed with no supports; its 206 x 174mm footprint needs a 220mm bed or larger. It uses about 52cm3 (~65g) of filament.",
+    "Drop the turntable base into the link's collar from above \u2014 the 200-degree wrap means it cannot slide out sideways, only lift straight up. Drop the phone stand's foot into the dock pocket the same way. Never connect the link to the platter; the platter must stay free to turn by hand.",
+    "The turntable base has three 12mm x 1.2mm recesses in its underside for stick-on rubber or TPU anti-slip pads. They print as short bridges a couple of layers above the bed \u2014 no support needed. Set foot_pads false in the customizer for a plain flat underside.",
+    "The optional scan boost prints flat on the bed with no supports, exactly as exported \u2014 every wall rises off the bed and the hollow core closes in at under 45 degrees. At the default 120mm setback, 20mm lift and 20-degree tilt it is about 173cm3 (~215g), 160mm long and 85mm tall; drop boost_setback or boost_lift in the customizer for a smaller, lighter version.",
+    "Fit the boost by standing it on the desk behind the rig link and sliding it forward until its saddle arms straddle the dock and its front wall meets the dock's rear face, then drop the phone stand's foot into the boost's pocket. It sets the camera 120mm further back as well as higher and nose-down, so the platter no longer fills the frame; the extra distance lowers the camera's elevation angle over the platter, and boost_lift (up to 60mm) is the adjustment that raises it again.",
+    "Lift it straight out to go back to the close, low view. Never link the boost to the platter \u2014 it must stay free to turn."
+  ],
+  "mating_pairs": [
+    [
+      "rig_link.stl",
+      "turntable_base.stl"
+    ],
+    [
+      "scan_boost.stl",
+      "rig_link.stl"
+    ]
   ],
   "hero": "scanning_rig_assembly.stl"
 }

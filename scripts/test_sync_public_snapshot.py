@@ -15,8 +15,12 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from sync_public_snapshot import (
     SECRET_SCAN_SKIP,
     SNAPSHOT_EXCLUDES,
+    STAGING_MARKER,
+    StagingDirError,
     build_snapshot,
     is_excluded,
+    mirror_files,
+    prepare_staging_dir,
     scan_for_secrets,
 )
 
@@ -144,6 +148,140 @@ class TestBuildSnapshot(unittest.TestCase):
                 build_snapshot(src, dst, ["part.scad"])
                 with open(os.path.join(dst, "part.scad")) as fh:
                     self.assertEqual(fh.read(), content)
+
+    def test_removes_stale_file_from_staging(self):
+        with tempfile.TemporaryDirectory() as src:
+            with tempfile.TemporaryDirectory() as dst:
+                keep_dir = os.path.join(src, "keep")
+                os.makedirs(keep_dir)
+                with open(os.path.join(keep_dir, "a.scad"), "w") as fh:
+                    fh.write("sphere(10);")
+
+                with open(os.path.join(dst, STAGING_MARKER), "w") as fh:
+                    fh.write("marker")
+                stale_dir = os.path.join(dst, "secret")
+                os.makedirs(stale_dir)
+                with open(os.path.join(stale_dir, "leak.md"), "w") as fh:
+                    fh.write("should not survive")
+
+                build_snapshot(src, dst, ["keep/a.scad"])
+
+                self.assertTrue(os.path.isfile(os.path.join(dst, "keep", "a.scad")))
+                self.assertFalse(os.path.exists(os.path.join(dst, "secret", "leak.md")))
+
+    def test_removes_stale_file_deleted_from_repo(self):
+        with tempfile.TemporaryDirectory() as src:
+            with tempfile.TemporaryDirectory() as dst:
+                with open(os.path.join(dst, STAGING_MARKER), "w") as fh:
+                    fh.write("marker")
+                with open(os.path.join(dst, "gone.md"), "w") as fh:
+                    fh.write("should not survive")
+
+                build_snapshot(src, dst, [])
+
+                self.assertFalse(os.path.exists(os.path.join(dst, "gone.md")))
+
+    def test_marker_written(self):
+        with tempfile.TemporaryDirectory() as src:
+            with tempfile.TemporaryDirectory() as dst:
+                build_snapshot(src, dst, [])
+                self.assertTrue(os.path.isfile(os.path.join(dst, STAGING_MARKER)))
+
+
+class TestPrepareStagingDir(unittest.TestCase):
+
+    def test_refuses_unmarked_non_empty_dir(self):
+        with tempfile.TemporaryDirectory() as dst:
+            important = os.path.join(dst, "important.txt")
+            with open(important, "w") as fh:
+                fh.write("do not delete")
+
+            with self.assertRaises(StagingDirError):
+                prepare_staging_dir(dst)
+
+            self.assertTrue(os.path.isfile(important))
+
+    def test_build_snapshot_refuses_unmarked_dir(self):
+        with tempfile.TemporaryDirectory() as src:
+            with tempfile.TemporaryDirectory() as dst:
+                important = os.path.join(dst, "important.txt")
+                with open(important, "w") as fh:
+                    fh.write("do not delete")
+
+                with self.assertRaises(StagingDirError):
+                    build_snapshot(src, dst, [])
+
+                self.assertTrue(os.path.isfile(important))
+
+    def test_accepts_empty_existing_dir(self):
+        with tempfile.TemporaryDirectory() as dst:
+            prepare_staging_dir(dst)
+            self.assertTrue(os.path.isfile(os.path.join(dst, STAGING_MARKER)))
+
+    def test_creates_missing_dir(self):
+        with tempfile.TemporaryDirectory() as parent:
+            staging = os.path.join(parent, "new_staging")
+            prepare_staging_dir(staging)
+            self.assertTrue(os.path.isfile(os.path.join(staging, STAGING_MARKER)))
+
+    def test_rejects_file_path(self):
+        with tempfile.TemporaryDirectory() as parent:
+            file_path = os.path.join(parent, "a_file.txt")
+            with open(file_path, "w") as fh:
+                fh.write("not a directory")
+            with self.assertRaises(StagingDirError):
+                prepare_staging_dir(file_path)
+
+    def test_rejects_symlink(self):
+        with tempfile.TemporaryDirectory() as parent:
+            real_dir = os.path.join(parent, "real")
+            os.makedirs(real_dir)
+            with open(os.path.join(real_dir, "keep.txt"), "w") as fh:
+                fh.write("keep me")
+            link_path = os.path.join(parent, "link")
+            os.symlink(real_dir, link_path)
+
+            with self.assertRaises(StagingDirError):
+                prepare_staging_dir(link_path)
+
+            self.assertTrue(os.path.isfile(os.path.join(real_dir, "keep.txt")))
+
+
+class TestMirrorFiles(unittest.TestCase):
+
+    def test_copies_only_listed_files(self):
+        with tempfile.TemporaryDirectory() as staging:
+            with tempfile.TemporaryDirectory() as dest:
+                with open(os.path.join(staging, "a.scad"), "w") as fh:
+                    fh.write("cube(1);")
+                with open(os.path.join(staging, STAGING_MARKER), "w") as fh:
+                    fh.write("marker")
+                with open(os.path.join(staging, "stale.md"), "w") as fh:
+                    fh.write("stale")
+
+                mirror_files(staging, dest, ["a.scad"])
+
+                self.assertTrue(os.path.isfile(os.path.join(dest, "a.scad")))
+                self.assertFalse(os.path.exists(os.path.join(dest, "stale.md")))
+                self.assertFalse(os.path.exists(os.path.join(dest, STAGING_MARKER)))
+
+    def test_creates_nested_parents(self):
+        with tempfile.TemporaryDirectory() as staging:
+            with tempfile.TemporaryDirectory() as dest:
+                nested_dir = os.path.join(staging, "deep", "nested")
+                os.makedirs(nested_dir)
+                with open(os.path.join(nested_dir, "b.scad"), "w") as fh:
+                    fh.write("sphere(1);")
+
+                mirror_files(staging, dest, ["deep/nested/b.scad"])
+
+                self.assertTrue(os.path.isfile(os.path.join(dest, "deep", "nested", "b.scad")))
+
+    def test_missing_source_raises(self):
+        with tempfile.TemporaryDirectory() as staging:
+            with tempfile.TemporaryDirectory() as dest:
+                with self.assertRaises(StagingDirError):
+                    mirror_files(staging, dest, ["absent.scad"])
 
 
 def _git_available():

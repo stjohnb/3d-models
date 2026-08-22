@@ -1,0 +1,85 @@
+{
+  "parameters": [
+    {
+      "name": "boost_setback",
+      "label": "Setback — how far back the camera moves (mm)",
+      "type": "number",
+      "min": 100,
+      "max": 200,
+      "step": 5,
+      "default": 120
+    },
+    {
+      "name": "boost_lift",
+      "label": "Boost lift — pocket floor rise (mm)",
+      "type": "number",
+      "min": 20,
+      "max": 60,
+      "step": 5,
+      "default": 20
+    },
+    {
+      "name": "boost_tilt",
+      "label": "Nose-down pitch given to the stand (degrees)",
+      "type": "number",
+      "min": 0,
+      "max": 30,
+      "step": 5,
+      "default": 20
+    },
+    {
+      "name": "stand_lift",
+      "label": "Stand lift — must match rig link (mm)",
+      "type": "number",
+      "min": 0,
+      "max": 50,
+      "step": 1,
+      "default": 25
+    },
+    {
+      "name": "base_d",
+      "label": "Turntable base diameter — must match rig link (mm)",
+      "type": "number",
+      "min": 160,
+      "max": 220,
+      "step": 1,
+      "default": 166
+    },
+    {
+      "name": "stand_gap",
+      "label": "Gap from collar to stand dock — must match rig link (mm)",
+      "type": "number",
+      "min": 3,
+      "max": 60,
+      "step": 1,
+      "default": 6
+    },
+    {
+      "name": "link_clear",
+      "label": "Collar-to-base clearance — must match rig link (mm)",
+      "type": "number",
+      "min": 0.2,
+      "max": 1,
+      "step": 0.05,
+      "default": 0.4
+    },
+    {
+      "name": "stand_w",
+      "label": "Stand width — must match phone stand (mm)",
+      "type": "number",
+      "min": 60,
+      "max": 120,
+      "step": 5,
+      "default": 80
+    },
+    {
+      "name": "boost_clear",
+      "label": "Plinth-to-dock clearance (mm)",
+      "type": "number",
+      "min": 0.2,
+      "max": 1,
+      "step": 0.05,
+      "default": 0.35
+    }
+  ]
+}

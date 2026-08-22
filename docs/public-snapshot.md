@@ -9,7 +9,7 @@ exposing ongoing development work.
 
 ## Safety mechanisms
 
-Two independent layers prevent secrets and strategy notes from leaking.
+Three independent layers prevent secrets and strategy notes from leaking.
 
 **1. Tracked-files-only enumeration.**
 The tool enumerates files via `git ls-files -z` — untracked files can never
@@ -32,6 +32,19 @@ contains the pattern strings themselves: the tool source
 real secret values — the live values live only in the gitignored, untracked
 `.mcp-claws.json` — so they stay in the snapshot but skip the secret scan
 (see `SECRET_SCAN_SKIP`).
+
+**3. Staging directory is authoritative.**
+Every run rebuilds `--staging-dir` from scratch — the directory is deleted and
+recreated before any file is copied in — so a file staged by an earlier run
+and since excluded, deleted, or `git rm`'d cannot survive into a later
+`--push`. The push step mirrors the explicit included-files list rather than
+walking the staging directory, so nothing that was not scanned this run can
+reach the mirror.
+
+To make that deletion safe, the tool writes a `.snapshot-staging` marker file
+into every staging directory it creates. If `--staging-dir` points at a
+directory that is non-empty and carries no marker, the tool aborts with a
+non-zero exit code and deletes nothing — use an empty or dedicated path.
 
 ## Exclusion set
 
@@ -68,6 +81,8 @@ python3 scripts/sync_public_snapshot.py --staging-dir /tmp/snap
 
 This prints a summary (files included/excluded, staging path) and exits 0.
 Inspect `/tmp/snap` to confirm the snapshot looks right before pushing.
+Re-running against the same `--staging-dir` is safe and expected: the
+directory is wiped and rebuilt each time.
 
 **Push to the public repo (requires maintainer push credentials for stjohnb/3d-models):**
 

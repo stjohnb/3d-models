@@ -19,12 +19,13 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── macbook-pro-laptop-stand/  # Parametric vertical laptop dock with swept arch frame
 ├── nz-ski-fields/        # Topographic terrain model of the NZ ski-fields region (3-part split)
 ├── power-workshop/       # Fisher-Price Power Workshop replacement parts
-├── scanning-rig/         # Photogrammetry rig: hand-rotated turntable + generic leaning phone stand
+├── scanning-rig/         # Photogrammetry rig: hand-rotated turntable + generic leaning phone stand + connecting link + optional camera setback/boost plinth
 ├── sink-tray/            # Sink tray foot
 ├── toothbrush/           # Toothbrush/toothpaste holder system
 ├── ukulele-wall-hook/    # Single-piece wall-mounted yoke that cradles a ukulele neck
 ├── vacuum-hose/          # Vacuum hose fittings (adapter and reducer)
 ├── ideas/                # Feature ideas, rejected patterns, and cross-project learnings
+├── scans/                # Watertight reference meshes of scanned real-world objects, as design input; the only committed STLs (see `scans/README.md`)
 ├── scripts/
 │   ├── scad-dep-graph.sh       # Generates per-project Mermaid dependency graphs
 │   ├── capped-openscad.sh      # Wraps openscad in a memory + wall-clock cap (CI render steps; issue #272)
@@ -38,6 +39,9 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_check_interference.py  # Tests for check_interference
 │   ├── fetch_openscad_wasm.py  # Fetches pinned openscad-wasm release into .cache/ and stages to site/openscad/
 │   ├── test_fetch_openscad_wasm.py # Tests for fetch_openscad_wasm (mocks urllib, verifies zip parsing)
+│   ├── threejs_assets.py       # Single source of truth for the pinned Three.js version and SHA-256 asset hashes
+│   ├── fetch_threejs.py        # Fetches the pinned Three.js release into .cache/threejs/ and stages it same-origin to site/vendor/three/<version>/ with hash verification (issue #403)
+│   ├── test_fetch_threejs.py   # Tests for fetch_threejs (hash verification, staging)
 │   ├── fetch_terrain_heightmap.py  # One-off generator: fetch a lat/lon terrain heightmap PNG (Mapzen terrarium tiles via AWS Open Data); not used by CI
 │   ├── test_fetch_terrain_heightmap.py # Tests for fetch_terrain_heightmap (mocks requests, verifies slippy math and decode)
 │   ├── generate_lake_bed.py        # One-off generator: bake lakebed bathymetry PNG from heightmap for nz-ski-fields; not used by CI
@@ -45,19 +49,25 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_render_view.py     # Tests for render_view
 │   ├── scan_pipeline.py        # Photogrammetry CLI: scanning-rig capture video → scaled STL (operator tool, not used by CI)
 │   ├── test_scan_pipeline.py   # Tests for scan_pipeline (stage selection, argument defaults)
-│   ├── scan_frames.py          # Frame extraction (ffmpeg) and sharpness-binned frame selection for scan_pipeline
-│   ├── test_scan_frames.py     # Tests for scan_frames' select_sharp_frames binning
+│   ├── scan_frames.py          # Frame extraction (ffmpeg), sharpness-binned and hold-aware frame selection for scan_pipeline
+│   ├── test_scan_frames.py     # Tests for scan_frames' binned and hold-detection selectors
 │   ├── scan_masks.py           # Platter-ellipse + salient-object masking for scan_pipeline (COLMAP mask PNGs)
 │   ├── test_scan_masks.py      # Tests for scan_masks; needs the `scan` devShell, so excluded from CI's unit-test step
 │   ├── scan_colmap.py          # COLMAP/OpenMVS command lines for scan_pipeline (CPU-only: never patch_match_stereo)
 │   ├── test_scan_colmap.py     # Tests for scan_colmap's argv builders and sparse-model selection; also validates option names against a real colmap when one is on PATH
 │   ├── scan_mesh.py            # Platter-plane fit, mm scaling, cropping and STL export for scan_pipeline
 │   ├── test_scan_mesh.py       # Tests for scan_mesh; only imports numpy/trimesh, both in the `default` devShell, so runs in CI's unit-test step
+│   ├── scan_reference.py       # Watertight, size-budgeted reference meshes from a cleaned scan (convex hull / slab-hull union) for scan_pipeline
+│   ├── test_scan_reference.py  # Tests for scan_reference; only imports numpy/trimesh/manifold3d, all in the `default` devShell, so runs in CI's unit-test step
+│   ├── external_assets.py      # Assets a project's .scad files reference from outside the project dir (used by CI's source-zip and parameter-manifest steps)
+│   ├── test_external_assets.py # Tests for external_assets
 │   ├── render_cache.py         # Content-addressed render cache key computation (used by CI render step)
 │   ├── test_render_cache.py    # Tests for render_cache
 │   ├── project_dates.py        # Per-project last-commit dates (models.json `updated`; landing-page recency ordering)
 │   ├── test_project_dates.py   # Tests for project_dates
 │   ├── test_generate_standalone.py  # Regression tests for standalone-viewer HTML injection escaping (filament colors, SEO head fields, JSON-LD)
+│   ├── test_scad_fonts.py      # Pins the no-text()/no-font rule (the deployed openscad-wasm build ships no fonts)
+│   ├── test_scad_orientation.py  # Pins the no-top-level-rotate([-90,0,0]) rule (see Viewer Rotation below); one allowlisted exception
 │   ├── test_wasm_customizer.mjs  # Node.js integration test for the in-browser WASM customizer pipeline
 │   ├── test_hash_routing.mjs    # Node.js test for index.html's parseHash/formatHash URL grammar
 │   ├── test_hash_history.mjs    # Node.js test for index.html's hashWriteMode push/replace/skip decision
@@ -129,7 +139,7 @@ generated artifacts produced by CI.
 | `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons; single-slot and dual-slot (two laptops side by side) variants |
 | `nz-ski-fields/` | Topographic NZ terrain model split into three separately-printable parts (lake/terrain/snow); viewer shows them as a coloured composite assembly |
 | `power-workshop/` | Fisher-Price Power Workshop replacement parts sharing a square-peg connection |
-| `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings) and a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased) |
+| `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings), a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased), a `rig_link` connecting the two so hand-turning cannot slide the base out from under the fixed masking ellipse, and an optional `scan_boost` plinth that sets the camera back 120mm and higher when the platter fills the frame |
 | `sink-tray/` | Single-file sink tray foot with counterbore |
 | `toothbrush/` | Multi-part holder system with dovetail-attached clips and a removable drip tray |
 | `ukulele-wall-hook/` | Single-piece wall-mounted yoke with two upturned prongs that cradle a ukulele neck behind the headstock |
@@ -404,7 +414,7 @@ Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
 `esp32-display-case` (`case_back`, `case_front`), `hex-connector` (`hex_connector`),
 `macbook-pro-laptop-stand` (`laptop_stand`, `dual_laptop_stand`),
 `nz-ski-fields` (`lake`, `terrain`, `snow`),
-`scanning-rig` (`turntable_base`, `turntable_platter`, `phone_stand`),
+`scanning-rig` (`turntable_base`, `turntable_platter`, `phone_stand`, `rig_link`, `scan_boost`),
 `sink-tray` (`tray_foot`), `ukulele-wall-hook` (`ukulele_hook`), and
 `vacuum-hose` (`adapter`, `reducer`). Adding one
 for a new model is just a matter of dropping a `<basename>.parameters.json` next
@@ -451,6 +461,46 @@ so the exported STL is simultaneously print-oriented (flat face on the bed) and
 sensible in the viewer — a model built this way never needs the print and
 viewer orientations reconciled at all.
 
+### Scan Reference Meshes (`scans/`)
+
+Real-world objects photographed on the scanning rig can be brought into the
+repo as design input, so a model can be built around one — `difference()` a
+scanned toothpaste tube out of a holder body (issue #439).
+
+Two things stand in the way of using a raw scan directly, and `scans/` answers
+both:
+
+- **The raw scan is not a solid.** `scan_pipeline.py`'s `clean` stage exports
+  the OpenMVS mesh as an open shell — a single low camera ring never sees the
+  underside of the object — so `trimesh.is_watertight` is `False` and OpenSCAD's
+  CSG rejects it as an operand. The `reference` stage
+  (`scripts/scan_reference.py`) closes it, either as a convex hull (default;
+  tiny, always available, right for convex-ish objects) or as a union of
+  overlapping per-slab convex hulls (`--reference-mode slabs`), which keeps
+  concavity that varies with Z. Both are watertight by construction. Quadric
+  decimation is deliberately not offered: it lowers the face count but leaves
+  the boundary open.
+- **`*.stl` is gitignored.** `.gitignore` carves these back out with
+  `!scans/**/*.stl`. The rejected "committed revision snapshots" pattern (#198)
+  covered *derived outputs* of committed `.scad` sources, which CI can always
+  reproduce. A scan mesh is *captured input data* — unreproducible from
+  anything in this repo — the same category as `nz-ski-fields/heightmap.png`.
+  A size budget (≤500 KB, enforced by the stage) keeps that carve-out honest.
+
+Each object gets `scans/<object>/<object>-reference.stl` plus a sanitised
+`scan-report.json` for provenance; `scans/README.md` has the full contract. The
+meshes are in platter-centred millimetres and stay Z-up like every other source
+(see Viewer Rotation above).
+
+A renderable may then `import()` one by relative path.
+`scripts/render_cache.py` already hashes `import()`/`surface()` targets into the
+cache key, so editing a mesh invalidates the render. Two build steps assume a
+project is self-contained, and `scripts/external_assets.py` bridges both: the
+source zip gains the external asset, and the parameter-manifest validation step
+**fails a renderable that both imports an external asset and ships a
+`<basename>.parameters.json`** — the in-browser customizer writes a project's
+files flat into the wasm FS, where a `../scans/…` path cannot resolve.
+
 ## Iterative Design Helpers
 
 Utilities for use during active design work — not part of the CI pipeline.
@@ -469,11 +519,13 @@ When iterating on a model, render any view of any `.scad` file without going thr
 
 ```bash
 # Top-down view into cavity openings
-python3 scripts/render_view.py power-workshop/drill_socket.scad --view top -o /tmp/top.png
+python3 scripts/render_view.py power-workshop/drill_socket.scad --view top
 
 # Custom camera angle with explicit gimbal coordinates
-python3 scripts/render_view.py power-workshop/drill_socket.scad --camera=0,0,0,75,0,25,500 --projection=perspective -o /tmp/custom.png
+python3 scripts/render_view.py power-workshop/drill_socket.scad --camera=0,0,0,75,0,25,500 --projection=perspective -o ~/renders/custom.png
 ```
+
+With no `-o`, the PNG is written into a fresh private temp directory (0700, created per invocation) and the path is printed — the old fixed `/tmp/render.png` default was replaceable via a planted symlink on the shared build hosts (#429).
 
 Available `--view` presets: `iso` (default), `top`, `bottom`, `front`, `back`, `left`, `right`, `custom`.
 Pass `--camera=tx,ty,tz,rx,ry,rz,dist` to use an arbitrary angle; this implies `--view custom`.
@@ -558,9 +610,11 @@ Reusable how-to guides for common development tasks live in `playbooks/`.
 - **`playbooks/scan_a_capture.md`** — how to run `scan_pipeline.py` over a
   scanning-rig capture video to reconstruct a mesh. Covers the `nix develop
   .#scan` shell, the two-step platter-ellipse confirmation via
-  `roi-preview.jpg`, the six pipeline stages and their wall-clock cost, the
+  `roi-preview.jpg`, the seven pipeline stages and their measured wall-clock cost at 720p and 4K, the
   `--mask-mode roi` no-ML fallback, how the platter's known 150 mm diameter
-  sets the exported scale, and capture guidance (the camera must not move).
+  sets the exported scale, capture guidance (the camera must not move, the scene must stay rigid, and the platter needs non-repeating marks), and
+  the `--capture-mode holds` selector for step-and-hold captures on a marked
+  platter.
 
 ## AI Agent Configuration
 

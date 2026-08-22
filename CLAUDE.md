@@ -9,7 +9,10 @@ Before working on any issue or change, read:
 - `docs/OVERVIEW.md` — architecture, model projects, key patterns (authoritative)
 - `docs/ci-pipeline.md` — CI/CD step-by-step detail (when touching CI or build)
 - `docs/OPENSCAD_LIBRARIES.md` — available third-party libraries (when proposing new models or geometry)
+- `docs/claws-automation.md` — how the Claws automation service manages issues, PRs, and labels for this repo
 - `ideas/rejected.md` — patterns the maintainer has already declined; do not re-propose these
+
+All changes land via pull request; nothing is pushed directly to the default branch — see [docs/claws-automation.md](docs/claws-automation.md) for the full lifecycle.
 
 ## Self-hosted runner constraint
 
@@ -40,6 +43,8 @@ The runners are NixOS and provide only a baseline (nix, git, docker). Every tool
 ## Filename safety
 
 CI refuses to render any `.scad` file whose basename contains characters outside `[A-Za-z0-9._ -]`. Do not introduce filenames with other characters.
+
+The same charset applies to `scans/<object>/` directory names — `scan_reference.py` validates it before installing. `scans/**/*.stl` is the one carve-out from the `*.stl` gitignore: scan reference meshes are captured input data, not build output, and are the only committed STLs in the repo (#439). See `scans/README.md`.
 
 ## XSS / HTML safety
 

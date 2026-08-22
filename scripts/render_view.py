@@ -2,16 +2,20 @@
 """Render an arbitrary OpenSCAD view to PNG (developer/agent tool, not used by CI).
 
 Usage:
-    python3 scripts/render_view.py power-workshop/drill_socket.scad --view top -o /tmp/top.png
-    python3 scripts/render_view.py power-workshop/drill_socket.scad --camera=0,0,0,75,0,25,500 --projection=perspective -o /tmp/custom.png
+    python3 scripts/render_view.py power-workshop/drill_socket.scad --view top
+    python3 scripts/render_view.py power-workshop/drill_socket.scad --camera=0,0,0,75,0,25,500 --projection=perspective -o ~/renders/custom.png
+
+With no -o, the PNG is written to a fresh private temp directory and the path is printed.
 """
 
 import argparse
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
+import tempfile
 
 # Gimbal camera presets: tx,ty,tz,rx,ry,rz,dist
 # rx=0,ry=0,rz=0 looks straight down the +Y axis at the XZ plane from above
@@ -54,8 +58,9 @@ def parse_args(argv=None):
     parser.add_argument(
         "-o", "--output",
         type=pathlib.Path,
-        default=pathlib.Path("/tmp/render.png"),
-        help="Output PNG path (default: /tmp/render.png)",
+        default=None,
+        help="Output PNG path (default: a new private temp directory, "
+             "created per invocation; the chosen path is printed).",
     )
     parser.add_argument(
         "--view",
@@ -178,6 +183,28 @@ def build_openscad_argv(args):
     return argv
 
 
+def resolve_output_path(output, scad_file):
+    """Resolve the PNG output path, creating a private temp dir when needed.
+
+    An explicit --output is returned unchanged, with no temp dir. With no
+    --output, a fresh 0700 directory is created via tempfile.mkdtemp() and
+    the render goes to <dir>/<sanitized scad stem>.png. The old default was
+    the fixed, world-writable path /tmp/render.png, which any other local
+    account on a shared build host could pre-plant as a symlink so that
+    openscad -o truncated the symlink's target (issue #429).
+
+    Returns (path, temp_dir) where temp_dir is the created directory as a
+    pathlib.Path, or None when --output was explicit.
+    """
+    if output is not None:
+        return output, None
+    stem = re.sub(r"[^A-Za-z0-9._ -]", "_", scad_file.stem)
+    if not stem.strip("."):
+        stem = "render"
+    temp_dir = pathlib.Path(tempfile.mkdtemp(prefix="render_view-"))
+    return temp_dir / f"{stem}.png", temp_dir
+
+
 def main():
     args = parse_args()
 
@@ -193,7 +220,9 @@ def main():
         )
         sys.exit(1)
 
-    args.output.parent.mkdir(parents=True, exist_ok=True)
+    output, temp_dir = resolve_output_path(args.output, args.scad_file)
+    args.output = output
+    output.parent.mkdir(parents=True, exist_ok=True)
 
     cmd = [openscad] + build_openscad_argv(args)
 
@@ -204,10 +233,17 @@ def main():
     result = subprocess.run(cmd, check=False, capture_output=False)
 
     if result.returncode != 0:
+        if temp_dir is not None and not output.exists():
+            try:
+                temp_dir.rmdir()
+            except OSError:
+                pass
         sys.exit(result.returncode)
 
     if not args.quiet:
-        print(f"Rendered {args.scad_file} [{args.view}] -> {args.output}")
+        print(f"Rendered {args.scad_file} [{args.view}] -> {output}")
+    elif temp_dir is not None:
+        print(output)
 
 
 if __name__ == "__main__":

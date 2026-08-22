@@ -130,6 +130,7 @@
                 opencv4
                 rembg
                 trimesh
+                manifold3d # trimesh boolean engine for scan_reference.py's slab-hull union
                 scipy
                 networkx
               ]))

@@ -14,6 +14,7 @@ import json
 import os
 import pathlib
 import shutil
+import statistics
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
@@ -31,7 +32,11 @@ from scan_colmap import (
     reconstruct_mesh_argv,
     run,
 )
-from scan_frames import extract_all_frames, probe_video, score_sharpness, select_sharp_frames
+from scan_frames import (
+    extract_all_frames, find_static_runs, hold_threshold, percentile,
+    probe_video, score_sharpness, score_sharpness_and_diffs,
+    select_hold_frames, select_sharp_frames, thin_evenly,
+)
 from scan_masks import (
     column_mask,
     frame_mask,
@@ -41,7 +46,7 @@ from scan_masks import (
     write_masked_pair,
 )
 
-STAGES = ["frames", "masks", "sfm", "dense", "mesh", "clean"]
+STAGES = ["frames", "masks", "sfm", "dense", "mesh", "clean", "reference"]
 
 # A mask covering more than this fraction of the frame means the ellipse is
 # almost certainly not on the platter — bail rather than burn hours on SfM.
@@ -54,6 +59,10 @@ MAX_EMPTY_FRACTION = 0.30
 # Below this fraction of selected frames registered by the mapper, the sparse
 # model is not trustworthy — almost always a mis-placed platter ellipse.
 MIN_REGISTERED_FRACTION = 0.60
+
+# Fewer holds than this means the capture almost certainly was not shot
+# step-and-hold — bail rather than feed SfM a handful of views.
+MIN_HOLDS = 20
 
 
 def stages_to_run(from_stage, to_stage, only):
@@ -99,7 +108,18 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--frames", type=int, default=150,
-        help="Number of sharp frames to select from the capture (default: 150)",
+        help="Number of frames to select (default: 150; in --capture-mode "
+             "holds this is an upper cap, one frame per hold)",
+    )
+    parser.add_argument(
+        "--capture-mode", choices=["continuous", "holds"], default="continuous",
+        help="continuous: sharpest frame per contiguous bin (default). "
+             "holds: one frame per detected step-and-hold pause; requires a "
+             "platter with non-repeating marks (see playbooks/scan_a_capture.md).",
+    )
+    parser.add_argument(
+        "--min-holds", type=int, default=MIN_HOLDS,
+        help="Fail if --capture-mode holds detects fewer holds than this (default: 20)",
     )
     parser.add_argument(
         "--platter", type=_ellipse_arg, default=None,
@@ -107,7 +127,9 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--object-height", type=float, default=400,
-        help="Pixels above the platter centre to include in the mask (default: 400)",
+        help="Pixels above the platter centre to include in the mask "
+             "(default: 400). Pixels, not mm — scale it with the capture "
+             "resolution; 400 suits 720p, ~900 suits a tall object at 4K",
     )
     parser.add_argument(
         "--mask-mode", choices=["salient", "roi"], default="salient",
@@ -149,6 +171,30 @@ def parse_args(argv=None):
         help="CPU threads for feature extraction and matching (default: all cores)",
     )
     parser.add_argument(
+        "--reference-out",
+        type=pathlib.Path,
+        default=None,
+        help="Reference mesh path (default: <output>-reference.stl)",
+    )
+    parser.add_argument(
+        "--reference-mode", choices=["hull", "slabs"], default="hull",
+        help="hull: convex hull, for convex-ish objects. slabs: union of "
+             "per-slab hulls, which keeps concavity that varies with Z.",
+    )
+    parser.add_argument(
+        "--reference-slabs", type=int, default=12,
+        help="Horizontal slabs for --reference-mode slabs (default: 12)",
+    )
+    parser.add_argument(
+        "--reference-max-bytes", type=int, default=512000,
+        help="Size budget for the reference mesh, in bytes (default: 512000)",
+    )
+    parser.add_argument(
+        "--install-as", type=str, default=None,
+        help="Copy the reference mesh and its report into scans/<name>/ "
+             "(committed input data)",
+    )
+    parser.add_argument(
         "--from", dest="from_stage", choices=STAGES, default=None,
         help="First stage to run",
     )
@@ -173,6 +219,8 @@ def parse_args(argv=None):
         args.work_dir = pathlib.Path(".cache") / "scan" / stem
     if args.output is None:
         args.output = args.work_dir / "output" / f"{stem}.stl"
+    if args.reference_out is None:
+        args.reference_out = args.output.with_name(args.output.stem + "-reference.stl")
     return args
 
 
@@ -187,6 +235,48 @@ def _raw_dir(work_dir):
 
 def _selection_path(work_dir):
     return work_dir / "selected.json"
+
+
+def _select_hold_indices(args, paths):
+    """Frame indices for step-and-hold captures: one sharp frame per hold."""
+    scores, diffs = score_sharpness_and_diffs(paths)
+    if not diffs:
+        sys.exit("error: --capture-mode holds needs at least 2 frames")
+
+    threshold = hold_threshold(diffs)
+    runs = find_static_runs(diffs, threshold)
+    selected = select_hold_frames(scores, runs)
+
+    report = {
+        "frames_decoded": len(paths),
+        "diff_threshold": round(threshold, 4),
+        "diff_p25": round(percentile(diffs, 0.25), 4),
+        "diff_median": round(statistics.median(diffs), 4),
+        "diff_max": round(max(diffs), 4),
+        "holds_detected": len(runs),
+        "hold_frame_counts": [stop - start for start, stop in runs],
+        "selected_frame_indices": selected,
+    }
+    report_path = args.work_dir / "hold-report.json"
+    report_path.write_text(json.dumps(report, indent=2) + "\n")
+    _log(args, f"detected {len(runs)} holds (diff threshold {threshold:.2f}) -> {report_path}")
+
+    if len(selected) < args.min_holds:
+        sys.exit(
+            f"error: only {len(selected)} holds detected "
+            f"(diff threshold {threshold:.2f}, median {statistics.median(diffs):.2f}, "
+            f"max {max(diffs):.2f}) — this capture does not look step-and-hold. "
+            f"Re-run with --capture-mode continuous, or lower --min-holds if you "
+            f"deliberately shot fewer steps. If the whole video reads as one hold "
+            f"the platter never turned; see "
+            f"{args.work_dir / 'hold-report.json'}"
+        )
+
+    if len(selected) > args.frames:
+        selected = thin_evenly(selected, args.frames)
+        _log(args, f"thinned {len(runs)} holds to {args.frames} frames (--frames cap)")
+
+    return selected
 
 
 def run_frames(args):
@@ -204,11 +294,14 @@ def run_frames(args):
         sys.exit(f"error: ffmpeg extracted no frames from {args.video}")
     _log(args, f"extracted {len(paths)} frames to {raw_dir}")
 
-    scores = score_sharpness(paths)
-    selected = select_sharp_frames(scores, args.frames)
+    if args.capture_mode == "holds":
+        selected = _select_hold_indices(args, paths)
+    else:
+        scores = score_sharpness(paths)
+        selected = select_sharp_frames(scores, args.frames)
     names = [paths[i].name for i in selected]
     _selection_path(args.work_dir).write_text(json.dumps(names, indent=2) + "\n")
-    _log(args, f"selected {len(names)} sharp frames -> {_selection_path(args.work_dir)}")
+    _log(args, f"selected {len(names)} frames ({args.capture_mode}) -> {_selection_path(args.work_dir)}")
     return len(names)
 
 
@@ -486,6 +579,7 @@ def run_clean(args):
         "frames_selected": len(json.loads(_selection_path(args.work_dir).read_text()))
         if _selection_path(args.work_dir).exists() else None,
         "mask_mode": args.mask_mode,
+        "capture_mode": args.capture_mode,
         "platter_ellipse": list(args.platter) if args.platter else None,
         "sparse_images_registered": count_registered_images(pick_sparse_model(sparse_dir))
         if sparse_dir.is_dir() else None,
@@ -503,6 +597,57 @@ def run_clean(args):
     return 1
 
 
+def run_reference(args):
+    """Close the cleaned scan into a watertight mesh OpenSCAD can difference()."""
+    import trimesh
+
+    from scan_reference import (
+        assert_watertight,
+        build_reference,
+        install_reference,
+        sanitised_report,
+        write_reference,
+    )
+
+    _require(args.output, "run the clean stage first")
+    mesh = trimesh.load(str(args.output), process=False)
+
+    reference = build_reference(
+        mesh, mode=args.reference_mode, slabs=args.reference_slabs
+    )
+    assert_watertight(reference)
+    write_reference(reference, args.reference_out, max_bytes=args.reference_max_bytes)
+    size = args.reference_out.stat().st_size
+    _log(
+        args,
+        f"wrote {args.reference_out} ({len(reference.faces)} faces, "
+        f"{size} bytes, watertight)",
+    )
+
+    extra = {
+        "mode": args.reference_mode,
+        "slabs": args.reference_slabs if args.reference_mode == "slabs" else None,
+        "faces": int(len(reference.faces)),
+        "bytes": int(size),
+        "watertight": True,
+        "bbox_mm": [[float(v) for v in row] for row in reference.bounds],
+        "source_faces": int(len(mesh.faces)),
+    }
+
+    if args.install_as:
+        report_path = args.work_dir / "scan-report.json"
+        _require(report_path, "run the clean stage first")
+        report = sanitised_report(json.loads(report_path.read_text()), extra)
+        repo_root = pathlib.Path(__file__).resolve().parent.parent
+        stl_dest, report_dest = install_reference(
+            args.reference_out, report, args.install_as, repo_root,
+            force=args.force,
+        )
+        _log(args, f"installed {stl_dest} and {report_dest}")
+
+    return 1
+
+
 STAGE_RUNNERS = {
     "frames": run_frames,
     "masks": run_masks,
@@ -510,6 +655,7 @@ STAGE_RUNNERS = {
     "dense": run_dense,
     "mesh": run_mesh,
     "clean": run_clean,
+    "reference": run_reference,
 }
 
 # External binaries each stage shells out to, so a missing tool fails before

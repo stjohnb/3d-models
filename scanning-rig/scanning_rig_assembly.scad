@@ -13,10 +13,20 @@ include <_scanning_rig.scad>
     translate([0, 0, base_t + race_clear])
         turntable_platter();
 
-    // Phone stand stood upright, lip and camera facing the turntable.
+    // Link: collar around the base, dock carrying the stand at a fixed distance.
+    rig_link();
+
+    // Phone stand dropped into the link's dock, backrest and camera facing the
+    // turntable. stand_lift raises the camera to the ~40-45 degree elevation
+    // that single-ring scans want.
     // rotate([90, 0, 0]) sends the profile's +Y to +Z and the extrusion to -Y,
-    // so the stand_w/2 offset centres it on y = 0.
-    translate([base_d / 2 + 70, stand_w / 2, 0])
+    // so the stand_w/2 offset centres it on y = 0. mirror([1, 0, 0]) flips the
+    // stand end-for-end so its long rear foot, not the cradle, lands against
+    // the dock's front wall — that puts the backrest nearest the turntable, so
+    // a phone resting back against it has its camera facing the platter
+    // instead of facing away, out over the long foot.
+    translate([stand_origin_x, stand_w / 2, stand_lift])
         rotate([90, 0, 0])
-            phone_stand();
+            mirror([1, 0, 0])
+                phone_stand();
 }

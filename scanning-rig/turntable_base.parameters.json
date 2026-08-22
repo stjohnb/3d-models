@@ -26,6 +26,12 @@
       "max": 24,
       "step": 0.5,
       "default": 16
+    },
+    {
+      "name": "foot_pads",
+      "label": "Recess anti-slip pads into the underside",
+      "type": "boolean",
+      "default": true
     }
   ]
 }

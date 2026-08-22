@@ -142,6 +142,9 @@ jobs:
           import glob, json, os, sys
           from jsonschema import validate, ValidationError
 
+          sys.path.insert(0, 'scripts')
+          from external_assets import external_assets
+
           with open('parameters.schema.json') as f:
               schema = json.load(f)
 
@@ -212,6 +215,20 @@ jobs:
                   errors += 1
                   failed_paths.append(path)
                   continue
+              # Cross-validation: a renderable that pulls in an asset from
+              # outside its project dir (e.g. a scans/ reference mesh, #439)
+              # cannot be customized in the browser — the wasm FS is written
+              # flat from the project's own files, so ../scans/... does not
+              # resolve there. Refuse the combination rather than ship a
+              # customizer that 404s.
+              ext = external_assets(project_dir)
+              if ext:
+                  print(f'  FAIL: {path} — {scad_path} imports {ext} from outside {project_dir}; '
+                        f'the in-browser customizer cannot resolve external assets, so a model '
+                        f'importing a scan reference mesh must not ship a parameters manifest')
+                  errors += 1
+                  failed_paths.append(path)
+                  continue
               print(f'  PASS: {path}')
 
           with open('.param-failures', 'w') as f:
@@ -227,7 +244,7 @@ jobs:
       - name: Run Python unit tests for build scripts
         run: |
           cd scripts
-          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow test_generate_standalone test_scad_orientation test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap test_scan_mesh -v
+          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow test_generate_standalone test_scad_orientation test_scad_fonts test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap test_scan_mesh test_scan_reference test_external_assets -v
 
       # The flake's `openscad` is a wrapper around openscad-unstable that
       # forces the EGL/llvmpipe software-GL path (QT_QPA_PLATFORM=offscreen,
@@ -543,6 +560,15 @@ jobs:
             echo "Bundling source for $dir into $zipname"
             git ls-files -z -- "$dir" | xargs -0 -r zip -q "$zipname" \
               || { echo "::error::Failed to create $zipname"; exit 1; }
+            # Assets imported from outside the project (a scans/ reference
+            # mesh, #439) are not in git ls-files for $dir, and a source zip
+            # without them cannot be re-rendered.
+            mapfile -t extra < <(python3 scripts/external_assets.py "$dir")
+            if [ ${#extra[@]} -gt 0 ]; then
+              echo "  + external assets: ${extra[*]}"
+              printf '%s\0' "${extra[@]}" | xargs -0 -r zip -q "$zipname" \
+                || { echo "::error::Failed to add external assets to $zipname"; exit 1; }
+            fi
           done
 
       # No Xvfb: the flake's openscad wrapper renders PNGs offscreen via

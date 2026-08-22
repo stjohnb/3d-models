@@ -111,6 +111,13 @@ step:
   - The manifest filename must correspond to a renderable `.scad` in the same
     directory (no underscore-prefixed files, i.e. library files cannot have
     manifests)
+  - The project must not reference any asset from outside its own directory
+    (`scripts/external_assets.py`, which walks the project's `.scad` files
+    through `render_cache.collect_inputs`). A renderable that `import()`s a
+    scan reference mesh from `scans/` (issue #439) renders fine in CI, but the
+    in-browser customizer writes a project's files flat into the wasm
+    filesystem, where a `../scans/…` path cannot resolve — so that model must
+    not ship a parameters manifest at all
 - Records failed file paths to `.param-failures` (always creates the file, even
   when there are no manifests, so the enforce step's check is reliable)
 - Uses the **deferred enforcement** pattern — records `failed=true` to
@@ -123,18 +130,20 @@ test_fetch_openscad_wasm test_fetch_threejs test_render_cache
 test_capped_openscad test_viewer_invariants test_project_dates
 test_build_workflow test_generate_standalone test_scad_orientation
 test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap
-test_scan_mesh -v` from within the `scripts/` directory. These are
+test_scan_mesh test_scan_reference test_external_assets -v` from within the
+`scripts/` directory. These are
 fast unit tests that mock external I/O (network, filesystem) and run on
 every push. They guard the helper functions used throughout the CI
 pipeline against regressions. `test_generate_standalone` guards the two
 escaping layers in `generate-standalone.py`'s `_load_filament_colors_js`,
 `test_scad_orientation` pins the no-top-level-`rotate([-90,0,0])` source
 rule, and `test_generate_gallery` covers `pick_thumbnail` hero selection.
-The four `test_scan_*` modules (added for issue #407, which turned "every
+The `test_scan_*` modules (added for issue #407, which turned "every
 `scripts/test_*.py` must run somewhere or be explicitly excluded" into a
 guarded invariant — see `UnitTestStepCoverageTests` in
 `scripts/test_build_workflow.py`) can run here because `numpy`/`trimesh`
-now ship in the `default` devShell (issue #423); `test_scan_masks` stays
+now ship in the `default` devShell (issue #423) — `test_scan_reference`
+included, since `manifold3d` is there too; `test_scan_masks` stays
 excluded because `scan_masks.py` needs `opencv4`/`rembg`, which only the
 `scan` devShell provides.
 
@@ -426,7 +435,13 @@ that directory and archives them with their `<dir>/` path prefix preserved
 with the STL bundle. Files with spaces in their names (e.g.,
 `toothbrush/Toothbrush holder.scad`) are handled safely via `git ls-files -z |
 xargs -0`. Only git-tracked files are included — gitignored outputs (STLs,
-`.mcp-claws.json`) never enter the archive. Source zips are deployed alongside
+`.mcp-claws.json`) never enter the archive.
+
+`git ls-files -- "$dir"` cannot see an asset a `.scad` references from outside
+its own project directory, which would make the archive unrenderable. The step
+therefore also appends whatever `python3 scripts/external_assets.py "$dir"`
+prints — the committed scan reference meshes under `scans/` that the project
+`import()`s (issue #439). With no such model in the tree yet, this is a no-op. Source zips are deployed alongside
 STLs via the existing `aws s3 sync` step and referenced from `models.json` as
 the optional `sourceZip` field.
 

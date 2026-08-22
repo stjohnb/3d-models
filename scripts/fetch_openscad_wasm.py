@@ -25,7 +25,8 @@ import urllib.request
 OPENSCAD_WASM_VERSION = "2022.03.20"
 
 # Files we copy into site/openscad/. Fonts and the MCAD library are
-# intentionally omitted — no model in this repo uses text() or MCAD.
+# intentionally omitted — no model in this repo uses text() or MCAD
+# (pinned by scripts/test_scad_fonts.py).
 ASSET_FILES = ("openscad.js", "openscad.wasm.js", "openscad.wasm")
 
 # SHA-256 of each asset at the pinned version. Verified offline against

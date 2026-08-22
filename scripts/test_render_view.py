@@ -4,13 +4,24 @@ Tests argument parsing and openscad argv assembly only — no openscad invocatio
 Run with: python3 -m unittest scripts/test_render_view.py
 """
 
+import os
 import pathlib
+import shutil
+import stat
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
-from render_view import build_openscad_argv, parse_args, PRESETS, PRESETS_Y_UP
+from render_view import (
+    build_openscad_argv,
+    parse_args,
+    resolve_output_path,
+    PRESETS,
+    PRESETS_Y_UP,
+)
 
 
 def _args(**kwargs):
@@ -185,6 +196,58 @@ class TestArgParsing(unittest.TestCase):
     def test_defines_accumulate(self):
         args = parse_args(["test.scad", "-D", "a=1", "-D", "b=2"])
         self.assertEqual(args.defines, ["a=1", "b=2"])
+
+
+class TestOutputDefault(unittest.TestCase):
+
+    def test_parse_args_output_defaults_to_none(self):
+        self.assertIsNone(parse_args(["test.scad"]).output)
+
+    def test_parse_args_creates_no_temp_dir(self):
+        with mock.patch("render_view.tempfile.mkdtemp") as m:
+            parse_args(["test.scad"])
+            m.assert_not_called()
+
+    def test_explicit_output_returned_unchanged(self):
+        with mock.patch("render_view.tempfile.mkdtemp") as m:
+            path, tmp = resolve_output_path(pathlib.Path("/tmp/my.png"), pathlib.Path("a.scad"))
+            self.assertEqual(path, pathlib.Path("/tmp/my.png"))
+            self.assertIsNone(tmp)
+            m.assert_not_called()
+
+    def test_default_output_is_private_and_unique(self):
+        path1, tmp1 = resolve_output_path(None, pathlib.Path("power-workshop/drill_socket.scad"))
+        self.addCleanup(shutil.rmtree, str(tmp1), True)
+        path2, tmp2 = resolve_output_path(None, pathlib.Path("power-workshop/drill_socket.scad"))
+        self.addCleanup(shutil.rmtree, str(tmp2), True)
+
+        self.assertNotEqual(path1, path2)
+        self.assertNotEqual(tmp1, tmp2)
+        self.assertEqual(path1.name, "drill_socket.png")
+        self.assertEqual(path2.name, "drill_socket.png")
+        self.assertEqual(path1.parent, tmp1)
+        self.assertEqual(path2.parent, tmp2)
+        self.assertEqual(stat.S_IMODE(os.stat(tmp1).st_mode), 0o700)
+        self.assertEqual(stat.S_IMODE(os.stat(tmp2).st_mode), 0o700)
+
+    def test_default_output_is_not_the_old_constant(self):
+        path, tmp = resolve_output_path(None, pathlib.Path("test.scad"))
+        self.addCleanup(shutil.rmtree, str(tmp), True)
+
+        self.assertNotEqual(str(path), "/tmp/render.png")
+        self.assertNotEqual(path.parent, pathlib.Path(tempfile.gettempdir()))
+
+    def test_default_output_sanitizes_stem(self):
+        path, tmp = resolve_output_path(None, pathlib.Path("weird name$;.scad"))
+        self.addCleanup(shutil.rmtree, str(tmp), True)
+
+        self.assertEqual(path.name, "weird name__.png")
+
+    def test_default_output_dot_only_stem_falls_back(self):
+        path, tmp = resolve_output_path(None, pathlib.Path(".."))
+        self.addCleanup(shutil.rmtree, str(tmp), True)
+
+        self.assertEqual(path.name, "render.png")
 
 
 if __name__ == "__main__":

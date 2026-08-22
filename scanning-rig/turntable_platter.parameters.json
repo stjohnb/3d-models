@@ -53,6 +53,12 @@
       "max": 48,
       "step": 1,
       "default": 24
+    },
+    {
+      "name": "numerals",
+      "label": "Engrave tick numerals",
+      "type": "boolean",
+      "default": true
     }
   ]
 }

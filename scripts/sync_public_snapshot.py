@@ -51,6 +51,19 @@ SECRET_PATTERNS = [
     re.compile(r"-----BEGIN (?:RSA |OPENSSH |EC )?PRIVATE KEY-----"),
 ]
 
+# Marker written into a staging directory this tool owns. Its presence is what
+# authorises build_snapshot() to wipe a non-empty staging dir; without it we
+# refuse, so a mistyped --staging-dir can never delete the maintainer's files.
+STAGING_MARKER = ".snapshot-staging"
+STAGING_MARKER_TEXT = (
+    "Staging directory for scripts/sync_public_snapshot.py.\n"
+    "Contents are rebuilt from scratch on every run; do not put files here.\n"
+)
+
+
+class StagingDirError(Exception):
+    """Raised when --staging-dir is unsafe to clear or is missing a file."""
+
 
 def repo_root():
     """Return the absolute path to the git repo root."""
@@ -119,12 +132,45 @@ def scan_for_secrets(root, files, skip=None):
     return hits
 
 
-def build_snapshot(root, staging_dir, files):
-    """Copy the given file list from root into staging_dir.
+def prepare_staging_dir(staging_dir):
+    """Ensure staging_dir exists and is empty, deleting prior contents if safe.
 
-    Creates parent directories as needed. staging_dir is created if missing.
+    Raises StagingDirError if staging_dir is a symlink, an existing
+    non-directory, or a non-empty directory that lacks the STAGING_MARKER
+    file — in all of these cases nothing is deleted.
     """
-    pathlib.Path(staging_dir).mkdir(parents=True, exist_ok=True)
+    path = pathlib.Path(staging_dir)
+
+    if path.is_symlink():
+        raise StagingDirError(
+            f"{staging_dir} is a symlink; refusing to use it as a staging directory"
+        )
+
+    if path.exists():
+        if not path.is_dir():
+            raise StagingDirError(f"{staging_dir} exists and is not a directory")
+        entries = list(path.iterdir())
+        if entries:
+            if not (path / STAGING_MARKER).is_file():
+                raise StagingDirError(
+                    f"{staging_dir} is not empty and has no {STAGING_MARKER} marker; "
+                    "refusing to delete its contents. Use an empty or dedicated staging directory."
+                )
+            shutil.rmtree(path)
+
+    path.mkdir(parents=True, exist_ok=True)
+    (path / STAGING_MARKER).write_text(STAGING_MARKER_TEXT)
+
+
+def build_snapshot(root, staging_dir, files):
+    """Rebuild staging_dir from scratch and copy the given file list into it.
+
+    The staging directory is authoritative: anything already there that is
+    not in ``files`` is deleted, so a stale copy from an earlier run can
+    never be pushed. Raises StagingDirError if staging_dir is non-empty and
+    unmarked.
+    """
+    prepare_staging_dir(staging_dir)
     for rel_path in files:
         src = os.path.join(root, rel_path)
         dst = os.path.join(staging_dir, rel_path)
@@ -132,7 +178,24 @@ def build_snapshot(root, staging_dir, files):
         shutil.copy2(src, dst)
 
 
-def push_snapshot(staging_dir, target_repo, *, commit_message="Sync public snapshot"):
+def mirror_files(staging_dir, dest_dir, files):
+    """Copy exactly ``files`` (paths relative to staging_dir) into dest_dir.
+
+    Explicit list, not os.walk: nothing that is not in ``files`` — including
+    STAGING_MARKER — can reach the destination.
+    """
+    for rel_path in files:
+        src = os.path.join(staging_dir, rel_path)
+        if not os.path.isfile(src):
+            raise StagingDirError(
+                f"{rel_path} is missing from {staging_dir}; rebuild the snapshot"
+            )
+        dst = os.path.join(dest_dir, rel_path)
+        pathlib.Path(dst).parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+
+
+def push_snapshot(staging_dir, target_repo, files, *, commit_message="Sync public snapshot"):
     """Clone target_repo, mirror staging_dir into it, commit, and push."""
     with tempfile.TemporaryDirectory() as tmp:
         clone_dir = os.path.join(tmp, "clone")
@@ -153,14 +216,7 @@ def push_snapshot(staging_dir, target_repo, *, commit_message="Sync public snaps
             if os.path.isfile(target_file):
                 os.remove(target_file)
 
-        # Mirror staging_dir into clone.
-        for dirpath, _dirs, filenames in os.walk(staging_dir):
-            for fname in filenames:
-                src = os.path.join(dirpath, fname)
-                rel = os.path.relpath(src, staging_dir)
-                dst = os.path.join(clone_dir, rel)
-                pathlib.Path(dst).parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(src, dst)
+        mirror_files(staging_dir, clone_dir, files)
 
         subprocess.run(["git", "-C", clone_dir, "add", "-A"], check=True)
         subprocess.run(
@@ -213,13 +269,18 @@ def main(argv=None):
     own_staging = args.staging_dir is None
     staging_dir = args.staging_dir or tempfile.mkdtemp(prefix="3d-models-snapshot-")
 
-    build_snapshot(root, staging_dir, files)
+    try:
+        build_snapshot(root, staging_dir, files)
+    except StagingDirError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
 
     print(f"Snapshot built: {len(files)} files included, {excluded_count} excluded.")
     print(f"Staging directory: {staging_dir}")
+    print("(Staging directory was rebuilt from scratch; stale files removed.)")
 
     if args.push:
-        push_snapshot(staging_dir, args.target_repo, commit_message=args.commit_message)
+        push_snapshot(staging_dir, args.target_repo, files, commit_message=args.commit_message)
         print(f"Pushed to {args.target_repo}.")
     else:
         print()
