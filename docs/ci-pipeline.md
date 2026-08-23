@@ -129,15 +129,17 @@ Runs `python3 -m unittest test_render_view test_oembed_helpers
 test_fetch_openscad_wasm test_fetch_threejs test_render_cache
 test_capped_openscad test_viewer_invariants test_project_dates
 test_build_workflow test_generate_standalone test_scad_orientation
-test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap
-test_scan_mesh test_scan_reference test_external_assets -v` from within the
+test_scad_fonts test_generate_gallery test_scan_frames test_scan_pipeline
+test_scan_colmap test_scan_mesh test_scan_reference test_external_assets -v`
+from within the
 `scripts/` directory. These are
 fast unit tests that mock external I/O (network, filesystem) and run on
 every push. They guard the helper functions used throughout the CI
 pipeline against regressions. `test_generate_standalone` guards the two
 escaping layers in `generate-standalone.py`'s `_load_filament_colors_js`,
 `test_scad_orientation` pins the no-top-level-`rotate([-90,0,0])` source
-rule, and `test_generate_gallery` covers `pick_thumbnail` hero selection.
+rule, `test_scad_fonts` pins the no-`text()`/no-font rule, and
+`test_generate_gallery` covers `pick_thumbnail` hero selection.
 The `test_scan_*` modules (added for issue #407, which turned "every
 `scripts/test_*.py` must run somewhere or be explicitly excluded" into a
 guarded invariant — see `UnitTestStepCoverageTests` in
@@ -353,7 +355,7 @@ Stages all assets the in-browser WASM customizer needs to function:
 
 ### 6.4. Smoke-Test WASM Customizer Rendering
 
-Runs three Node tests using the `nodejs_22` package from the flake's
+Runs four Node tests using the `nodejs_22` package from the flake's
 `default` devShell — there is no separate Node setup step:
 
 - `scripts/test_wasm_customizer.mjs` — exercises the full in-browser customizer
@@ -366,6 +368,9 @@ Runs three Node tests using the `nodejs_22` package from the flake's
 - `scripts/test_landing_order.mjs` — slices
   `interestScore`/`recencyScore`/`landingOrder` out of `index.html` between the
   `__LANDING_ORDER_*` markers and pins the landing gallery's project ranking.
+- `scripts/test_hash_history.mjs` — slices `hashWriteMode()` out of
+  `index.html` and pins whether a hash change is pushed, replaced, or skipped
+  in browser history (issue #383's fix for dead Forward navigation).
 
 This replaces the old `actions/setup-node` + relocate-to-`$RUNNER_TEMP` dance
 (issue #356): `actions/setup-node`'s prebuilt tarball and the ryzen runner's
@@ -1010,8 +1015,9 @@ run independently — if multiple fail, all errors are visible.
   test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs
   test_render_cache test_capped_openscad test_viewer_invariants
   test_project_dates test_build_workflow test_generate_standalone
-  test_scad_orientation test_generate_gallery test_scan_frames
-  test_scan_pipeline test_scan_colmap test_scan_mesh` runs on every push
+  test_scad_orientation test_scad_fonts test_generate_gallery test_scan_frames
+  test_scan_pipeline test_scan_colmap test_scan_mesh test_scan_reference
+  test_external_assets` runs on every push
   (step 2.6) before any heavy tools are invoked. These tests mock I/O and
   finish in seconds, catching regressions in build-script helpers before
   rendering begins. `test_build_workflow.py`'s own `UnitTestStepCoverageTests`
