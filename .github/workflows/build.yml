@@ -143,7 +143,7 @@ jobs:
           from jsonschema import validate, ValidationError
 
           sys.path.insert(0, 'scripts')
-          from external_assets import external_assets
+          from external_assets import external_assets_for
 
           with open('parameters.schema.json') as f:
               schema = json.load(f)
@@ -220,8 +220,10 @@ jobs:
               # cannot be customized in the browser — the wasm FS is written
               # flat from the project's own files, so ../scans/... does not
               # resolve there. Refuse the combination rather than ship a
-              # customizer that 404s.
-              ext = external_assets(project_dir)
+              # customizer that 404s. Scoped to this manifest's own
+              # renderable — a scan-importing sibling must not disable the
+              # customizer for the rest of the project.
+              ext = external_assets_for(scad_path, project_dir)
               if ext:
                   print(f'  FAIL: {path} — {scad_path} imports {ext} from outside {project_dir}; '
                         f'the in-browser customizer cannot resolve external assets, so a model '
@@ -244,7 +246,7 @@ jobs:
       - name: Run Python unit tests for build scripts
         run: |
           cd scripts
-          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow test_generate_standalone test_scad_orientation test_scad_fonts test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap test_scan_mesh test_scan_reference test_external_assets -v
+          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow test_generate_standalone test_scad_orientation test_scad_fonts test_output_names test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap test_scan_mesh test_scan_reference test_external_assets -v
 
       # The flake's `openscad` is a wrapper around openscad-unstable that
       # forces the EGL/llvmpipe software-GL path (QT_QPA_PLATFORM=offscreen,
@@ -851,17 +853,12 @@ jobs:
           python3 -c "
           import sys
           sys.path.insert(0, '.')
-          from scripts.oembed_helpers import parse_scad_map, standalone_url, BASE_URL
-          urls = [f'{BASE_URL}/']
-          for stl in sorted(parse_scad_map('site/.scad-map')):
-              urls.append(standalone_url(stl))
-          body = ''.join(f'  <url><loc>{u}</loc></url>\n' for u in urls)
+          from scripts.oembed_helpers import build_sitemap, parse_scad_map, stl_lastmods
+          stls = sorted(parse_scad_map('site/.scad-map'))
+          lastmods = stl_lastmods('site/models.json')
           with open('site/sitemap.xml', 'w') as f:
-              f.write('<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n')
-              f.write('<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n')
-              f.write(body)
-              f.write('</urlset>\n')
-          print(f'Wrote sitemap.xml with {len(urls)} URLs')
+              f.write(build_sitemap(stls, lastmods))
+          print(f'Wrote sitemap.xml with {len(stls) + 1} URLs, {len(lastmods)} with lastmod')
           "
 
       - name: Generate README gallery

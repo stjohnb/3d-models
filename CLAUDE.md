@@ -42,7 +42,7 @@ The runners are NixOS and provide only a baseline (nix, git, docker). Every tool
 
 ## Filename safety
 
-CI refuses to render any `.scad` file whose basename contains characters outside `[A-Za-z0-9._ -]`. Do not introduce filenames with other characters.
+CI refuses to render any `.scad` file whose basename contains characters outside `[A-Za-z0-9._ -]`. Do not introduce filenames with other characters. Renderable (non-underscore) `.scad` basenames must also be unique across all projects, and within a project no two renderables may `slugify()` to the same value — enforced by `scripts/test_output_names.py`, which CI runs before the render step.
 
 The same charset applies to `scans/<object>/` directory names — `scan_reference.py` validates it before installing. `scans/**/*.stl` is the one carve-out from the `*.stl` gitignore: scan reference meshes are captured input data, not build output, and are the only committed STLs in the repo (#439). See `scans/README.md`.
 
@@ -135,8 +135,11 @@ sanity-check geometry. Therefore:
   checks, never in the committed `.scad`. Do a high-resolution export only once
   geometry is correct, and still under the memory cap.
 - **Don't render multiple models concurrently.**
-- `scripts/render_view.py` also invokes `openscad` — run it under the same
-  memory/time cap, and pass a low `--fn` / modest view while iterating.
+- `scripts/render_view.py` now routes every render through
+  `scripts/capped-openscad.sh` itself (defaults `RENDER_MEM_MAX=2G`,
+  `RENDER_TIMEOUT=300`; override either env var to raise the ceiling), so you
+  do not need to wrap it by hand — but still keep resolution modest while
+  iterating (`-D '$fn=16'`, smaller `--imgsize`).
 - **If a render is OOM-killed or times out, do NOT just retry it.** Treat it as
   "too heavy for this host": reduce resolution/geometry, or leave the full
   render to CI. Blindly re-running an OOM'd render repeats the outage.

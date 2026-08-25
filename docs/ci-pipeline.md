@@ -111,13 +111,16 @@ step:
   - The manifest filename must correspond to a renderable `.scad` in the same
     directory (no underscore-prefixed files, i.e. library files cannot have
     manifests)
-  - The project must not reference any asset from outside its own directory
-    (`scripts/external_assets.py`, which walks the project's `.scad` files
-    through `render_cache.collect_inputs`). A renderable that `import()`s a
-    scan reference mesh from `scans/` (issue #439) renders fine in CI, but the
-    in-browser customizer writes a project's files flat into the wasm
-    filesystem, where a `../scans/…` path cannot resolve — so that model must
-    not ship a parameters manifest at all
+  - The manifest's own renderable must not reference any asset from outside
+    the project directory (`external_assets_for(scad_path, project_dir)` in
+    `scripts/external_assets.py`, which walks that one file's transitive
+    `include`/`use` chain via `render_cache.collect_inputs`). Only the
+    importing renderable loses its manifest — self-contained siblings in the
+    same directory keep their ⚙ Customize button. A renderable that
+    `import()`s a scan reference mesh from `scans/` (issue #439) renders fine
+    in CI, but the in-browser customizer writes a project's files flat into
+    the wasm filesystem, where a `../scans/…` path cannot resolve — so that
+    model must not ship a parameters manifest at all
 - Records failed file paths to `.param-failures` (always creates the file, even
   when there are no manifests, so the enforce step's check is reliable)
 - Uses the **deferred enforcement** pattern — records `failed=true` to
@@ -129,7 +132,7 @@ Runs `python3 -m unittest test_render_view test_oembed_helpers
 test_fetch_openscad_wasm test_fetch_threejs test_render_cache
 test_capped_openscad test_viewer_invariants test_project_dates
 test_build_workflow test_generate_standalone test_scad_orientation
-test_scad_fonts test_generate_gallery test_scan_frames test_scan_pipeline
+test_scad_fonts test_output_names test_generate_gallery test_scan_frames test_scan_pipeline
 test_scan_colmap test_scan_mesh test_scan_reference test_external_assets -v`
 from within the
 `scripts/` directory. These are
@@ -138,7 +141,10 @@ every push. They guard the helper functions used throughout the CI
 pipeline against regressions. `test_generate_standalone` guards the two
 escaping layers in `generate-standalone.py`'s `_load_filament_colors_js`,
 `test_scad_orientation` pins the no-top-level-`rotate([-90,0,0])` source
-rule, `test_scad_fonts` pins the no-`text()`/no-font rule, and
+rule, `test_scad_fonts` pins the no-`text()`/no-font rule, `test_output_names`
+pins renderable basename uniqueness across all projects and per-project slug
+uniqueness (issue #449) — this step runs before step 5's render, so a
+collision fails the build before any STL is written, and
 `test_generate_gallery` covers `pick_thumbnail` hero selection.
 The `test_scan_*` modules (added for issue #407, which turned "every
 `scripts/test_*.py` must run somewhere or be explicitly excluded" into a
@@ -230,6 +236,14 @@ regex (`^[A-Za-z0-9._ -]+$`). Files whose basename contains characters
 outside this set cause the step to exit with an error immediately. This is a
 defense-in-depth security check that prevents adversarially-named files from
 injecting unexpected content into generated paths, HTML, or JSON.
+
+Because every renderable's output lands in the same flat `site/` namespace,
+renderable basenames must additionally be unique across all projects, and
+within a project no two renderables may `slugify()` to the same value.
+Both checks are enforced statically in step 2.6 (`test_output_names`) rather
+than in this loop, because both are functions of the file list and a runtime
+guard here would only fire after the first STL is already on disk (issue
+#449).
 
 Failure classification checks the wrapper's exit code for a cap hit
 **before** the existing library-detection strategy runs: if the exit code is
@@ -610,12 +624,22 @@ features.
 ### 12.5. Generate sitemap.xml
 
 After the models manifest is written, a Python snippet reads `site/.scad-map`
-via `oembed_helpers.parse_scad_map()` and generates `site/sitemap.xml` — a
-standard `<urlset>` listing the gallery root and one `<url>` per standalone
-viewer (`/standalone/<model>.html`). URLs are built from `BASE_URL` in
-`oembed_helpers.py` and the standalone filenames are URL-encoded with
-`urllib.parse.quote`. The sitemap is deployed to `/3d-models/sitemap.xml`; as
-with `robots.txt`, crawlers only read the authoritative copy at the origin root
+and `site/models.json` and calls `oembed_helpers.build_sitemap()` to generate
+`site/sitemap.xml` — a standard `<urlset>` listing the gallery root and one
+`<url>` per standalone viewer (`/standalone/<model>.html`). URLs are built
+from `BASE_URL` in `oembed_helpers.py` and the standalone filenames are
+URL-encoded with `urllib.parse.quote`.
+
+Each `<url>` also carries a `<lastmod>`, taken via `stl_lastmods()` from the
+owning project's `updated` field in `site/models.json` (the last-commit date
+computed by `scripts/project_dates.py`). The gallery root URL gets the newest
+such date across all standalone viewers. On a shallow clone —
+`project_updated()` returns `{}` in that case — no project has an `updated`
+field, so `<lastmod>` is simply omitted everywhere rather than failing the
+build.
+
+The sitemap is deployed to `/3d-models/sitemap.xml`; as with `robots.txt`,
+crawlers only read the authoritative copy at the origin root
 (`/sitemap.xml`), which requires a separate infra step.
 
 ### 13. Generate README Gallery (main branch only)
@@ -990,6 +1014,15 @@ run independently — if multiple fail, all errors are visible.
   characters outside this set would propagate into generated STL paths, HTML
   snippets, and JSON, creating potential injection vectors. Hard-failing early
   is safer than escaping every downstream consumer.
+- **Name-collision checks are static, not runtime**: every renderable's
+  output lands in one flat namespace (`site/<name>.stl`, `.png`,
+  `site/qr/<name>.png`, `site/standalone/<name>.html`), and each renderable's
+  OEmbed endpoint and deep link are keyed on `slugify()` within its project.
+  Both basename and slug uniqueness are therefore a property of the source
+  tree alone, so they are `scripts/test_output_names.py` unit tests that run
+  in step 2.6 and fail in seconds — not deferred-enforcement checks or bash
+  guards inside the `find | while` render loop, which would only fail after
+  the first colliding STL is already on disk (issue #449).
 - **DOM API over innerHTML in viewers**: `index.html` and `embed.html` use
   `createElement` / `textContent` / `setAttribute` for all content derived
   from `models.json` (model names, STL URLs, QR paths). `innerHTML` is only
@@ -1015,7 +1048,7 @@ run independently — if multiple fail, all errors are visible.
   test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs
   test_render_cache test_capped_openscad test_viewer_invariants
   test_project_dates test_build_workflow test_generate_standalone
-  test_scad_orientation test_scad_fonts test_generate_gallery test_scan_frames
+  test_scad_orientation test_scad_fonts test_output_names test_generate_gallery test_scan_frames
   test_scan_pipeline test_scan_colmap test_scan_mesh test_scan_reference
   test_external_assets` runs on every push
   (step 2.6) before any heavy tools are invoked. These tests mock I/O and

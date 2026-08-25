@@ -9,6 +9,7 @@ import json
 import os
 import tempfile
 import unittest
+import xml.etree.ElementTree as ET
 
 from oembed_helpers import (
     slugify,
@@ -20,6 +21,9 @@ from oembed_helpers import (
     build_structured_data,
     standalone_url,
     strip_stl_ext,
+    build_sitemap,
+    stl_lastmods,
+    BASE_URL,
     ORG_ID,
     SITE_ID,
     COLLECTION_ID,
@@ -328,6 +332,115 @@ class TestBuildStructuredData(unittest.TestCase):
         data = build_structured_data(self._scad_map(), {'power-workshop': 'Custom description'})
         item = data['@graph'][2]['mainEntity']['itemListElement'][0]['item']
         self.assertEqual(item['description'], 'Custom description')
+
+
+class TestStlLastmods(unittest.TestCase):
+
+    def _write_models(self, data):
+        fd, path = tempfile.mkstemp(suffix='.json')
+        with os.fdopen(fd, 'w') as f:
+            json.dump(data, f)
+        self.addCleanup(os.unlink, path)
+        return path
+
+    def test_maps_every_file_to_project_updated(self):
+        path = self._write_models({
+            'Dated Project': {
+                'dir': 'dated-project',
+                'updated': '2026-08-12T14:03:22+01:00',
+                'files': [{'stl': 'a.stl'}, {'stl': 'b.stl'}],
+            },
+            'Undated Project': {
+                'dir': 'undated-project',
+                'files': [{'stl': 'c.stl'}],
+            },
+        })
+        result = stl_lastmods(path)
+        self.assertEqual(result['a.stl'], '2026-08-12T14:03:22+01:00')
+        self.assertEqual(result['b.stl'], '2026-08-12T14:03:22+01:00')
+        self.assertNotIn('c.stl', result)
+
+    def test_missing_file_returns_empty(self):
+        self.assertEqual(stl_lastmods('/nonexistent/models.json'), {})
+
+    def test_malformed_json_returns_empty(self):
+        fd, path = tempfile.mkstemp(suffix='.json')
+        os.write(fd, b'not json')
+        os.close(fd)
+        self.addCleanup(os.unlink, path)
+        self.assertEqual(stl_lastmods(path), {})
+
+    def test_entry_without_files_is_skipped(self):
+        path = self._write_models({
+            'Dated Project': {
+                'dir': 'dated-project',
+                'updated': '2026-08-12T14:03:22+01:00',
+            },
+        })
+        self.assertEqual(stl_lastmods(path), {})
+
+
+class TestBuildSitemap(unittest.TestCase):
+
+    def test_root_and_each_stl_present(self):
+        xml = build_sitemap(['a.stl', 'b part.stl'])
+        self.assertIn(f'<loc>{BASE_URL}/</loc>', xml)
+        self.assertIn(standalone_url('a.stl'), xml)
+        self.assertIn(standalone_url('b part.stl'), xml)
+        self.assertEqual(xml.count('<url>'), 3)
+
+    def test_no_lastmod_when_dates_absent(self):
+        self.assertNotIn('<lastmod>', build_sitemap(['a.stl']))
+
+    def test_lastmod_emitted_per_stl(self):
+        xml = build_sitemap(['a.stl'], {'a.stl': '2026-08-12T14:03:22+01:00'})
+        for line in xml.splitlines():
+            if standalone_url('a.stl') in line:
+                self.assertIn('<lastmod>2026-08-12T14:03:22+01:00</lastmod>', line)
+                return
+        self.fail('a.stl <url> line not found')
+
+    def test_partial_lastmods(self):
+        xml = build_sitemap(
+            ['a.stl', 'b.stl'], {'a.stl': '2026-08-12T14:03:22+01:00'}
+        )
+        for line in xml.splitlines():
+            if standalone_url('b.stl') in line:
+                self.assertNotIn('<lastmod>', line)
+                return
+        self.fail('b.stl <url> line not found')
+
+    def test_root_uses_newest_date_across_offsets(self):
+        # a.stl: 2026-08-12T00:30:00+01:00 == 2026-08-11T23:30:00 UTC
+        # b.stl: 2026-08-11T23:45:00+00:00 == 2026-08-11T23:45:00 UTC (later)
+        lastmods = {
+            'a.stl': '2026-08-12T00:30:00+01:00',
+            'b.stl': '2026-08-11T23:45:00+00:00',
+        }
+        xml = build_sitemap(['a.stl', 'b.stl'], lastmods)
+        for line in xml.splitlines():
+            if f'<loc>{BASE_URL}/</loc>' in line:
+                self.assertIn('<lastmod>2026-08-11T23:45:00+00:00</lastmod>', line)
+                return
+        self.fail('root <url> line not found')
+
+    def test_unparsable_date_ignored_for_root_but_kept_on_entry(self):
+        xml = build_sitemap(['a.stl'], {'a.stl': 'not-a-date'})
+        for line in xml.splitlines():
+            if f'<loc>{BASE_URL}/</loc>' in line:
+                self.assertNotIn('<lastmod>', line)
+            if standalone_url('a.stl') in line:
+                self.assertIn('<lastmod>not-a-date</lastmod>', line)
+
+    def test_empty_stl_list(self):
+        xml = build_sitemap([])
+        self.assertEqual(xml.count('<url>'), 1)
+        self.assertIn(f'<loc>{BASE_URL}/</loc>', xml)
+
+    def test_output_is_well_formed_xml(self):
+        xml = build_sitemap(['a.stl', 'b.stl'], {'a.stl': '2026-08-12T14:03:22+01:00'})
+        root = ET.fromstring(xml)
+        self.assertEqual(len(root), 3)
 
 
 if __name__ == '__main__':

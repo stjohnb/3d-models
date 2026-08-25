@@ -1,9 +1,12 @@
 """Shared helpers for OEmbed generation and link-tag injection in build.yml."""
 
+import json
 import os
 import re
 import sys
+from datetime import datetime, timezone
 from urllib.parse import quote
+from xml.sax.saxutils import escape
 
 BASE_URL = 'https://www.bstjohn.net/3d-models'
 
@@ -159,3 +162,77 @@ def build_structured_data(scad_map, project_descriptions, stl_sizes=None):
             },
         ],
     }
+
+
+def stl_lastmods(models_path='site/models.json'):
+    """Return {stl filename: ISO-8601 'updated' string} from a models.json.
+
+    Each models.json project entry carries an optional 'updated' field (the
+    project directory's last commit date, from scripts/project_dates.py) and a
+    'files' list of {'stl': ...} entries. Projects without 'updated' — every
+    project on a shallow clone — contribute nothing. A missing or malformed
+    models.json returns {}; a missing date must degrade silently, never fail
+    the build (same contract as project_updated()).
+    """
+    try:
+        with open(models_path) as f:
+            models = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    if not isinstance(models, dict):
+        return {}
+    lastmods = {}
+    for entry in models.values():
+        if not isinstance(entry, dict):
+            continue
+        updated = entry.get('updated')
+        if not updated:
+            continue
+        for file_entry in entry.get('files') or []:
+            stl = (file_entry or {}).get('stl')
+            if stl:
+                lastmods[stl] = updated
+    return lastmods
+
+
+def _parse_iso(value):
+    """Parse an ISO-8601 timestamp to an aware datetime, or None if unparsable."""
+    try:
+        dt = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+
+
+def build_sitemap(stls, lastmods=None):
+    """Return the sitemap.xml document text.
+
+    stls: iterable of STL filenames (from parse_scad_map). Emitted in the
+      order given — build.yml passes them sorted.
+    lastmods: optional {stl: ISO-8601 string} from stl_lastmods(). An STL with
+      no entry (or an empty value) gets no <lastmod> element. The gallery root
+      URL gets the newest parsable date across the emitted STLs, and no
+      <lastmod> at all when none are available.
+    """
+    lastmods = lastmods or {}
+    stls = list(stls)
+    rows = []
+    newest = None
+    newest_raw = None
+    for stl in stls:
+        rows.append((standalone_url(stl), lastmods.get(stl)))
+    for _, raw in rows:
+        parsed = _parse_iso(raw) if raw else None
+        if parsed is not None and (newest is None or parsed > newest):
+            newest, newest_raw = parsed, raw
+    entries = [(f'{BASE_URL}/', newest_raw)] + rows
+
+    lines = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ]
+    for loc, raw in entries:
+        lastmod = f'<lastmod>{escape(raw)}</lastmod>' if raw else ''
+        lines.append(f'  <url><loc>{escape(loc)}</loc>{lastmod}</url>')
+    lines.append('</urlset>')
+    return '\n'.join(lines) + '\n'

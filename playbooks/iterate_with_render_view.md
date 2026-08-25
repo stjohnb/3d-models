@@ -15,6 +15,16 @@ Use `render_view.py` to inspect a model from multiple angles between edits inste
 
 Each default-output render creates a new temp directory; pass `-o <path>` when you want to overwrite the same file while iterating, and clean the temp dirs up when you're done.
 
+## Memory and time caps
+
+Every render runs under `scripts/capped-openscad.sh`, which defaults to `RENDER_MEM_MAX=2G` / `RENDER_TIMEOUT=300` on this script (CI uses larger values). Override either by setting the env var before the command:
+
+```bash
+RENDER_MEM_MAX=4G python3 scripts/render_view.py power-workshop/drill_socket.scad --view top
+```
+
+A cap hit (exit 124 for timeout, ≥128 for SIGKILL) means "reduce geometry or resolution," not "retry" — see CLAUDE.md's "Rendering on the constrained build host" section. If `systemd-run --user` is unavailable, the wrapper falls back to `ulimit -v`, which caps virtual address space rather than RSS; OpenSCAD's EGL/llvmpipe path can need more headroom there, so raise `RENDER_MEM_MAX` (e.g. `4G` or higher) rather than assuming the render itself is too heavy.
+
 ## View presets
 
 | Preset   | What it shows |

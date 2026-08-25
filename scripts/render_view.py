@@ -6,6 +6,7 @@ Usage:
     python3 scripts/render_view.py power-workshop/drill_socket.scad --camera=0,0,0,75,0,25,500 --projection=perspective -o ~/renders/custom.png
 
 With no -o, the PNG is written to a fresh private temp directory and the path is printed.
+Renders run under scripts/capped-openscad.sh (RENDER_MEM_MAX=2G, RENDER_TIMEOUT=300 by default).
 """
 
 import argparse
@@ -47,6 +48,14 @@ PRESETS_Y_UP = {
 }
 
 VIEW_CHOICES = list(PRESETS.keys()) + ["custom"]
+
+CAPPED_OPENSCAD = pathlib.Path(__file__).resolve().parent / "capped-openscad.sh"
+
+# Modest local defaults — this script runs on the shared ~3.8 GB build host
+# where an uncapped render has frozen the box before (see CLAUDE.md,
+# "Rendering on the constrained build host"). CI sets its own, larger values.
+DEFAULT_RENDER_MEM_MAX = "2G"
+DEFAULT_RENDER_TIMEOUT = "300"
 
 
 def parse_args(argv=None):
@@ -205,6 +214,33 @@ def resolve_output_path(output, scad_file):
     return temp_dir / f"{stem}.png", temp_dir
 
 
+def build_render_command(openscad_argv):
+    """Return the argv that runs openscad under scripts/capped-openscad.sh.
+
+    capped-openscad.sh invokes `openscad` itself and forwards every argument
+    verbatim, so openscad_argv is the argv *after* the program name.
+    """
+    return [shutil.which("bash") or "bash", str(CAPPED_OPENSCAD)] + list(openscad_argv)
+
+
+def capped_render_env(base_env=None):
+    """Copy of the environment with render caps defaulted (caller wins).
+
+    An existing RENDER_MEM_MAX / RENDER_TIMEOUT is preserved so a caller can
+    raise the ceiling; an empty or whitespace-only value counts as unset,
+    because capped-openscad.sh's ${VAR:-default} would otherwise silently fall
+    back to its own 8G/600 CI-sized defaults.
+    """
+    env = dict(os.environ if base_env is None else base_env)
+    for key, default in (
+        ("RENDER_MEM_MAX", DEFAULT_RENDER_MEM_MAX),
+        ("RENDER_TIMEOUT", DEFAULT_RENDER_TIMEOUT),
+    ):
+        if not env.get(key, "").strip():
+            env[key] = default
+    return env
+
+
 def main():
     args = parse_args()
 
@@ -212,27 +248,34 @@ def main():
         print(f"error: {args.scad_file} not found", file=sys.stderr)
         sys.exit(1)
 
-    openscad = shutil.which("openscad")
-    if openscad is None:
+    if shutil.which("openscad") is None:
         print(
             "error: openscad not found on PATH; install it from https://openscad.org/downloads.html",
             file=sys.stderr,
         )
         sys.exit(1)
 
+    if not CAPPED_OPENSCAD.is_file():
+        print(f"error: {CAPPED_OPENSCAD} not found", file=sys.stderr)
+        sys.exit(1)
+
     output, temp_dir = resolve_output_path(args.output, args.scad_file)
     args.output = output
     output.parent.mkdir(parents=True, exist_ok=True)
 
-    cmd = [openscad] + build_openscad_argv(args)
-
-    # Wrap with xvfb-run on headless hosts (no DISPLAY set)
-    if shutil.which("xvfb-run") and not os.environ.get("DISPLAY"):
-        cmd = ["xvfb-run", "-a"] + cmd
-
-    result = subprocess.run(cmd, check=False, capture_output=False)
+    env = capped_render_env()
+    cmd = build_render_command(build_openscad_argv(args))
+    result = subprocess.run(cmd, check=False, capture_output=False, env=env)
 
     if result.returncode != 0:
+        if result.returncode == 124 or result.returncode >= 128:
+            print(
+                f"error: render hit the cap (RENDER_MEM_MAX={env['RENDER_MEM_MAX']}, "
+                f"RENDER_TIMEOUT={env['RENDER_TIMEOUT']}s). Reduce geometry, lower "
+                "resolution with -D '$fn=16', shrink --imgsize, or raise the caps "
+                "via those env vars — do not just retry.",
+                file=sys.stderr,
+            )
         if temp_dir is not None and not output.exists():
             try:
                 temp_dir.rmdir()

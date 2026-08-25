@@ -10,7 +10,7 @@ import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
-from external_assets import external_assets, main
+from external_assets import external_assets, external_assets_for, main
 
 
 @contextlib.contextmanager
@@ -63,6 +63,45 @@ class ExternalAssetTests(unittest.TestCase):
             with contextlib.redirect_stdout(out):
                 self.assertEqual(main(["proj"]), 0)
             self.assertEqual(out.getvalue(), "scans/tube/tube-reference.stl\n")
+
+
+class PerRenderableTests(unittest.TestCase):
+    def test_only_the_importing_renderable_is_rejected(self):
+        with tree({
+            "proj/importer.scad": 'import("../scans/tube/tube-reference.stl");\n',
+            "proj/clean.scad": "cube(10);\n",
+            "scans/tube/tube-reference.stl": "stl",
+        }):
+            self.assertEqual(external_assets_for("proj/clean.scad", "proj"), [])
+            self.assertEqual(
+                external_assets_for("proj/importer.scad", "proj"),
+                ["scans/tube/tube-reference.stl"],
+            )
+            self.assertEqual(
+                external_assets("proj"), ["scans/tube/tube-reference.stl"]
+            )
+
+    def test_transitive_include_is_followed(self):
+        with tree({
+            "proj/a.scad": "include <_lib.scad>\n",
+            "proj/_lib.scad": 'import("../scans/tube/tube-reference.stl");\n',
+            "scans/tube/tube-reference.stl": "stl",
+        }):
+            self.assertEqual(
+                external_assets_for("proj/a.scad", "proj"),
+                ["scans/tube/tube-reference.stl"],
+            )
+
+    def test_local_assets_are_not_reported(self):
+        with tree({
+            "proj/a.scad": 'surface("heightmap.png");\n',
+            "proj/heightmap.png": "png",
+        }):
+            self.assertEqual(external_assets_for("proj/a.scad", "proj"), [])
+
+    def test_missing_external_asset_is_not_reported(self):
+        with tree({"proj/a.scad": 'import("../scans/gone/gone.stl");\n'}):
+            self.assertEqual(external_assets_for("proj/a.scad", "proj"), [])
 
 
 if __name__ == "__main__":

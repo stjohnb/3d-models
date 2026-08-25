@@ -45,7 +45,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── fetch_terrain_heightmap.py  # One-off generator: fetch a lat/lon terrain heightmap PNG (Mapzen terrarium tiles via AWS Open Data); not used by CI
 │   ├── test_fetch_terrain_heightmap.py # Tests for fetch_terrain_heightmap (mocks requests, verifies slippy math and decode)
 │   ├── generate_lake_bed.py        # One-off generator: bake lakebed bathymetry PNG from heightmap for nz-ski-fields; not used by CI
-│   ├── render_view.py          # Render an arbitrary OpenSCAD view to PNG (developer/agent tool, not used by CI)
+│   ├── render_view.py          # Render an arbitrary OpenSCAD view to PNG via capped-openscad.sh (developer/agent tool, not used by CI)
 │   ├── test_render_view.py     # Tests for render_view
 │   ├── scan_pipeline.py        # Photogrammetry CLI: scanning-rig capture video → scaled STL (operator tool, not used by CI)
 │   ├── test_scan_pipeline.py   # Tests for scan_pipeline (stage selection, argument defaults)
@@ -68,6 +68,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_generate_standalone.py  # Regression tests for standalone-viewer HTML injection escaping (filament colors, SEO head fields, JSON-LD)
 │   ├── test_scad_fonts.py      # Pins the no-text()/no-font rule (the deployed openscad-wasm build ships no fonts)
 │   ├── test_scad_orientation.py  # Pins the no-top-level-rotate([-90,0,0]) rule (see Viewer Rotation below); one allowlisted exception
+│   ├── test_output_names.py    # Pins renderable basename uniqueness across projects and per-project slug uniqueness (issue #449)
 │   ├── test_wasm_customizer.mjs  # Node.js integration test for the in-browser WASM customizer pipeline
 │   ├── test_hash_routing.mjs    # Node.js test for index.html's parseHash/formatHash URL grammar
 │   ├── test_hash_history.mjs    # Node.js test for index.html's hashWriteMode push/replace/skip decision
@@ -527,6 +528,8 @@ python3 scripts/render_view.py power-workshop/drill_socket.scad --camera=0,0,0,7
 
 With no `-o`, the PNG is written into a fresh private temp directory (0700, created per invocation) and the path is printed — the old fixed `/tmp/render.png` default was replaceable via a planted symlink on the shared build hosts (#429).
 
+Renders run under `scripts/capped-openscad.sh` with `RENDER_MEM_MAX=2G` / `RENDER_TIMEOUT=300` defaults, both overridable via env — a cap hit exits 124 (timeout) or ≥128 (SIGKILL) with a diagnostic instead of freezing the host.
+
 Available `--view` presets: `iso` (default), `top`, `bottom`, `front`, `back`, `left`, `right`, `custom`.
 Pass `--camera=tx,ty,tz,rx,ry,rz,dist` to use an arbitrary angle; this implies `--view custom`.
 Additional options: `--imgsize WxH`, `--projection ortho|perspective`, `--no-viewall`, `-D VAR=VALUE` (repeatable).
@@ -709,7 +712,7 @@ comment.
 | Item | Location | Notes |
 |------|----------|-------|
 | CI runner | `[self-hosted, linux, ryzen]` in `build.yml`; `[self-hosted, linux]` in `notify-failures.yml` | Runner provides only `nix`/`git`/`docker`; OpenSCAD, ImageMagick, ADMesh, qrencode, zip, Python 3, Node.js, and the AWS CLI all come from this repo's `flake.nix` devShells (`default` for `build.yml`, `scripts` for `notify-failures.yml`), entered via `.github/actions/setup-nix` + the job-level `defaults.run.shell`. `build.yml`'s `build` job is pinned to `ryzen` so render memory caps are calibrated to a known host (issue #272) — the label must exist on the runner or the job queues forever |
-| Render memory/time caps | `scripts/capped-openscad.sh`; `RENDER_MEM_MAX`/`RENDER_TIMEOUT` env in `build.yml` | Wraps every `openscad` call (STL render: `28G`/`3600s`, sized to the heaviest model's measured cost after the 2026-07-07 runner-freeze incident; thumbnails and orthographic views: `4G`/`120s`). Timeout (124) or SIGKILL (≥128) hard-fails the build before the "suspected library" heuristic can silently swallow it |
+| Render memory/time caps | `scripts/capped-openscad.sh`; `RENDER_MEM_MAX`/`RENDER_TIMEOUT` env in `build.yml` | Wraps every `openscad` call (STL render: `28G`/`3600s`, sized to the heaviest model's measured cost after the 2026-07-07 runner-freeze incident; thumbnails and orthographic views: `4G`/`120s`). Timeout (124) or SIGKILL (≥128) hard-fails the build before the "suspected library" heuristic can silently swallow it. `scripts/render_view.py` also invokes the wrapper, defaulting to `2G`/`300s` |
 | OpenSCAD version baseline | `.openscad-version` | Committed expected version string; CI warns on mismatch |
 | AWS deployment role | `secrets.AWS_ROLE_ARN` | OIDC role for S3 sync |
 | S3 bucket path | `s3://www.bstjohn.net/3d-models/` | Production deployment target |
@@ -746,5 +749,5 @@ comment.
 | Web app manifest | `site.webmanifest` (repo root) | PWA metadata; copied to `site/site.webmanifest` by CI |
 | robots.txt | `robots.txt` (repo root) | Served at `/3d-models/robots.txt`; crawler-authoritative copy requires origin-root infra |
 | llms.txt | `llms.txt` (repo root) | AI agent discoverability; served at `/3d-models/llms.txt`; same sub-path caveat |
-| sitemap.xml | Generated by CI "Generate sitemap.xml" step | Lists gallery root + all standalone viewer URLs; deployed to `site/sitemap.xml` |
+| sitemap.xml | Generated by CI "Generate sitemap.xml" step | Lists gallery root + all standalone viewer URLs, each with a `<lastmod>` from the project's last-commit date; deployed to `site/sitemap.xml` |
 | Dependency updates | `.github/dependabot.yml` | `github-actions` ecosystem only, weekly, grouped into a single PR (`open-pull-requests-limit: 5`), no default label (#288). No `npm`/`pip` entries — the repo has no root `package.json` and OpenSCAD/Python tooling isn't a Dependabot-supported ecosystem |

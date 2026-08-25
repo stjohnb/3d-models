@@ -15,10 +15,14 @@ from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
+import render_view
 from render_view import (
     build_openscad_argv,
+    build_render_command,
+    capped_render_env,
     parse_args,
     resolve_output_path,
+    CAPPED_OPENSCAD,
     PRESETS,
     PRESETS_Y_UP,
 )
@@ -248,6 +252,47 @@ class TestOutputDefault(unittest.TestCase):
         self.addCleanup(shutil.rmtree, str(tmp), True)
 
         self.assertEqual(path.name, "render.png")
+
+
+class TestCappedRenderCommand(unittest.TestCase):
+
+    def test_command_runs_capped_wrapper(self):
+        cmd = build_render_command(["-o", "x.png", "y.scad"])
+        self.assertEqual(os.path.basename(cmd[0]), "bash")
+        self.assertTrue(cmd[1].endswith(os.path.join("scripts", "capped-openscad.sh")))
+        self.assertEqual(cmd[2:], ["-o", "x.png", "y.scad"])
+
+    def test_command_does_not_invoke_openscad_directly(self):
+        cmd = build_render_command(["-o", "x.png", "y.scad"])
+        self.assertNotIn("openscad", cmd)
+        self.assertFalse(any("xvfb" in part for part in cmd))
+
+    def test_capped_wrapper_exists(self):
+        self.assertTrue(CAPPED_OPENSCAD.is_file())
+
+    def test_env_defaults_to_modest_caps(self):
+        env = capped_render_env({})
+        self.assertEqual(env["RENDER_MEM_MAX"], "2G")
+        self.assertEqual(env["RENDER_TIMEOUT"], "300")
+
+    def test_env_preserves_caller_override(self):
+        env = capped_render_env({"RENDER_MEM_MAX": "8G", "RENDER_TIMEOUT": "60"})
+        self.assertEqual(env["RENDER_MEM_MAX"], "8G")
+        self.assertEqual(env["RENDER_TIMEOUT"], "60")
+
+    def test_env_treats_blank_as_unset(self):
+        env = capped_render_env({"RENDER_MEM_MAX": "", "RENDER_TIMEOUT": "   "})
+        self.assertEqual(env["RENDER_MEM_MAX"], "2G")
+        self.assertEqual(env["RENDER_TIMEOUT"], "300")
+
+    def test_env_does_not_mutate_input(self):
+        base = {"RENDER_MEM_MAX": "8G"}
+        capped_render_env(base)
+        self.assertEqual(base, {"RENDER_MEM_MAX": "8G"})
+
+    def test_no_xvfb_reference_in_source(self):
+        text = pathlib.Path(render_view.__file__).read_text()
+        self.assertNotIn("xvfb", text.lower())
 
 
 if __name__ == "__main__":

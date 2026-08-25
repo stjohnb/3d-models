@@ -385,6 +385,20 @@ class ProjectDisplayNameTests(unittest.TestCase):
         )
 
 
+class ParamManifestExternalAssetTests(unittest.TestCase):
+    """The customizer check is per-renderable, not per-project (#448)."""
+
+    def test_check_is_scoped_to_the_manifests_own_scad(self):
+        body = code_lines(step_body(read(BUILD_YML), "Validate parameters manifests"))
+        self.assertIn("external_assets_for(scad_path, project_dir)", body)
+        self.assertNotIn("external_assets(project_dir)", body)
+        self.assertIn("from external_assets import external_assets_for", body)
+
+    def test_source_zip_step_stays_per_project(self):
+        body = step_body(read(BUILD_YML), "Bundle project source zips")
+        self.assertIn('python3 scripts/external_assets.py "$dir"', body)
+
+
 class QrSlugifyTests(unittest.TestCase):
     """Issue #398: the QR step imports slugify(); it never re-derives it.
 
@@ -413,6 +427,30 @@ class QrSlugifyTests(unittest.TestCase):
         )
 
 
+class OutputNameUniquenessTests(unittest.TestCase):
+    """Issue #449: renderables share one flat output namespace.
+
+    The gate is scripts/test_output_names.py, a source-tree invariant test.
+    It only gates the build if the unit-test step still runs before the
+    render step — reordering them would let a collision clobber an STL
+    before the check fires.
+    """
+
+    def test_output_names_module_runs_in_ci(self):
+        self.assertIn("test_output_names",
+                      step_body(read(BUILD_YML), UNIT_TEST_STEP))
+
+    def test_unit_tests_run_before_the_render_step(self):
+        text = read(BUILD_YML)
+        self.assertLess(
+            text.index(f"      - name: {UNIT_TEST_STEP}"),
+            text.index("      - name: Render STL files"),
+            "test_output_names gates duplicate basenames and slug "
+            "collisions; if the unit-test step moves after the render "
+            "step, the clobber happens before the gate fires",
+        )
+
+
 class StructuredDataTests(unittest.TestCase):
     """Issue #409: the @graph payload is built by the shared helper, not inline."""
 
@@ -423,7 +461,10 @@ class StructuredDataTests(unittest.TestCase):
 
     def test_sitemap_step_uses_helper(self):
         body = step_body(read(BUILD_YML), "Generate sitemap.xml")
-        self.assertIn("standalone_url", body)
+        self.assertIn("build_sitemap", body)
+        self.assertIn("stl_lastmods", body)
+        self.assertNotIn("<urlset", body)
+        self.assertNotIn("<loc>", body)
         self.assertNotIn(r"re.sub(r'\.stl$'", body)
 
     def test_injection_preserves_script_escapes(self):

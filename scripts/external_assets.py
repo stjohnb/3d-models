@@ -25,22 +25,35 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from render_cache import collect_inputs
 
 
+def external_assets_for(scad_path, project_dir):
+    """Sorted relative paths of assets scad_path references from outside project_dir.
+
+    Scoped to one renderable's own transitive include chain — unlike
+    external_assets(), which unions every .scad in the directory. The
+    customizer check in build.yml needs the per-renderable answer: a
+    scan-importing model must not disable the customizer for its
+    self-contained siblings.
+    """
+    prefix = os.path.normpath(project_dir) + os.sep
+    _scad_files, asset_files, _unresolved = collect_inputs(scad_path)
+    return sorted(
+        rel
+        for rel in (os.path.relpath(asset) for asset in asset_files)
+        if not rel.startswith(prefix)
+    )
+
+
 def external_assets(project_dir):
     """Sorted relative paths of assets referenced from outside project_dir."""
-    prefix = os.path.normpath(project_dir) + os.sep
     external = set()
 
     for root, _dirs, files in os.walk(project_dir):
         for name in sorted(files):
             if not name.endswith(".scad"):
                 continue
-            _scad_files, asset_files, _unresolved = collect_inputs(
-                os.path.join(root, name)
+            external.update(
+                external_assets_for(os.path.join(root, name), project_dir)
             )
-            for asset in asset_files:
-                rel = os.path.relpath(asset)
-                if not rel.startswith(prefix):
-                    external.add(rel)
 
     return sorted(external)
 
