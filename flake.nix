@@ -90,6 +90,9 @@
                 numpy # trimesh dep; imported directly by test_check_interference
                 networkx # trimesh graph/repair optional backend
                 scipy # trimesh graph/repair optional backend
+                pillow # scripts/fetch_terrain_heightmap.py terrarium PNG decode
+                requests # scripts/fetch_terrain_heightmap.py tile fetch
+                pytest # CLAUDE.md's documented `python3 -m pytest scripts/`
               ]))
               nodejs_22 # WASM customizer smoke tests (scripts/*.mjs)
               imagemagick # montage/convert/identify for og-hero.png

@@ -3,10 +3,11 @@
 
 The non-threaded openscad-wasm build (no SharedArrayBuffer requirement)
 is used so the customizer works on plain S3 hosting without COOP/COEP
-headers. Files are cached locally under .cache/openscad-wasm/ so repeat
-runs (and local dev) don't re-download. SHA-256 hashes are pinned per
-file; first-run / version-bump procedure is the same as
-scripts/generate-standalone.py — compute, hard-code, commit.
+headers. Files are cached under $HOME/.cache/3d-models/openscad-wasm/<version>/
+(override with ASSET_CACHE_DIR) so repeat runs (and local dev) don't
+re-download. SHA-256 hashes are pinned per file; first-run / version-bump
+procedure is the same as scripts/generate-standalone.py — compute,
+hard-code, commit.
 
 Pinned release: 2022.03.20
   - openscad.js       (ES module wrapper; default export is async OpenSCAD())
@@ -21,6 +22,8 @@ import hashlib
 import os
 import sys
 import urllib.request
+
+import asset_cache
 
 OPENSCAD_WASM_VERSION = "2022.03.20"
 
@@ -37,7 +40,12 @@ EXPECTED_HASHES = {
     "openscad.wasm":    "2dbec831e81e963dd7011606e3ddd87e9984bc04e9a4076255641d30ebe2fbf0",
 }
 
-CACHE_DIR = os.path.join(".cache", "openscad-wasm", OPENSCAD_WASM_VERSION)
+
+def cache_dir() -> str:
+    """Host-level cache dir for the pinned openscad-wasm release."""
+    return asset_cache.cache_dir("openscad-wasm", OPENSCAD_WASM_VERSION)
+
+
 OUTPUT_DIR = os.path.join("site", "openscad")
 BASE_URL = (
     f"https://github.com/openscad/openscad-wasm/releases/download/"
@@ -51,7 +59,7 @@ def fetch_asset(name: str, *, opener=urllib.request.urlopen) -> bytes:
     The opener kwarg is overridable for tests so the disk + network path
     doesn't have to be exercised live.
     """
-    cache_path = os.path.join(CACHE_DIR, name)
+    cache_path = os.path.join(cache_dir(), name)
     expected = EXPECTED_HASHES.get(name)
 
     if os.path.isfile(cache_path):
@@ -80,9 +88,7 @@ def fetch_asset(name: str, *, opener=urllib.request.urlopen) -> bytes:
             file=sys.stderr,
         )
 
-    os.makedirs(CACHE_DIR, exist_ok=True)
-    with open(cache_path, "wb") as f:
-        f.write(data)
+    asset_cache.write_atomic(cache_path, data)
     return data
 
 

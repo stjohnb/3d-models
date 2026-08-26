@@ -61,9 +61,9 @@ path-segment-exact: `ideas` excludes `ideas/rejected.md` but not
 
 Everything else is included: all model project directories, `index.html`,
 `embed.html`, `openscad-worker.js`, `scripts/`, `*.schema.json`,
-`filament-colors.json`, `README.md`, `llms.txt`, `robots.txt`,
-`favicon.svg`, `site.webmanifest`, `CLAUDE.md`, `.claude/agents/`,
-`playbooks/`, `docs/OVERVIEW.md`, `docs/ci-pipeline.md`,
+`filament-colors.json`, `README.md` (substituted — see below), `llms.txt`,
+`robots.txt`, `favicon.svg`, `site.webmanifest`, `CLAUDE.md`,
+`.claude/agents/`, `playbooks/`, `docs/OVERVIEW.md`, `docs/ci-pipeline.md`,
 `docs/OPENSCAD_LIBRARIES.md`, and `.github/workflows/`.
 
 `CLAUDE.md` and `.claude/agents/` are kept deliberately — the blog post
@@ -104,16 +104,27 @@ Additional options:
 
 ## `README.public.md`
 
-The repo root also has a hand-maintained `README.public.md`: plain project-
-intro text with no snapshot/mirror/private-repo language, covering
-architecture, conventions, local rendering, and test instructions, and
-linking only to the safe doc paths already listed above. It is meant to
-replace `README.md` in the public snapshot (the LLM-generated gallery
-README isn't meaningful without the CI-populated `models.json`/thumbnails
-that don't exist in the mirror). As of this writing,
-`scripts/sync_public_snapshot.py` does **not yet** swap it in — the
-snapshot still stages `README.md` as-is — so wiring `README.public.md` into
-the sync step is outstanding follow-up work, not yet implemented.
+The repo root has a hand-maintained `README.public.md`: plain project-intro
+text with no snapshot/mirror/private-repo language, covering architecture,
+conventions, local rendering, and test instructions, and linking only to the
+safe doc paths already listed above.
+
+The snapshot **substitutes** it for `README.md`. `SNAPSHOT_RENAMES` in
+`scripts/sync_public_snapshot.py` maps `README.public.md` → `README.md`:
+`included_files()` drops the tracked `README.md` (the LLM-generated gallery,
+whose table is derived from the CI-built `site/models.json` that does not
+exist in the mirror), `build_snapshot()` stages `README.public.md`'s contents
+under the name `README.md`, and `push_snapshot()` is handed the staged names.
+The mirror therefore contains exactly one readme — the public text — and no
+`README.public.md`.
+
+The secret scan still runs against the real source file under its own name
+(`scan_for_secrets()` reads from the repo root before any staging), so the
+substitution does not create a scan blind spot.
+
+If `README.public.md` is ever deleted or untracked, the substitution simply
+does not apply and `README.md` ships as-is — the tool does not fail and the
+mirror is never left without a readme.
 
 ## One-directional sync
 

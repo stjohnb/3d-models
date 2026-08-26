@@ -23,6 +23,10 @@ from oembed_helpers import (
     strip_stl_ext,
     build_sitemap,
     stl_lastmods,
+    og_hero_thumbnails,
+    OG_HERO_MAX_TILES,
+    OG_HERO_TILE_COLUMNS,
+    OG_HERO_TILE_ROWS,
     BASE_URL,
     ORG_ID,
     SITE_ID,
@@ -441,6 +445,106 @@ class TestBuildSitemap(unittest.TestCase):
         xml = build_sitemap(['a.stl', 'b.stl'], {'a.stl': '2026-08-12T14:03:22+01:00'})
         root = ET.fromstring(xml)
         self.assertEqual(len(root), 3)
+
+
+class TestOgHeroThumbnails(unittest.TestCase):
+
+    def _scad_map(self, entries):
+        """entries: {project_dir: [stl, ...]} -> parse_scad_map-shaped dict."""
+        scad_map = {}
+        for project_dir, stls in entries.items():
+            for stl in stls:
+                scad_map[stl] = {
+                    'project': project_display_name(project_dir),
+                    'dir': project_dir,
+                    'source': f'{project_dir}/{stl}',
+                }
+        return scad_map
+
+    def test_hero_honoured(self):
+        """limit=1 isolates the one-per-project pass from the grid-fill pass."""
+        scad_map = self._scad_map({
+            'blast-gate': ['gate_assembly.stl', 'gate_body.stl'],
+        })
+        existing = {'gate_assembly.png', 'gate_body.png'}
+        result = og_hero_thumbnails(scad_map, {'blast-gate': 'gate_assembly.stl'}, existing, limit=1)
+        self.assertEqual(result, ['gate_assembly.png'])
+
+    def test_no_hero_declared_falls_back_to_alphabetical(self):
+        scad_map = self._scad_map({
+            'blast-gate': ['gate_body.stl', 'gate_assembly.stl'],
+        })
+        existing = {'gate_assembly.png', 'gate_body.png'}
+        result = og_hero_thumbnails(scad_map, {}, existing, limit=1)
+        self.assertEqual(result, ['gate_assembly.png'])
+
+    def test_hero_thumbnail_missing_falls_back(self):
+        scad_map = self._scad_map({
+            'blast-gate': ['gate_assembly.stl', 'gate_body.stl'],
+        })
+        existing = {'gate_body.png'}
+        result = og_hero_thumbnails(scad_map, {'blast-gate': 'gate_assembly.stl'}, existing)
+        self.assertEqual(result, ['gate_body.png'])
+
+    def test_project_with_zero_surviving_thumbnails_contributes_nothing(self):
+        scad_map = self._scad_map({
+            'blast-gate': ['gate_assembly.stl'],
+            'hex-connector': ['hex.stl'],
+        })
+        existing = {'hex.png'}
+        result = og_hero_thumbnails(scad_map, {}, existing)
+        self.assertEqual(result, ['hex.png'])
+
+    def test_one_tile_per_project_in_dir_order(self):
+        """limit=3 isolates the one-per-project pass from the grid-fill pass."""
+        scad_map = self._scad_map({
+            'proj-a': ['a1.stl', 'a2.stl', 'a3.stl'],
+            'proj-b': ['b1.stl', 'b2.stl', 'b3.stl'],
+            'proj-c': ['c1.stl', 'c2.stl', 'c3.stl'],
+        })
+        existing = {f'{p}{n}.png' for p in 'abc' for n in '123'}
+        result = og_hero_thumbnails(scad_map, {}, existing, limit=3)
+        self.assertEqual(result, ['a1.png', 'b1.png', 'c1.png'])
+
+    def test_grid_fill_no_duplicates(self):
+        scad_map = self._scad_map({
+            'proj-a': [f'a{n}.stl' for n in range(5)],
+            'proj-b': [f'b{n}.stl' for n in range(5)],
+        })
+        existing = {f'{p}{n}.png' for p in 'ab' for n in range(5)}
+        result = og_hero_thumbnails(scad_map, {}, existing)
+        self.assertEqual(len(result), 10)
+        self.assertEqual(len(set(result)), 10)
+
+    def test_hard_cap_at_max_tiles(self):
+        scad_map = self._scad_map({
+            f'proj-{i:02d}': [f'p{i:02d}-a.stl', f'p{i:02d}-b.stl']
+            for i in range(20)
+        })
+        existing = {thumbnail_name(stl) for stl in scad_map}
+        result = og_hero_thumbnails(scad_map, {}, existing)
+        self.assertEqual(len(result), OG_HERO_MAX_TILES)
+        self.assertEqual(len(set(result)), OG_HERO_MAX_TILES)
+        self.assertEqual(OG_HERO_MAX_TILES, OG_HERO_TILE_COLUMNS * OG_HERO_TILE_ROWS)
+
+    def test_orthographic_views_never_selected(self):
+        scad_map = self._scad_map({
+            'drawer-organiser': ['drawer_bin_5x5.stl'],
+        })
+        existing = {'drawer_bin_5x5.png', 'drawer_bin_5x5_top.png'}
+        result = og_hero_thumbnails(scad_map, {}, existing)
+        self.assertNotIn('drawer_bin_5x5_top.png', result)
+        self.assertEqual(result, ['drawer_bin_5x5.png'])
+
+    def test_space_in_filename(self):
+        scad_map = self._scad_map({
+            'toothbrush': ['Toothbrush assembly.stl'],
+        })
+        existing = {'Toothbrush assembly.png'}
+        result = og_hero_thumbnails(
+            scad_map, {'toothbrush': 'Toothbrush assembly.stl'}, existing,
+        )
+        self.assertEqual(result, ['Toothbrush assembly.png'])
 
 
 if __name__ == '__main__':

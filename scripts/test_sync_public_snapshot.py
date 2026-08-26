@@ -15,13 +15,18 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 from sync_public_snapshot import (
     SECRET_SCAN_SKIP,
     SNAPSHOT_EXCLUDES,
+    SNAPSHOT_RENAMES,
     STAGING_MARKER,
     StagingDirError,
     build_snapshot,
+    included_files,
     is_excluded,
     mirror_files,
     prepare_staging_dir,
     scan_for_secrets,
+    staged_path,
+    staged_paths,
+    superseded_targets,
 )
 
 
@@ -284,6 +289,47 @@ class TestMirrorFiles(unittest.TestCase):
                     mirror_files(staging, dest, ["absent.scad"])
 
 
+class TestSnapshotRenames(unittest.TestCase):
+
+    def test_staged_paths_maps_public_readme(self):
+        self.assertEqual(
+            staged_paths(["a.scad", "README.public.md"]),
+            ["a.scad", "README.md"],
+        )
+        self.assertEqual(staged_path("index.html"), "index.html")
+
+    def test_superseded_targets_requires_source_present(self):
+        self.assertEqual(
+            superseded_targets(["README.md", "README.public.md"]),
+            {"README.md"},
+        )
+        self.assertEqual(superseded_targets(["README.md"]), set())
+
+    def test_build_snapshot_writes_public_text_as_readme(self):
+        with tempfile.TemporaryDirectory() as src:
+            with tempfile.TemporaryDirectory() as dst:
+                with open(os.path.join(src, "README.md"), "w") as fh:
+                    fh.write("gallery")
+                with open(os.path.join(src, "README.public.md"), "w") as fh:
+                    fh.write("public intro")
+
+                build_snapshot(src, dst, ["README.public.md"])
+
+                with open(os.path.join(dst, "README.md")) as fh:
+                    self.assertEqual(fh.read(), "public intro")
+                self.assertFalse(os.path.exists(os.path.join(dst, "README.public.md")))
+
+    def test_secret_scan_reads_source_name(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            fpath = os.path.join(tmp, "README.public.md")
+            with open(fpath, "w") as fh:
+                fh.write(
+                    "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.abcdefghijk\n"
+                )
+            hits = scan_for_secrets(tmp, ["README.public.md"])
+        self.assertTrue(any(h[0] == "README.public.md" for h in hits))
+
+
 def _git_available():
     try:
         subprocess.run(["git", "--version"], capture_output=True, check=True)
@@ -323,6 +369,70 @@ class TestEnumerateTrackedFiles(unittest.TestCase):
 
         self.assertIn("committed.scad", tracked)
         self.assertNotIn("untracked.txt", tracked)
+
+
+@unittest.skipUnless(_git_available(), "git not available")
+class TestIncludedFilesRename(unittest.TestCase):
+
+    def _init_repo(self, tmp, filenames_and_contents):
+        subprocess.run(["git", "init", tmp], capture_output=True, check=True)
+        subprocess.run(
+            ["git", "-C", tmp, "config", "user.email", "test@test.com"],
+            capture_output=True, check=True,
+        )
+        subprocess.run(
+            ["git", "-C", tmp, "config", "user.name", "Test"],
+            capture_output=True, check=True,
+        )
+        for name, content in filenames_and_contents.items():
+            with open(os.path.join(tmp, name), "w") as fh:
+                fh.write(content)
+        subprocess.run(
+            ["git", "-C", tmp, "add"] + list(filenames_and_contents.keys()),
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", tmp, "commit", "-m", "init"],
+            capture_output=True, check=True,
+        )
+
+    def test_drops_gallery_readme_when_public_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._init_repo(tmp, {
+                "README.md": "gallery",
+                "README.public.md": "public intro",
+                "index.html": "<html></html>",
+            })
+            files = included_files(tmp)
+        self.assertIn("README.public.md", files)
+        self.assertIn("index.html", files)
+        self.assertNotIn("README.md", files)
+
+    def test_keeps_readme_when_public_absent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._init_repo(tmp, {
+                "README.md": "gallery",
+                "index.html": "<html></html>",
+            })
+            files = included_files(tmp)
+        self.assertIn("README.md", files)
+
+    def test_mirror_contains_exactly_one_readme(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self._init_repo(tmp, {
+                "README.md": "gallery",
+                "README.public.md": "public intro",
+                "index.html": "<html></html>",
+            })
+            files = included_files(tmp)
+            with tempfile.TemporaryDirectory() as staging:
+                with tempfile.TemporaryDirectory() as dest:
+                    build_snapshot(tmp, staging, files)
+                    mirror_files(staging, dest, staged_paths(files))
+                    readmes = sorted(p for p in os.listdir(dest) if "README" in p)
+                    self.assertEqual(readmes, ["README.md"])
+                    with open(os.path.join(dest, "README.md")) as fh:
+                        self.assertEqual(fh.read(), "public intro")
 
 
 if __name__ == "__main__":

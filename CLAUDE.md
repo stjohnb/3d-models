@@ -110,6 +110,7 @@ Dependency-graph checks, mesh validation, metadata validation, interference chec
 ## Testing
 
 - Python scripts: `python3 -m pytest scripts/`
+- CI runs the same suite as `python3 -m unittest discover -s scripts -p 'test_*.py'` from the repo root; every `scripts/test_*.py` is discovered automatically — never add a module to a hand-maintained list.
 - WASM customizer pipeline: `node scripts/test_wasm_customizer.mjs`
 - Do not run integration tests or anything requiring Docker or external services locally — CI handles those.
 

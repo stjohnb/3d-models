@@ -30,6 +30,9 @@ class FetchAssetTests(unittest.TestCase):
         self._cwd = os.getcwd()
         os.chdir(self._tmp.name)
         self.addCleanup(lambda: os.chdir(self._cwd))
+        patcher = mock.patch.dict(os.environ, {"ASSET_CACHE_DIR": self._tmp.name})
+        patcher.start()
+        self.addCleanup(patcher.stop)
 
     def test_fetch_asset_validates_hash_and_caches(self):
         payload = b"// not-really-openscad.js content"
@@ -40,7 +43,7 @@ class FetchAssetTests(unittest.TestCase):
             data = foa.fetch_asset("openscad.js", opener=opener)
         self.assertEqual(data, payload)
         # Cache populated for subsequent calls.
-        cache_path = os.path.join(foa.CACHE_DIR, "openscad.js")
+        cache_path = os.path.join(foa.cache_dir(), "openscad.js")
         self.assertTrue(os.path.isfile(cache_path))
         with open(cache_path, "rb") as f:
             self.assertEqual(f.read(), payload)
@@ -55,8 +58,8 @@ class FetchAssetTests(unittest.TestCase):
     def test_fetch_asset_reuses_cache_when_hash_matches(self):
         payload = b"cached-bytes"
         digest = hashlib.sha256(payload).hexdigest()
-        os.makedirs(foa.CACHE_DIR, exist_ok=True)
-        with open(os.path.join(foa.CACHE_DIR, "openscad.wasm"), "wb") as f:
+        os.makedirs(foa.cache_dir(), exist_ok=True)
+        with open(os.path.join(foa.cache_dir(), "openscad.wasm"), "wb") as f:
             f.write(payload)
         opener = mock.Mock(side_effect=AssertionError("should not call network"))
         with mock.patch.dict(foa.EXPECTED_HASHES, {"openscad.wasm": digest}, clear=False):

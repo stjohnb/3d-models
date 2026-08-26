@@ -1,8 +1,9 @@
 """Unit tests for scan_masks.py.
 
-Needs numpy and opencv4 (and, transitively, rembg), which live in the `scan`
-devShell rather than `default` — so this module is deliberately excluded from
-CI's unit-test step. Run with:
+The pure helpers (parse_ellipse, mask_filename) have no third-party
+dependencies and run in CI's default devShell. MaskGeometryTests needs
+opencv4, which lives in the `scan` devShell rather than `default`, so it
+self-skips unless `cv2` is importable — run those with:
 
     nix develop .#scan --command python3 -m unittest scripts/test_scan_masks.py
 """
@@ -14,6 +15,12 @@ import unittest
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 from scan_masks import column_mask, mask_filename, parse_ellipse, platter_mask
+
+try:
+    import cv2  # noqa: F401
+    _HAVE_CV2 = True
+except ImportError:  # opencv4 lives in the `scan` devShell, not `default`
+    _HAVE_CV2 = False
 
 
 class ParseEllipseTests(unittest.TestCase):
@@ -38,6 +45,7 @@ class ParseEllipseTests(unittest.TestCase):
                     parse_ellipse(text)
 
 
+@unittest.skipUnless(_HAVE_CV2, "needs opencv4 — run inside `nix develop .#scan`")
 class MaskGeometryTests(unittest.TestCase):
     SHAPE = (200, 200)
     ELLIPSE = (100.0, 150.0, 50.0, 20.0)

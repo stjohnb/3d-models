@@ -245,8 +245,7 @@ jobs:
 
       - name: Run Python unit tests for build scripts
         run: |
-          cd scripts
-          python3 -m unittest test_render_view test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs test_render_cache test_capped_openscad test_viewer_invariants test_project_dates test_build_workflow test_generate_standalone test_scad_orientation test_scad_fonts test_output_names test_generate_gallery test_scan_frames test_scan_pipeline test_scan_colmap test_scan_mesh test_scan_reference test_external_assets -v
+          python3 -m unittest discover -s scripts -p 'test_*.py' -v
 
       # The flake's `openscad` is a wrapper around openscad-unstable that
       # forces the EGL/llvmpipe software-GL path (QT_QPA_PLATFORM=offscreen,
@@ -708,18 +707,62 @@ jobs:
             IM_CONVERT=(convert)
           fi
 
+          # Tiles come from site/.scad-map, not a site/*.png glob: the glob
+          # also swept the _top/_bottom/_front orthographic views written by
+          # the complex_interior step, and the untiled montage was a
+          # 1224x14168 strip (issue #458). One tile per project (meta.json
+          # `hero` when it rendered), capped to the 5x3 grid.
+          python3 -c "
+          import glob, json, os, sys
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import (
+              parse_scad_map, load_meta_failures, og_hero_thumbnails,
+              OG_HERO_MAX_TILES,
+          )
+
+          scad_map = parse_scad_map('site/.scad-map')
+          failed = load_meta_failures()
+          heroes = {}
+          for path in sorted(glob.glob('*/meta.json')):
+              if path in failed:
+                  continue
+              try:
+                  with open(path) as f:
+                      meta = json.load(f)
+              except (OSError, json.JSONDecodeError):
+                  continue
+              hero = meta.get('hero')
+              if hero:
+                  heroes[os.path.dirname(path)] = hero
+
+          existing = {os.path.basename(p) for p in glob.glob('site/*.png')}
+          tiles = og_hero_thumbnails(scad_map, heroes, existing)
+          print('OG hero tiles: %d of max %d' % (len(tiles), OG_HERO_MAX_TILES))
+          with open(sys.argv[1], 'w') as out:
+              for name in tiles:
+                  print('  ' + name)
+                  out.write('site/' + name + '\n')
+          " "$RUNNER_TEMP/og-tiles.txt"
+
           ok=0
-          THUMBS=(site/*.png)
+          mapfile -t THUMBS < "$RUNNER_TEMP/og-tiles.txt"
           if [ ${#THUMBS[@]} -gt 0 ] && [ -e "${THUMBS[0]}" ]; then
+            # Two stages on purpose: -resize/-extent chained onto montage are
+            # silently ignored (confirmed: the deployed og-hero.png was
+            # 1224x14168). montage writes MIFF on stdout; the second stage
+            # centres the grid on a 1200x630 dark canvas.
             if montage "${THUMBS[@]}" \
               -font "$OG_FONT" \
-              -geometry 400x300+4+4 \
-              -tile 3x \
+              -geometry 232x202+4+4 \
+              -tile 5x3 \
               -background '#1a1a2e' \
-              -resize 1200x630^ \
-              -gravity center \
-              -extent 1200x630 \
-              site/og-hero.png; then
+              miff:- \
+              | "${IM_CONVERT[@]}" miff:- \
+                -font "$OG_FONT" \
+                -background '#1a1a2e' \
+                -gravity center \
+                -extent 1200x630 \
+                png:site/og-hero.png; then
               ok=1
             else
               echo "::warning::montage failed to composite og-hero.png; falling back to a plain hero image"

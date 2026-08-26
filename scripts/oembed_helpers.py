@@ -104,6 +104,56 @@ def parse_scad_map(path):
     return scad_map
 
 
+OG_HERO_TILE_COLUMNS = 5
+OG_HERO_TILE_ROWS = 3
+OG_HERO_MAX_TILES = OG_HERO_TILE_COLUMNS * OG_HERO_TILE_ROWS
+
+
+def og_hero_thumbnails(scad_map, heroes, existing, limit=OG_HERO_MAX_TILES):
+    """Pick the ordered thumbnails for the OG hero montage (issue #458).
+
+    scad_map: {stl: {'project','dir','source'}} from parse_scad_map.
+    heroes:   {project_dir: hero_stl} from each project's meta.json.
+    existing: set of PNG basenames actually present in site/.
+
+    Returns at most `limit` thumbnail basenames: one per project (the
+    declared hero when it rendered, else the first STL alphabetically),
+    in project-directory order, then further models in (dir, stl) order
+    to fill the grid. Never returns a name absent from `existing` and
+    never returns duplicates. Excludes the _top/_bottom/_front
+    orthographic views by construction: every name is derived from an
+    STL in .scad-map.
+    """
+    by_dir = {}
+    for stl, info in scad_map.items():
+        by_dir.setdefault(info['dir'], []).append(stl)
+
+    picked = []
+    seen = set()
+    for project_dir in sorted(by_dir):
+        if len(picked) >= limit:
+            break
+        stls = sorted(by_dir[project_dir])
+        hero = heroes.get(project_dir)
+        order = ([hero] if hero in stls else []) + [s for s in stls if s != hero]
+        for stl in order:
+            png = thumbnail_name(stl)
+            if png in existing:
+                picked.append(png)
+                seen.add(png)
+                break
+
+    for project_dir in sorted(by_dir):
+        for stl in sorted(by_dir[project_dir]):
+            if len(picked) >= limit:
+                return picked[:limit]
+            png = thumbnail_name(stl)
+            if png in existing and png not in seen:
+                picked.append(png)
+                seen.add(png)
+    return picked[:limit]
+
+
 def build_structured_data(scad_map, project_descriptions, stl_sizes=None):
     """Build the root page's Schema.org @graph payload.
 

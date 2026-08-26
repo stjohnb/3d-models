@@ -37,13 +37,15 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_oembed_helpers.py  # Tests for oembed_helpers
 │   ├── check_interference.py   # Geometric overlap detection for mating part pairs (meta.json mating_pairs)
 │   ├── test_check_interference.py  # Tests for check_interference
-│   ├── fetch_openscad_wasm.py  # Fetches pinned openscad-wasm release into .cache/ and stages to site/openscad/
+│   ├── fetch_openscad_wasm.py  # Fetches pinned openscad-wasm release into $HOME/.cache/3d-models/openscad-wasm/<version>/ and stages to site/openscad/
 │   ├── test_fetch_openscad_wasm.py # Tests for fetch_openscad_wasm (mocks urllib, verifies zip parsing)
 │   ├── threejs_assets.py       # Single source of truth for the pinned Three.js version and SHA-256 asset hashes
-│   ├── fetch_threejs.py        # Fetches the pinned Three.js release into .cache/threejs/ and stages it same-origin to site/vendor/three/<version>/ with hash verification (issue #403)
+│   ├── fetch_threejs.py        # Fetches the pinned Three.js release into $HOME/.cache/3d-models/threejs/ and stages it same-origin to site/vendor/three/<version>/ with hash verification (issue #403)
 │   ├── test_fetch_threejs.py   # Tests for fetch_threejs (hash verification, staging)
+│   ├── asset_cache.py          # Host-level download-cache root shared by threejs_assets and fetch_openscad_wasm (issue #460)
+│   ├── test_asset_cache.py     # Tests for asset_cache (cache root resolution, atomic writes)
 │   ├── fetch_terrain_heightmap.py  # One-off generator: fetch a lat/lon terrain heightmap PNG (Mapzen terrarium tiles via AWS Open Data); not used by CI
-│   ├── test_fetch_terrain_heightmap.py # Tests for fetch_terrain_heightmap (mocks requests, verifies slippy math and decode)
+│   ├── test_fetch_terrain_heightmap.py # Tests for fetch_terrain_heightmap (mocks requests, verifies slippy math and decode); pillow/requests are in the `default` devShell, so this runs in CI
 │   ├── generate_lake_bed.py        # One-off generator: bake lakebed bathymetry PNG from heightmap for nz-ski-fields; not used by CI
 │   ├── render_view.py          # Render an arbitrary OpenSCAD view to PNG via capped-openscad.sh (developer/agent tool, not used by CI)
 │   ├── test_render_view.py     # Tests for render_view
@@ -52,7 +54,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── scan_frames.py          # Frame extraction (ffmpeg), sharpness-binned and hold-aware frame selection for scan_pipeline
 │   ├── test_scan_frames.py     # Tests for scan_frames' binned and hold-detection selectors
 │   ├── scan_masks.py           # Platter-ellipse + salient-object masking for scan_pipeline (COLMAP mask PNGs)
-│   ├── test_scan_masks.py      # Tests for scan_masks; needs the `scan` devShell, so excluded from CI's unit-test step
+│   ├── test_scan_masks.py      # Tests for scan_masks; pure-helper tests run in CI, mask-geometry tests skip unless `cv2` is importable (`nix develop .#scan`)
 │   ├── scan_colmap.py          # COLMAP/OpenMVS command lines for scan_pipeline (CPU-only: never patch_match_stereo)
 │   ├── test_scan_colmap.py     # Tests for scan_colmap's argv builders and sparse-model selection; also validates option names against a real colmap when one is on PATH
 │   ├── scan_mesh.py            # Platter-plane fit, mm scaling, cropping and STL export for scan_pipeline
@@ -76,9 +78,9 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_viewer_invariants.py # Text-level checks on index.html/embed.html (build markers, slugify/PUBLIC_REPO parity, innerHTML)
 │   ├── test_build_workflow.py  # Text-level invariant checks on build.yml/flake.nix (ImageMagick font args, no-toolchain-setup-actions, no-Xvfb, EGL pinning); see ci-pipeline.md
 │   ├── sync_public_snapshot.py  # Builds a sanitized public snapshot for stjohnb/3d-models; not used by CI
-│   └── test_sync_public_snapshot.py  # Tests for sync_public_snapshot
+│   └── test_sync_public_snapshot.py  # Tests for sync_public_snapshot; runs in CI's unit-test step
 ├── README.md             # Project readme; gallery section auto-generated (see below)
-├── README.public.md      # Hand-maintained readme text for the public snapshot (stjohnb/3d-models); see public-snapshot.md
+├── README.public.md      # Hand-maintained readme; staged as README.md in the public snapshot (stjohnb/3d-models)
 ├── filament-colors.json  # Shared color palette (single source of truth)
 ├── .openscad-version     # Committed expected OpenSCAD version baseline; CI warns on drift
 ├── flake.nix             # Repo-owned CI/dev toolchain (default/scripts/scan devShells); see ci-pipeline.md
@@ -723,7 +725,7 @@ comment.
 | Viewer render policy | On-demand (`invalidate()` / `needsRender`); rAF loop suspends after ~90 idle frames; `powerPreference: 'low-power'` | Issue #341 — continuous rAF rendering overheated client laptops. Any external scene/material mutation must call `viewer.invalidate()` (see [web-viewer.md](web-viewer.md#render-budget)) |
 | OpenSCAD resolution | `$fn = 64` | Set per-file in `.scad` sources |
 | Thumbnail size | `800x600` | Set in build.yml render step |
-| OG hero image | `og-hero.png` (1200x630) | Composited by CI; stable URL, not cache-busted |
+| OG hero image | `og-hero.png` (1200x630) | Composited by CI from one thumbnail per project (5x3 grid, max 15); stable URL, not cache-busted |
 | Structured data | `<!-- __STRUCTURED_DATA__ -->` in `index.html` | Replaced by CI with Schema.org JSON-LD |
 | OEmbed links | `<!-- __OEMBED_LINKS__ -->` in `index.html` | Replaced by CI with `<link rel="alternate">` tags |
 | Filament colors | `filament-colors.json` | 8 preset colors; Blue is default. Single source of truth loaded by `index.html` at runtime and injected into standalone viewers at build time by `generate-standalone.py` |
@@ -736,7 +738,7 @@ comment.
 | Print-time heuristic | 0.2mm layers, 50mm/s, 5x multiplier | Conservative defaults; volume fallback for flat models |
 | Metadata schema | `meta.schema.json` (JSON Schema draft 2020-12) | Validated in CI; `description` required, all others optional |
 | README gallery markers | `<!-- gallery:start -->` / `<!-- gallery:end -->` | Auto-replaced by `scripts/generate-gallery.py` |
-| Standalone viewer cache | `.cache/threejs/` | Local cache for the upstream Three.js downloads, shared by `fetch_threejs.py` and `generate-standalone.py` |
+| Standalone viewer cache | `$HOME/.cache/3d-models/threejs` (override `ASSET_CACHE_DIR`) | Host-level cache for the upstream Three.js downloads, shared by `fetch_threejs.py` and `generate-standalone.py`; lives outside the checkout so `actions/checkout`'s `git clean -ffdx` can't wipe it, and is consulted before the network when the SHA-256 pin matches (issue #460) |
 | Render cache | `$HOME/.cache/3d-models/render` (override `RENDER_CACHE_DIR`, disable `RENDER_CACHE_DISABLED=1`) | Host-level content-addressed STL cache; key = SHA-256 over transitive include/use chain + binary assets + OpenSCAD version + `CACHE_VERSION` via `scripts/render_cache.py`; pruned at 30 days by mtime |
 | Interference check | `mating_pairs` in `meta.json` | Pairs of STL filenames validated by `check_interference.py` using `trimesh` + `manifold3d` |
 | Interference threshold | overlap volume > 0 | Any geometric overlap between mating parts is a failure |

@@ -29,6 +29,14 @@ SNAPSHOT_EXCLUDES = [
     ".mcp-claws.json",
 ]
 
+# Source path -> path it is staged/pushed as. The public mirror gets
+# README.public.md's text under the name README.md: the tracked README.md is
+# the CI-generated gallery (scripts/generate-gallery.py), whose table is built
+# from site/models.json — a build artifact that does not exist in the mirror.
+# The rename happens at staging time, so scan_for_secrets() still reads the
+# real file from the repo root under its own name.
+SNAPSHOT_RENAMES = {"README.public.md": "README.md"}
+
 # Files that legitimately contain the secret *patterns* themselves — the
 # scanner's own definition, its tests' planted fixtures, and the doc that
 # describes the patterns. These hold no real secret values (the live values
@@ -101,9 +109,41 @@ def is_excluded(path, excludes=None):
     return False
 
 
-def included_files(root):
-    """Return tracked files that are not excluded."""
-    return [p for p in enumerate_tracked_files(root) if not is_excluded(p)]
+def superseded_targets(files, renames=None):
+    """Return rename destinations whose source file is present in ``files``.
+
+    A destination is only dropped from the snapshot when its replacement
+    actually exists, so deleting or untracking README.public.md degrades to
+    the old behaviour (README.md ships as-is) rather than shipping no readme.
+    """
+    if renames is None:
+        renames = SNAPSHOT_RENAMES
+    present = set(files)
+    return {dst for src, dst in renames.items() if src in present}
+
+
+def staged_path(rel_path, renames=None):
+    """Return the name ``rel_path`` is staged and pushed under."""
+    if renames is None:
+        renames = SNAPSHOT_RENAMES
+    return renames.get(rel_path, rel_path)
+
+
+def staged_paths(files, renames=None):
+    """Map a list of repo-relative source paths to their staged names."""
+    return [staged_path(p, renames) for p in files]
+
+
+def included_files(root, renames=None):
+    """Return tracked files that are not excluded.
+
+    Paths that a rename supersedes (README.md, replaced by README.public.md)
+    are dropped; the rename *source* stays in the list so it is secret-scanned
+    under its real name before being staged under the new name.
+    """
+    files = [p for p in enumerate_tracked_files(root) if not is_excluded(p)]
+    dropped = superseded_targets(files, renames)
+    return [p for p in files if p not in dropped]
 
 
 def scan_for_secrets(root, files, skip=None):
@@ -162,18 +202,20 @@ def prepare_staging_dir(staging_dir):
     (path / STAGING_MARKER).write_text(STAGING_MARKER_TEXT)
 
 
-def build_snapshot(root, staging_dir, files):
+def build_snapshot(root, staging_dir, files, renames=None):
     """Rebuild staging_dir from scratch and copy the given file list into it.
 
     The staging directory is authoritative: anything already there that is
     not in ``files`` is deleted, so a stale copy from an earlier run can
     never be pushed. Raises StagingDirError if staging_dir is non-empty and
-    unmarked.
+    unmarked. Destination names are passed through SNAPSHOT_RENAMES (or the
+    override ``renames``), so a source path like README.public.md is staged
+    under its rename target.
     """
     prepare_staging_dir(staging_dir)
     for rel_path in files:
         src = os.path.join(root, rel_path)
-        dst = os.path.join(staging_dir, rel_path)
+        dst = os.path.join(staging_dir, staged_path(rel_path, renames))
         pathlib.Path(dst).parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
 
@@ -275,12 +317,17 @@ def main(argv=None):
         print(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
+    staged = staged_paths(files)
+    for src, dst in sorted(SNAPSHOT_RENAMES.items()):
+        if src in set(files):
+            print(f"Substituted: {src} -> {dst}")
+
     print(f"Snapshot built: {len(files)} files included, {excluded_count} excluded.")
     print(f"Staging directory: {staging_dir}")
     print("(Staging directory was rebuilt from scratch; stale files removed.)")
 
     if args.push:
-        push_snapshot(staging_dir, args.target_repo, files, commit_message=args.commit_message)
+        push_snapshot(staging_dir, args.target_repo, staged, commit_message=args.commit_message)
         print(f"Pushed to {args.target_repo}.")
     else:
         print()

@@ -17,6 +17,8 @@ import hashlib
 import os
 import urllib.request
 
+import asset_cache
+
 THREEJS_VERSION = "0.170.0"
 
 # url: where the bytes come from; sha256: the only bytes we accept;
@@ -41,19 +43,34 @@ THREEJS_ASSETS = {
 
 VENDOR_DIR = os.path.join("site", "vendor", "three", THREEJS_VERSION)
 IMPORTMAP_PREFIX = f"./vendor/three/{THREEJS_VERSION}/"
-CACHE_DIR = ".cache/threejs"
+
+
+def cache_dir() -> str:
+    """Host-level cache dir for the upstream Three.js downloads."""
+    return asset_cache.cache_dir("threejs")
 
 
 def _cache_path(url: str) -> str:
     """Return a deterministic local cache path for a URL."""
     url_hash = hashlib.sha256(url.encode()).hexdigest()[:16]
     basename = url.rsplit("/", 1)[-1]
-    return os.path.join(CACHE_DIR, f"{url_hash}_{basename}")
+    return os.path.join(cache_dir(), f"{url_hash}_{basename}")
 
 
 def fetch_url(url: str, expected_sha256: str | None = None) -> bytes:
     """Download a URL with a single retry, SHA-256 verification, and local cache fallback."""
     cache_file = _cache_path(url)
+
+    if expected_sha256 and os.path.isfile(cache_file):
+        try:
+            with open(cache_file, "rb") as f:
+                data = f.read()
+        except OSError:
+            data = None
+        if data is not None and hashlib.sha256(data).hexdigest() == expected_sha256:
+            print(f"  Cache hit: {cache_file}")
+            return data
+        # Stale or unreadable — fall through and re-download.
 
     for attempt in range(2):
         try:
@@ -89,8 +106,6 @@ def fetch_url(url: str, expected_sha256: str | None = None) -> bytes:
                     f"  got:      {actual}"
                 )
         # Cache the verified data for future runs
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        with open(cache_file, "wb") as f:
-            f.write(data)
+        asset_cache.write_atomic(cache_file, data)
         return data
     raise RuntimeError(f"Failed to fetch {url}")

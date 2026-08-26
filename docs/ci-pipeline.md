@@ -128,32 +128,33 @@ step:
 
 ### 2.6. Run Python Unit Tests for Build Scripts
 
-Runs `python3 -m unittest test_render_view test_oembed_helpers
-test_fetch_openscad_wasm test_fetch_threejs test_render_cache
-test_capped_openscad test_viewer_invariants test_project_dates
-test_build_workflow test_generate_standalone test_scad_orientation
-test_scad_fonts test_output_names test_generate_gallery test_scan_frames test_scan_pipeline
-test_scan_colmap test_scan_mesh test_scan_reference test_external_assets -v`
-from within the
-`scripts/` directory. These are
-fast unit tests that mock external I/O (network, filesystem) and run on
-every push. They guard the helper functions used throughout the CI
-pipeline against regressions. `test_generate_standalone` guards the two
-escaping layers in `generate-standalone.py`'s `_load_filament_colors_js`,
-`test_scad_orientation` pins the no-top-level-`rotate([-90,0,0])` source
-rule, `test_scad_fonts` pins the no-`text()`/no-font rule, `test_output_names`
-pins renderable basename uniqueness across all projects and per-project slug
-uniqueness (issue #449) — this step runs before step 5's render, so a
-collision fails the build before any STL is written, and
-`test_generate_gallery` covers `pick_thumbnail` hero selection.
-The `test_scan_*` modules (added for issue #407, which turned "every
-`scripts/test_*.py` must run somewhere or be explicitly excluded" into a
-guarded invariant — see `UnitTestStepCoverageTests` in
-`scripts/test_build_workflow.py`) can run here because `numpy`/`trimesh`
-now ship in the `default` devShell (issue #423) — `test_scan_reference`
-included, since `manifold3d` is there too; `test_scan_masks` stays
-excluded because `scan_masks.py` needs `opencv4`/`rembg`, which only the
-`scan` devShell provides.
+Runs `python3 -m unittest discover -s scripts -p 'test_*.py' -v` from the
+repo root. These are fast unit tests that mock external I/O (network,
+filesystem) and run on every push. They guard the helper functions used
+throughout the CI pipeline against regressions. `test_generate_standalone`
+guards the two escaping layers in `generate-standalone.py`'s
+`_load_filament_colors_js`, `test_scad_orientation` pins the
+no-top-level-`rotate([-90,0,0])` source rule, `test_scad_fonts` pins the
+no-`text()`/no-font rule, `test_output_names` pins renderable basename
+uniqueness across all projects and per-project slug uniqueness (issue #449)
+— this step runs before step 5's render, so a collision fails the build
+before any STL is written, and `test_generate_gallery` covers
+`pick_thumbnail` hero selection.
+
+Discovery (issue #457) picks up every `scripts/test_*.py` automatically, so
+a newly added test module can never silently go unrun — `test_build_workflow.py`'s
+`UnitTestStepCoverageTests` pins the discovery invocation itself and asserts
+no module is named by hand in the step. `test_sync_public_snapshot` and
+`test_fetch_terrain_heightmap` (now that `pillow`/`requests` are in the
+`default` devShell) run here for the first time. `test_scan_masks`' pure
+helper tests (`parse_ellipse`, `mask_filename`) also run here; only
+`MaskGeometryTests` self-skips via `unittest.skipUnless`, since it needs
+`opencv4`, which only the `scan` devShell provides — run those with
+`nix develop .#scan --command python3 -m unittest scripts/test_scan_masks.py`.
+`test_check_interference` is discovered here too, in addition to its
+dedicated pre-flight run immediately before `check_interference.py` (step
+6.5) — the duplicate run costs milliseconds and touches nothing in the
+workspace.
 
 ### 3. Verify Headless OpenSCAD Rendering
 
@@ -331,8 +332,8 @@ to `site/vendor/three/<version>/` alongside a `VERSION` file. The import maps
 in `index.html` and `embed.html` resolve `three` and `three/addons/` to this
 same-origin tree, so no visitor ever executes unverified third-party script on
 `www.bstjohn.net` (issue #403). A hash mismatch or an unreachable CDN with a
-cold `.cache/threejs/` fails the step immediately — this is deliberately *not*
-part of the deferred-enforcement pattern.
+cold `$HOME/.cache/3d-models/threejs/` fails the step immediately — this is
+deliberately *not* part of the deferred-enforcement pattern.
 
 The version directory in the path means `aws s3 sync --delete` prunes the old
 tree on the next main deploy, and a returning visitor's cached
@@ -344,7 +345,7 @@ Stages all assets the in-browser WASM customizer needs to function:
 
 1. **`scripts/fetch_openscad_wasm.py`** — downloads the pinned non-threaded
    openscad-wasm release (v2022.03.20) from GitHub if not already in
-   `.cache/openscad-wasm/`, verifies SHA-256 hashes of each asset, and copies
+   `$HOME/.cache/3d-models/openscad-wasm/<version>/`, verifies SHA-256 hashes of each asset, and copies
    `openscad.js`, `openscad.wasm.js`, and `openscad.wasm` into `site/openscad/`.
    Font and MCAD library files are intentionally omitted — no model in this repo
    uses `text()` or MCAD.
@@ -422,9 +423,11 @@ HTML file per model at `site/standalone/<name>.html`. The script:
 
 - Downloads the Three.js 0.170.0 assets declared in `scripts/threejs_assets.py`
   (once for all models) — the same URLs and pinned hashes the "Vendor Three.js
-  runtime" step uses, so a build fetches each file at most once
-- Verifies SHA-256 hashes of downloaded assets; caches verified copies in
-  `.cache/threejs/` with a local cache fallback if the CDN is unreachable
+  runtime" step uses
+- Verifies SHA-256 hashes of downloaded assets; verified copies are cached in
+  `$HOME/.cache/3d-models/threejs/` and reused before the network on a digest
+  match, so a build downloads each file at most once *across* runs, with a
+  cache fallback if the CDN is unreachable
 - Cross-checks the vendored Three.js version parsed from both `index.html` and
   `embed.html` import maps via `_check_threejs_version()` — exits with error if
   either file uses a different version than `THREEJS_VERSION`, or references no
@@ -514,20 +517,40 @@ then loops over it in Bash to call `qrencode`. There is no Bash
 re-implementation of `slugify()` (issue #398);
 `scripts/test_build_workflow.py::QrSlugifyTests` enforces this. QR images use
 the site's dark theme colors (`--foreground=E0E0E0 --background=1A1A2E`), module size 8,
-and margin 2. QR codes are stored in a separate `site/qr/` directory to avoid
-polluting the `site/*.png` glob used by the OG hero image step. Failures
+and margin 2. QR codes are stored in a separate `site/qr/` directory to keep
+QR PNGs out of the deployed thumbnail namespace. Failures
 emit a warning but don't break the build (same pattern as thumbnails).
 
 ### 11. Generate OG Hero Image
 
-Composites the rendered PNG thumbnails into a single 1200×630 `og-hero.png`
-for Open Graph social previews. Uses ImageMagick `montage` to tile thumbnails
-in a 3-column grid against the site's dark background (`#1a1a2e`). If no
-thumbnails exist (all renders failed), falls back to a solid-color image with
-text using `magick`/`convert` (whichever is present — ImageMagick 7 ships
-`magick` and may omit the legacy `convert` symlink).
+Composites a fixed grid of model thumbnails into a single 1200×630
+`og-hero.png` for Open Graph social previews. Tiles are chosen by
+`og_hero_thumbnails()` in `scripts/oembed_helpers.py`, driven from
+`site/.scad-map` rather than a `site/*.png` glob: one thumbnail per project
+(the project's `meta.json` `hero` when it rendered, else the first STL
+alphabetically), in project-directory order, capped at
+`OG_HERO_MAX_TILES` (15, a 5×3 grid) so the montage never has more tiles than
+the grid has slots. Because every candidate name is derived from an STL in
+`.scad-map`, the `_top`/`_bottom`/`_front` orthographic views written by the
+complex-interior step (and any other stray PNG dropped into `site/`) are
+excluded by construction. If no thumbnails exist (all renders failed), the
+step falls back to a solid-color image with text using `magick`/`convert`
+(whichever is present — ImageMagick 7 ships `magick` and may omit the legacy
+`convert` symlink).
 
-Both the `montage` path and the solid-color fallback pass `-font
+`montage` tiles the selected thumbnails in a 5×3 grid (`-geometry
+232x202+4+4 -tile 5x3`) against the site's dark background (`#1a1a2e`) and
+writes MIFF to stdout, which is piped into a second `magick`/`convert`
+invocation that applies `-gravity center -extent 1200x630`. This two-stage
+pipe is required: `-resize`/`-extent` chained directly onto the `montage`
+invocation are silently ignored by ImageMagick — confirmed by downloading
+the live deployed artifact, which measured 1224×14168 (exactly the raw
+`-tile 3x -geometry 400x300+4+4` canvas from the old glob-based step, with no
+resize or crop applied at all). Piping through an intermediate stage is the
+fix; `identify -format '%wx%h\n' site/og-hero.png` should always report
+`1200x630` now.
+
+Both the `montage` stage and the solid-color fallback pass `-font
 Liberation-Sans` explicitly. ImageMagick from the flake has no
 distro-supplied `type.xml` and therefore no default font; `montage` needs one
 even when no visible text is requested, because it labels each tile by
@@ -544,23 +567,9 @@ that also fails, the step emits `::warning::`, removes any partial
 `og-hero.png`, and lets the build continue rather than blocking the deploy.
 
 The image is deployed to a stable URL (`/3d-models/og-hero.png`) — it is
-intentionally not cache-busted so social media crawlers can cache it reliably.
-
-**Known unconfirmed caveat**: the `montage` operator order above
-(`-resize 1200x630^` / `-gravity center` / `-extent 1200x630` applied after
-the tiling) may not actually resize the composed montage — testing on the
-runner with three synthetic 400×300 inputs produced a `1224x308` output
-(exactly the raw `-tile 3x -geometry 400x300+4+4` tile size) instead of
-`1200x630`, though the owner noted this could be an artifact of the
-synthetic test inputs rather than real behavior (issue #352). This predates
-the font fix (the operator ordering is unchanged from the previous runner)
-so it is not a regression, but it has never been confirmed against real
-thumbnail output because the step used to die before reaching this point. If
-it reproduces, the likely fix is piping through an intermediate
-(`montage ... miff:- | magick - -resize ...`) rather than chaining `-resize`/
-`-extent` onto the `montage` invocation directly — check `identify -format
-'%wx%h\n' site/og-hero.png` on a real run before trusting the composed
-dimensions.
+intentionally not cache-busted so social media crawlers can cache it
+reliably. That also means a bad composite is sticky: crawler caches may keep
+serving a stale image for a while after a fix merges.
 
 ### 12. Generate Models Manifest
 
@@ -930,13 +939,15 @@ run independently — if multiple fail, all errors are visible.
   staged same-origin under `site/vendor/three/<version>/` for `index.html` /
   `embed.html` and the copies inlined into standalone HTML — is verified
   against the SHA-256 hashes pinned in `scripts/threejs_assets.py` to prevent
-  supply-chain attacks from the CDN. A local cache (`.cache/threejs/`) avoids
-  re-downloading on subsequent runs, with the cached copy also verified. A
+  supply-chain attacks from the CDN. A host-level cache
+  (`$HOME/.cache/3d-models/threejs/`) avoids re-downloading on subsequent
+  runs, with the cached copy also verified. A
   mismatch is a hard failure, deliberately outside the deferred-enforcement
   pattern — a tampered runtime must never reach S3 (issue #403).
 - **QR codes in separate directory**: QR PNGs are stored in `site/qr/` rather
-  than alongside model thumbnails in `site/` to avoid being picked up by the
-  OG hero image `montage` glob (`site/*.png`).
+  than alongside model thumbnails in `site/`. The OG hero image step no
+  longer globs `site/*.png` (issue #458), but `site/qr/` stays separate to
+  keep QR PNGs out of the deployed thumbnail namespace.
 - **Explicit ImageMagick font**: the OG hero step always passes `-font
   Liberation-Sans` because ImageMagick has no default font and `montage`
   fails outright without one (issue #352). `MAGICK_FONT` and supplying a
@@ -1044,18 +1055,17 @@ run independently — if multiple fail, all errors are visible.
   one instance across renders causes silent "empty STL" failures because
   emscripten's `exit()` call at the end of `callMain` corrupts the module's
   internal FS state. A new instance per render is more expensive but reliable.
-- **Unit tests run in CI**: `python3 -m unittest test_render_view
-  test_oembed_helpers test_fetch_openscad_wasm test_fetch_threejs
-  test_render_cache test_capped_openscad test_viewer_invariants
-  test_project_dates test_build_workflow test_generate_standalone
-  test_scad_orientation test_scad_fonts test_output_names test_generate_gallery test_scan_frames
-  test_scan_pipeline test_scan_colmap test_scan_mesh test_scan_reference
-  test_external_assets` runs on every push
-  (step 2.6) before any heavy tools are invoked. These tests mock I/O and
-  finish in seconds, catching regressions in build-script helpers before
-  rendering begins. `test_build_workflow.py`'s own `UnitTestStepCoverageTests`
-  fails the build if any `scripts/test_*.py` module is added but never listed
-  here or in its `EXCLUDED_TEST_MODULES` (issue #407).
+- **Unit tests run in CI**: `python3 -m unittest discover -s scripts -p
+  'test_*.py' -v` runs on every push (step 2.6) before any heavy tools are
+  invoked. These tests mock I/O and finish in seconds, catching regressions
+  in build-script helpers before rendering begins. Discovery means every
+  `scripts/test_*.py` module runs automatically — there is no hand-maintained
+  list to fall out of sync (issue #457). `test_build_workflow.py`'s own
+  `UnitTestStepCoverageTests` pins the discovery invocation and asserts no
+  module is named individually in the step; a module whose third-party deps
+  aren't all in the `default` devShell must self-skip via
+  `unittest.skipUnless`/`skipIf` (see `ENV_GATED_TEST_MODULES`), never be
+  silently omitted.
 - **site/sources/ layout**: All `.scad` source files, validated
   `*.parameters.json` manifests, and binary render assets (`.png` files whose
   basename appears in a sibling `.scad`) are staged under

@@ -32,6 +32,8 @@ import pathlib
 import re
 import unittest
 
+from oembed_helpers import OG_HERO_TILE_COLUMNS, OG_HERO_TILE_ROWS
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD_YML = REPO_ROOT / ".github" / "workflows" / "build.yml"
 NOTIFY_YML = REPO_ROOT / ".github" / "workflows" / "notify-failures.yml"
@@ -399,6 +401,59 @@ class ParamManifestExternalAssetTests(unittest.TestCase):
         self.assertIn('python3 scripts/external_assets.py "$dir"', body)
 
 
+class OgHeroTileSourceTests(unittest.TestCase):
+    """Issue #458: OG hero tiles come from .scad-map, not a site/*.png glob."""
+
+    def test_no_bare_png_glob(self):
+        body = step_body(read(BUILD_YML), "Generate OG hero image")
+        self.assertNotIn(
+            "(site/*.png)",
+            code_lines(body),
+            "the glob swept the _top/_bottom/_front orthographic views "
+            "written by the complex_interior step (issue #458)",
+        )
+
+    def test_tiles_chosen_by_tested_helper(self):
+        body = step_body(read(BUILD_YML), "Generate OG hero image")
+        self.assertIn(
+            "og_hero_thumbnails",
+            body,
+            "tile selection must go through the tested Python helper, not "
+            "be re-derived in Bash",
+        )
+
+    def test_tile_grid_matches_helper_cap(self):
+        body = step_body(read(BUILD_YML), "Generate OG hero image")
+        self.assertIn(f"-tile {OG_HERO_TILE_COLUMNS}x{OG_HERO_TILE_ROWS}", body)
+
+    def test_montage_output_piped_to_second_stage(self):
+        body = step_body(read(BUILD_YML), "Generate OG hero image")
+        self.assertIn("miff:-", body)
+        self.assertGreaterEqual(
+            body.count("miff:-"),
+            2,
+            "montage output must be piped into a second ImageMagick stage "
+            "for -extent to actually apply",
+        )
+
+    def test_extent_applied(self):
+        body = step_body(read(BUILD_YML), "Generate OG hero image")
+        self.assertIn("-extent 1200x630", body)
+
+    def test_no_resize_chained_onto_montage(self):
+        body = step_body(read(BUILD_YML), "Generate OG hero image")
+        self.assertNotIn(
+            "-resize",
+            code_lines(body),
+            "-resize chained onto montage is a silent no-op — the deployed "
+            "og-hero.png measured 1224x14168 (issue #458)",
+        )
+
+    def test_tiles_read_with_mapfile(self):
+        body = step_body(read(BUILD_YML), "Generate OG hero image")
+        self.assertIn("mapfile -t THUMBS", body)
+
+
 class QrSlugifyTests(unittest.TestCase):
     """Issue #398: the QR step imports slugify(); it never re-derives it.
 
@@ -437,8 +492,9 @@ class OutputNameUniquenessTests(unittest.TestCase):
     """
 
     def test_output_names_module_runs_in_ci(self):
-        self.assertIn("test_output_names",
-                      step_body(read(BUILD_YML), UNIT_TEST_STEP))
+        body = step_body(read(BUILD_YML), UNIT_TEST_STEP)
+        self.assertIn("unittest discover", body)
+        self.assertIn("-p 'test_*.py'", body)
 
     def test_unit_tests_run_before_the_render_step(self):
         text = read(BUILD_YML)
@@ -477,57 +533,44 @@ class StructuredDataTests(unittest.TestCase):
 
 
 UNIT_TEST_STEP = "Run Python unit tests for build scripts"
+UNIT_TEST_DISCOVER = "python3 -m unittest discover -s scripts -p 'test_*.py'"
 
-# test_*.py modules deliberately NOT in the fast unit-test step, with why.
-EXCLUDED_TEST_MODULES = {
-    "test_check_interference":
-        "runs in the 'Check mating part interference' step, immediately "
-        "before check_interference.py itself",
-    "test_fetch_terrain_heightmap":
-        "needs numpy/PIL/requests, which are not in the flake devShell",
-    "test_sync_public_snapshot":
-        "integration-style: drives real git subprocesses in temp repos",
+# Modules whose *third-party* deps are not all in the `default` devShell.
+# They must be discovered and self-skip, never silently omitted.
+ENV_GATED_TEST_MODULES = {
     "test_scan_masks":
-        "needs numpy/opencv4/rembg, which live in the scan devShell, not default",
+        "MaskGeometryTests needs opencv4, which lives in the `scan` devShell",
 }
 
 
 class UnitTestStepCoverageTests(unittest.TestCase):
-    """Issue #407: every scripts/test_*.py must run somewhere, or be
-    explicitly excluded with a reason. Three modules silently never ran."""
+    """Issue #457: the step discovers every scripts/test_*.py rather than
+    naming modules by hand, so a new test file cannot silently not run."""
 
-    def _listed_modules(self):
+    def test_step_uses_discovery_not_a_hand_list(self):
         body = step_body(read(BUILD_YML), UNIT_TEST_STEP)
-        return set(re.findall(r"\btest_[a-z0-9_]+\b", body))
+        self.assertIn(UNIT_TEST_DISCOVER, body)
 
-    def test_every_test_module_is_listed_or_excluded(self):
-        on_disk = {p.stem for p in SCRIPTS_DIR.glob("test_*.py")}
-        missing = sorted(on_disk - self._listed_modules()
-                         - set(EXCLUDED_TEST_MODULES))
+    def test_step_names_no_individual_modules(self):
+        body = step_body(read(BUILD_YML), UNIT_TEST_STEP)
+        named = sorted(set(re.findall(r"\btest_[a-z0-9_]{2,}\b", body))
+                       - {"test_"})
         self.assertEqual(
-            missing, [],
-            f"{missing} exist in scripts/ but run nowhere in CI; add them "
-            f"to the {UNIT_TEST_STEP!r} step or to EXCLUDED_TEST_MODULES",
+            named, [],
+            f"{named} named explicitly in the {UNIT_TEST_STEP!r} step; "
+            f"discovery covers scripts/test_*.py — remove the hand list",
         )
 
-    def test_listed_modules_all_exist(self):
-        for mod in sorted(self._listed_modules()):
+    def test_env_gated_modules_self_skip(self):
+        for mod, why in sorted(ENV_GATED_TEST_MODULES.items()):
+            path = SCRIPTS_DIR / f"{mod}.py"
+            self.assertTrue(path.is_file(), f"stale entry: {path} is gone")
+            src = path.read_text()
             self.assertTrue(
-                (SCRIPTS_DIR / f"{mod}.py").is_file(),
-                f"build.yml runs {mod}, but scripts/{mod}.py does not exist",
+                "skipUnless" in src or "skipIf" in src,
+                f"{mod} ({why}) is discovered by CI but has no skip guard; "
+                f"it will hard-error in the default devShell",
             )
-
-    def test_exclusions_are_not_stale(self):
-        for mod in sorted(EXCLUDED_TEST_MODULES):
-            self.assertTrue(
-                (SCRIPTS_DIR / f"{mod}.py").is_file(),
-                f"stale exclusion: scripts/{mod}.py no longer exists",
-            )
-
-    def test_newly_added_modules_are_listed(self):
-        for mod in ("test_generate_standalone", "test_scad_orientation",
-                    "test_generate_gallery"):
-            self.assertIn(mod, self._listed_modules())
 
 
 if __name__ == "__main__":
