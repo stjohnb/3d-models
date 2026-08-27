@@ -524,7 +524,8 @@ scene setup as `index.html` (background `#0f3460`, `MeshPhongMaterial` blue,
 3-light rig, OrbitControls with damping). Includes a small "Open in viewer"
 link (bottom-right) that opens the full gallery. Has `<meta name="robots"
 content="noindex">` to avoid search indexing. A 10-second timeout detects
-CDN load failures and shows a fallback error message. Pauses rendering when
+viewer module load failures (network issues loading the same-origin
+Three.js vendor bundle) and shows a fallback error message. Pauses rendering when
 the tab is hidden via `visibilitychange`.
 
 ## Standalone HTML Viewers

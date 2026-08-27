@@ -439,14 +439,17 @@ width, default sized to fit an iPhone 15 Pro bare or in a case).
 | `phone_stand.scad` | Renderable — leaning phone cradle; single side profile `linear_extrude()`d along Z, print-oriented as authored (see below) |
 | `rig_link.scad` | Renderable — collar + spar + stand dock that ties the turntable base to the phone stand (issue #434, see below); authored about the platter axis, not its own centroid |
 | `scan_boost.scad` | Renderable — optional setback plinth that stands on the desk behind the rig link's dock and re-presents its stand pocket further back, higher and pitched nose-down (issues #436, #444, see below) |
+| `scan_setback.scad` | Renderable — optional spacer that straddles the rig link's dock and presents a dock-shaped rail `setback_shift` further back, so the scan boost's own saddle grips it and the whole boost moves back (issue #465, see below) |
 | `scanning_rig_assembly.scad` | Renderable — preview-only assembly (platter dropped onto the base with a display-only gap, `rig_link()`, phone stand docked into the link at `stand_lift`); the inner `rotate([90, 0, 0])` on `phone_stand()` stands the stand up and keeps the assembly internally Z-up-consistent |
 | `scanning_rig_boost_assembly.scad` | Renderable — preview-only assembly, same as `scanning_rig_assembly.scad` but with `scan_boost()` behind the dock and the phone stand lifted, set back and pitched onto the boost's tilted pocket floor |
+| `scanning_rig_setback_assembly.scad` | Renderable — preview-only assembly, `scanning_rig_boost_assembly.scad` with the spacer fitted and the boost translated `setback_shift` further back |
 | `turntable_base.parameters.json` | Customizer manifest — `base_d`, `race_r`, `spindle_d`, `foot_pads` |
 | `turntable_platter.parameters.json` | Customizer manifest — `platter_d`, `race_r`, `spindle_d`, `race_clear`, `bore_clear`, `tick_count`, `numerals` |
 | `phone_stand.parameters.json` | Customizer manifest — `slot_w`, `lean`, `stand_w`, `backrest_h`, `lip_h`, `foot_rear` |
 | `rig_link.parameters.json` | Customizer manifest — `stand_lift`, `stand_gap`, `base_d`, `stand_w`, `foot_rear`, `collar_wrap`, `link_clear`, `dock_clear` |
 | `scan_boost.parameters.json` | Customizer manifest — `boost_setback`, `boost_lift`, `boost_tilt`, `stand_lift`, `base_d`, `stand_gap`, `link_clear`, `stand_w`, `boost_clear` (deliberately no `foot_rear`/`dock_clear` — see below) |
-| `meta.json` | Project metadata (description, tags: photogrammetry/scanning/utility/desk, difficulty: beginner, version 1.2.0, `mating_pairs`: `[[rig_link.stl, turntable_base.stl], [scan_boost.stl, rig_link.stl]]`, `printing_notes`: support-free orientations, groove lubrication, slot-width tuning, landscape-scan overhang tip, tick-numeral engraving depth, rig-link bed size and drop-in assembly, anti-slip pad recesses, scan-boost fit and size) |
+| `scan_setback.parameters.json` | Customizer manifest — `setback_shift`, `setback_clear`, `stand_lift`, `base_d`, `stand_gap`, `link_clear`, `stand_w` |
+| `meta.json` | Project metadata (description, tags: photogrammetry/scanning/utility/desk, difficulty: beginner, version 1.3.0, `mating_pairs`: `[[rig_link.stl, turntable_base.stl], [scan_boost.stl, rig_link.stl], [scan_setback.stl, rig_link.stl]]`, `printing_notes`: support-free orientations, groove lubrication, slot-width tuning, landscape-scan overhang tip, tick-numeral engraving depth, rig-link bed size and drop-in assembly, anti-slip pad recesses, scan-boost fit and size, scan-setback fit and size) |
 | `dependency-graph.md` | Auto-generated `include` dependency graph — every renderable includes `_scanning_rig.scad` |
 
 **Turntable fit**: the platter's V-groove is the ridge triangle grown by
@@ -564,6 +567,23 @@ the tilted foot against the pocket's downhill (front) kerb wall, with the
 fore-aft slack landing at the rear. The boost must never link to the
 platter — only to the rig link's dock and the phone stand's foot — so the
 platter stays free to turn.
+
+**Scan setback spacer (issue #465)**: framing tests at the boost's 120mm
+setback showed the 150mm platter spanning ~77% of a 4K portrait frame with
+the base plate clipped at both edges, and a tube-sized object touching the
+frame edge at some rotation angles. The setback spacer is a second optional
+piece that inserts between the rig link's dock and the boost: it straddles
+the dock the same way the boost's own saddle does, and re-presents a
+dock-shaped rail (`dock_w` wide, top at `stand_lift + kerb_h`) `setback_shift`
+further back, so the boost's existing saddle grips the rail instead of the
+dock, unchanged. Dropping the boost onto the spacer therefore moves the whole
+boost — and the camera — rearward by exactly `setback_shift` (100mm default)
+at unchanged height and pitch; the target is the platter at 50-60% of frame
+width. The spacer carries no load of its own — the rig link and the boost
+both stand on the desk under their own weight — its only jobs are fixing the
+boost's distance with a hard butt joint at the rail's rear wall, and keeping
+the boost coupled to the link so the whole rig still slides as one rigid body
+and `scan_masks.py`'s single fixed platter ellipse (issue #434) stays valid.
 
 **Phone stand profile**: `stand_profile()` draws the side view in XY with
 +Y up and +X rearward (the lean direction), then `phone_stand()` extrudes it

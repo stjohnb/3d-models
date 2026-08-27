@@ -19,7 +19,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── macbook-pro-laptop-stand/  # Parametric vertical laptop dock with swept arch frame
 ├── nz-ski-fields/        # Topographic terrain model of the NZ ski-fields region (3-part split)
 ├── power-workshop/       # Fisher-Price Power Workshop replacement parts
-├── scanning-rig/         # Photogrammetry rig: hand-rotated turntable + generic leaning phone stand + connecting link + optional camera setback/boost plinth
+├── scanning-rig/         # Photogrammetry rig: hand-rotated turntable + generic leaning phone stand + connecting link + optional camera setback/boost plinth + optional further-setback spacer
 ├── sink-tray/            # Sink tray foot
 ├── toothbrush/           # Toothbrush/toothpaste holder system
 ├── ukulele-wall-hook/    # Single-piece wall-mounted yoke that cradles a ukulele neck
@@ -142,7 +142,7 @@ generated artifacts produced by CI.
 | `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons; single-slot and dual-slot (two laptops side by side) variants |
 | `nz-ski-fields/` | Topographic NZ terrain model split into three separately-printable parts (lake/terrain/snow); viewer shows them as a coloured composite assembly |
 | `power-workshop/` | Fisher-Price Power Workshop replacement parts sharing a square-peg connection |
-| `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings), a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased), a `rig_link` connecting the two so hand-turning cannot slide the base out from under the fixed masking ellipse, and an optional `scan_boost` plinth that sets the camera back 120mm and higher when the platter fills the frame |
+| `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings), a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased), a `rig_link` connecting the two so hand-turning cannot slide the base out from under the fixed masking ellipse, an optional `scan_boost` plinth that sets the camera back 120mm and higher when the platter fills the frame, and an optional `scan_setback` spacer that inserts between the link and the boost for another 100mm of setback when the platter still fills the frame |
 | `sink-tray/` | Single-file sink tray foot with counterbore |
 | `toothbrush/` | Multi-part holder system with dovetail-attached clips and a removable drip tray |
 | `ukulele-wall-hook/` | Single-piece wall-mounted yoke with two upturned prongs that cradle a ukulele neck behind the headstock |
@@ -417,7 +417,7 @@ Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
 `esp32-display-case` (`case_back`, `case_front`), `hex-connector` (`hex_connector`),
 `macbook-pro-laptop-stand` (`laptop_stand`, `dual_laptop_stand`),
 `nz-ski-fields` (`lake`, `terrain`, `snow`),
-`scanning-rig` (`turntable_base`, `turntable_platter`, `phone_stand`, `rig_link`, `scan_boost`),
+`scanning-rig` (`turntable_base`, `turntable_platter`, `phone_stand`, `rig_link`, `scan_boost`, `scan_setback`),
 `sink-tray` (`tray_foot`), `ukulele-wall-hook` (`ukulele_hook`), and
 `vacuum-hose` (`adapter`, `reducer`). Adding one
 for a new model is just a matter of dropping a `<basename>.parameters.json` next
@@ -630,7 +630,9 @@ for user data, hand-edit generated artifacts, etc.).
 
 **Claws automation** — an autonomous agent service — manages issues, PRs, and
 documentation for this repo using the subagents below. See
-[claws-automation.md](claws-automation.md) for details.
+[claws-automation.md](claws-automation.md) for details, and the "Automation host
+policy" section of `CLAUDE.md` for the constraints on the shared host those runs
+execute on.
 
 **Cross-cutting requirements** — [requirements.md](requirements.md) holds
 process/workflow requirements the owner has stated that don't belong to any

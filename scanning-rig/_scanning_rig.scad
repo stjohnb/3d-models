@@ -101,6 +101,19 @@ boost_ledge   = 5;    // top ledge width the stand foot rests on
 boost_kerb_h  = 6;    // kerb height above the pocket floor (stand foot is 7mm)
 boost_grip    = 40;   // saddle arm length hugging the dock's outer side walls
 
+// === Scan setback spacer parameters (mm unless noted) ===
+// Optional second stage (issue #465). Even with the boost's 120mm setback the
+// 150mm platter still spans ~77% of a 4K portrait frame and the base plate is
+// clipped at both edges, so an object overhanging the platter leaves frame at
+// some rotation angles. This spacer straddles the rig link's dock and presents
+// a dock-shaped rail setback_shift further back; the scan boost's own saddle
+// then grips that rail instead of the dock, moving the boost — and the camera —
+// rearward by exactly setback_shift with height and pitch unchanged.
+setback_shift = 100;  // extra setback handed to the scan boost (#465)
+setback_wall  = 3;    // wall / floor thickness
+setback_clear = 0.35; // clearance, spacer vs the rig link's dock
+setback_grip  = 40;   // saddle arm length hugging the dock's outer side walls
+
 // === Platter numeral parameters (mm) ===
 // The platter rim is rotationally PERIODIC: knurl teeth and evenly-spaced ticks
 // map onto themselves when the platter is stepped by one tick, so SIFT matches
@@ -199,6 +212,17 @@ boost_lip_x    = boost_x0 + boost_corbel_z * sin(boost_tilt);
 boost_lip_z    = boost_floor_z - boost_corbel_z * cos(boost_tilt);
 boost_core_x0  = max(boost_body_x0 + boost_wall, boost_lip_x - boost_lip_z);
 BOOST_BIG      = 600;                             // half-space / through-cut size
+
+// Scan setback derived. The rail's outer side faces are dock_w apart and its
+// top is flush with the dock's, so the boost's saddle grips it with exactly the
+// geometry it was cut for. setback_shift is measured from the dock's rear face,
+// which is also where the boost's saddle bottoms out, so the boost's shift is
+// setback_shift exactly — the boost_clear slack at the butt joint is present in
+// both configurations and cancels.
+setback_saddle_y = dock_w + 2 * (setback_clear + setback_wall);
+setback_h        = stand_lift + kerb_h;   // rail top, flush with the dock top
+setback_rail_x0  = dock_x1 + setback_clear + setback_wall;  // rail front
+setback_rail_x1  = dock_x1 + setback_shift;                 // rail rear = new stop
 
 // Numerals sit just inside the tick band. The ticks are cubes spanning
 // platter_d/2 - 6 .. platter_d/2 + 2 radially, so tick_inner_r is their inner
@@ -569,5 +593,55 @@ module scan_boost() {
                 translate([boost_ledge, -boost_hole_y / 2, -ledge_t])
                     cube([boost_hole_x, boost_hole_y, BOOST_BIG]);
         }
+    }
+}
+
+// === Scan setback spacer ===
+// Prints flat on the bed as authored: floor plate on the bed, every wall
+// vertical off it, open top. Nothing bridges and nothing hangs, so no supports.
+//
+// It carries no load — the rig link and the boost both stand on the desk on
+// their own. Its only jobs are to fix the boost's distance (rail rear face is a
+// hard stop) and to keep the boost tied to the link, so the whole rig still
+// slides as one body and scan_masks.py's single fixed platter ellipse stays
+// valid (issue #434).
+
+// Geometry precondition for scan_setback(). A module called from
+// scan_setback() rather than a top-level assert, for the same reason
+// boost_checks() is: the other parts in this library must stay renderable
+// across their own manifests' ranges.
+module setback_checks() {
+    assert(setback_shift >= setback_clear + 2 * setback_wall + boost_grip,
+           "setback_shift too small for the scan boost's saddle to grip the rail");
+}
+
+module scan_setback() {
+    setback_checks();
+
+    union() {
+        // Saddle over the dock's rear end — the same grip the boost's saddle
+        // uses: cross wall butts the dock's rear face, arms hug its side walls.
+        difference() {
+            translate([dock_x1 - setback_grip, -setback_saddle_y / 2, 0])
+                cube([setback_grip + setback_clear + setback_wall,
+                      setback_saddle_y, setback_h]);
+            translate([dock_x1 - setback_grip - 1, -(dock_w / 2 + setback_clear), -1])
+                cube([setback_grip + setback_clear + 1,
+                      dock_w + 2 * setback_clear, setback_h + 2]);
+        }
+
+        // Rail — an open-top channel the same outer width and height as the
+        // dock, so the boost cannot tell the difference. Floor plate on the
+        // desk ties the two side walls together and keeps the channel square.
+        translate([setback_rail_x0, -dock_w / 2, 0])
+            cube([setback_rail_x1 - setback_rail_x0, dock_w, setback_wall]);
+        for (m = [0, 1])
+            mirror([0, m, 0])
+                translate([setback_rail_x0, dock_w / 2 - setback_wall, 0])
+                    cube([setback_rail_x1 - setback_rail_x0, setback_wall, setback_h]);
+
+        // Rear end wall — the boost's new stop face, and the rail's stiffener.
+        translate([setback_rail_x1 - setback_wall, -dock_w / 2, 0])
+            cube([setback_wall, dock_w, setback_h]);
     }
 }

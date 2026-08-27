@@ -18,8 +18,10 @@ from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
+from scan_colmap import interface_colmap_argv
 from scan_pipeline import (
     STAGES,
+    _mvs_scene,
     _select_hold_indices,
     parse_args,
     run_clean,
@@ -64,9 +66,10 @@ class ParseArgsTests(unittest.TestCase):
         self.assertFalse(args.force)
         self.assertEqual(args.capture_mode, "continuous")
         self.assertEqual(args.min_holds, 20)
-        self.assertEqual(args.work_dir, pathlib.Path(".cache/scan/IMG_3814"))
+        self.assertEqual(args.work_dir, pathlib.Path(".cache/scan/IMG_3814").resolve())
         self.assertEqual(
-            args.output, pathlib.Path(".cache/scan/IMG_3814/output/IMG_3814.stl")
+            args.output,
+            pathlib.Path(".cache/scan/IMG_3814").resolve() / "output" / "IMG_3814.stl",
         )
 
     def test_capture_mode_holds(self):
@@ -85,13 +88,17 @@ class ParseArgsTests(unittest.TestCase):
         self.assertEqual(args.reference_max_bytes, 512000)
         self.assertEqual(
             args.reference_out,
-            pathlib.Path(".cache/scan/IMG_3814/output/IMG_3814-reference.stl"),
+            pathlib.Path(".cache/scan/IMG_3814").resolve()
+            / "output" / "IMG_3814-reference.stl",
         )
         self.assertIsNone(args.install_as)
 
     def test_output_defaults_under_explicit_work_dir(self):
         args = parse_args(["/captures/IMG_3814.MOV", "--work-dir", "/tmp/scan"])
-        self.assertEqual(args.output, pathlib.Path("/tmp/scan/output/IMG_3814.stl"))
+        self.assertEqual(
+            args.output,
+            pathlib.Path("/tmp/scan").resolve() / "output" / "IMG_3814.stl",
+        )
 
     def test_platter_is_parsed_into_floats(self):
         args = parse_args(["a.MOV", "--platter", "540,1420,470,150"])
@@ -111,6 +118,25 @@ class ParseArgsTests(unittest.TestCase):
         with self.assertRaises(SystemExit):
             with contextlib.redirect_stderr(io.StringIO()):
                 parse_args(["a.MOV", "--only", "masks", "--to", "sfm"])
+
+    def test_relative_work_dir_is_absolutised(self):
+        args = parse_args(["a.MOV", "--work-dir", ".cache/scan/IMG_3948"])
+        self.assertTrue(args.work_dir.is_absolute())
+        self.assertTrue(args.output.is_absolute())
+        self.assertTrue(args.reference_out.is_absolute())
+        self.assertEqual(
+            args.work_dir, (pathlib.Path.cwd() / ".cache/scan/IMG_3948").resolve()
+        )
+
+    def test_relative_work_dir_gives_openmvs_absolute_paths(self):
+        # End-to-end regression pin for issue #470.
+        args = parse_args(["a.MOV", "--work-dir", ".cache/scan/IMG_3948"])
+        scene = _mvs_scene(args.work_dir)
+        self.assertTrue(scene.is_absolute())
+        argv = interface_colmap_argv(args.work_dir / "dense", scene)
+        image_folder = argv[argv.index("--image-folder") + 1]
+        self.assertTrue(pathlib.Path(image_folder).is_absolute())
+        self.assertEqual(image_folder.count(".cache/scan/IMG_3948/dense"), 1)
 
 
 class StageStampTests(unittest.TestCase):

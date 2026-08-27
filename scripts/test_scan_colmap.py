@@ -95,10 +95,26 @@ class ArgvBuilderTests(unittest.TestCase):
         self.assert_pair(argv, "--max_image_size", "1600")
 
     def test_interface_colmap_names_the_image_folder(self):
+        dense = pathlib.Path("work/dense").resolve()
+        scene = pathlib.Path("work/mvs/scene.mvs").resolve()
         argv = interface_colmap_argv("work/dense", "work/mvs/scene.mvs")
-        self.assert_pair(argv, "-i", "work/dense")
-        self.assert_pair(argv, "-o", "work/mvs/scene.mvs")
-        self.assert_pair(argv, "--image-folder", str(pathlib.Path("work/dense/images")))
+        self.assert_pair(argv, "-i", str(dense))
+        self.assert_pair(argv, "-o", str(scene))
+        self.assert_pair(argv, "--image-folder", str(dense / "images"))
+
+    def test_interface_colmap_paths_are_absolute_for_relative_inputs(self):
+        # issue #470: a relative work dir left InterfaceCOLMAP unable to
+        # relativise --image-folder against the scene path, so it baked a
+        # doubled CWD-relative path into scene.mvs.
+        argv = interface_colmap_argv(
+            ".cache/scan/IMG_3948/dense", ".cache/scan/IMG_3948/mvs/scene.mvs"
+        )
+        for flag in ("-i", "-o", "--image-folder"):
+            value = argv[argv.index(flag) + 1]
+            with self.subTest(flag=flag):
+                self.assertTrue(pathlib.Path(value).is_absolute())
+        image_folder = argv[argv.index("--image-folder") + 1]
+        self.assertEqual(image_folder.count(".cache/scan/IMG_3948/dense"), 1)
 
     def test_densify_names_the_scene_folder_as_working_folder(self):
         scene = pathlib.Path("work/mvs/scene.mvs").resolve()
@@ -120,6 +136,11 @@ class ArgvBuilderTests(unittest.TestCase):
                      reconstruct_mesh_argv("mvs/scene_dense.mvs")):
             with self.subTest(argv=argv[0]):
                 self.assertTrue(pathlib.Path(argv[0]).is_absolute())
+        for value in interface_colmap_argv("dense", "mvs/scene.mvs"):
+            if value.startswith("-"):
+                continue
+            with self.subTest(value=value):
+                self.assertTrue(pathlib.Path(value).is_absolute())
 
     def test_no_builder_uses_a_cuda_only_subcommand(self):
         # patch_match_stereo is CUDA-only and hard-errors on the CPU colmap in

@@ -92,8 +92,17 @@ def interface_colmap_argv(dense_dir, mvs_scene):
 
     `--image-folder` is passed explicitly: OpenMVS resolves it relative to the
     working directory otherwise, and the pipeline never chdir's.
+
+    Every path is absolutised. InterfaceCOLMAP can only relativise the image
+    folder against the scene output path when both are full paths; given a
+    relative folder it stores the CWD-relative path joined onto the workspace
+    folder, so `scene.mvs` comes out already doubled
+    (`.cache/scan/X/dense/.cache/scan/X/dense/images/003021.jpg`) and
+    `DensifyPointCloud` joins that onto its own `-w` again, failing with
+    `error: failed loading image header` (issue #470; same family as #419).
     """
-    dense_dir = pathlib.Path(dense_dir)
+    dense_dir = pathlib.Path(dense_dir).resolve()
+    mvs_scene = pathlib.Path(mvs_scene).resolve()
     return [
         "-i", str(dense_dir),
         "-o", str(mvs_scene),

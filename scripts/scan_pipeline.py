@@ -217,6 +217,10 @@ def parse_args(argv=None):
     stem = args.video.stem
     if args.work_dir is None:
         args.work_dir = pathlib.Path(".cache") / "scan" / stem
+    # Absolute from here on. OpenMVS joins any relative path onto its own
+    # working folder, which double-prefixes it (issues #470, #419); making the
+    # work dir absolute once protects every path derived from it.
+    args.work_dir = args.work_dir.resolve()
     if args.output is None:
         args.output = args.work_dir / "output" / f"{stem}.stl"
     if args.reference_out is None:

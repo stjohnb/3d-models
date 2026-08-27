@@ -15,6 +15,8 @@ graph TD
   scanning_rig_assembly["scanning_rig_assembly.scad"]
   scanning_rig_boost_assembly["scanning_rig_boost_assembly.scad"]
   _scanning_rig(["_scanning_rig.scad"])
+  scanning_rig_setback_assembly["scanning_rig_setback_assembly.scad"]
+  scan_setback["scan_setback.scad"]
   turntable_base["turntable_base.scad"]
   turntable_platter["turntable_platter.scad"]
   phone_stand -->|include| _scanning_rig
@@ -22,6 +24,8 @@ graph TD
   scan_boost -->|include| _scanning_rig
   scanning_rig_assembly -->|include| _scanning_rig
   scanning_rig_boost_assembly -->|include| _scanning_rig
+  scanning_rig_setback_assembly -->|include| _scanning_rig
+  scan_setback -->|include| _scanning_rig
   turntable_base -->|include| _scanning_rig
   turntable_platter -->|include| _scanning_rig
 ```

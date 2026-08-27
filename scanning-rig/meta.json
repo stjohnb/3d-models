@@ -1,12 +1,12 @@
 {
-  "description": "Photogrammetry 3D-scanning rig: a fully printed hand-rotated turntable whose platter locates on a 45-degree V-groove race and a centring spindle, with numbered 15-degree rotation tick marks against an index pointer on the base rim, plus a generic leaning phone stand whose slot width is customizable (default fits an iPhone 15 Pro, bare or cased). No non-printed hardware required. A separate link part collars the turntable base and docks the phone stand, so hand-turning cannot drag the base out from under the fixed masking ellipse, and the camera's distance and height repeat between captures. An optional boost plinth stands on the desk behind the link's dock and re-presents the same stand pocket 120mm further back, higher, and pitched nose-down, for objects that fill the frame at the rig's normal camera distance.",
+  "description": "Photogrammetry 3D-scanning rig: a fully printed hand-rotated turntable whose platter locates on a 45-degree V-groove race and a centring spindle, with numbered 15-degree rotation tick marks against an index pointer on the base rim, plus a generic leaning phone stand whose slot width is customizable (default fits an iPhone 15 Pro, bare or cased). No non-printed hardware required. A separate link part collars the turntable base and docks the phone stand, so hand-turning cannot drag the base out from under the fixed masking ellipse, and the camera's distance and height repeat between captures. An optional boost plinth stands on the desk behind the link's dock and re-presents the same stand pocket 120mm further back, higher, and pitched nose-down, for objects that fill the frame at the rig's normal camera distance. A second optional spacer inserts between the link's dock and the boost and moves the boost another 100mm back, for objects that still overhang the frame at the boost's distance.",
   "tags": [
     "photogrammetry",
     "scanning",
     "utility",
     "desk"
   ],
-  "version": "1.2.0",
+  "version": "1.3.0",
   "difficulty": "beginner",
   "printing_notes": [
     "All parts print support-free in their exported orientations: turntable base and platter flat on the bed, phone stand on its side face (every layer is the same cross-section).",
@@ -20,7 +20,10 @@
     "The turntable base has three 12mm x 1.2mm recesses in its underside for stick-on rubber or TPU anti-slip pads. They print as short bridges a couple of layers above the bed \u2014 no support needed. Set foot_pads false in the customizer for a plain flat underside.",
     "The optional scan boost prints flat on the bed with no supports, exactly as exported \u2014 every wall rises off the bed and the hollow core closes in at under 45 degrees. At the default 120mm setback, 20mm lift and 20-degree tilt it is about 173cm3 (~215g), 160mm long and 85mm tall; drop boost_setback or boost_lift in the customizer for a smaller, lighter version.",
     "Fit the boost by standing it on the desk behind the rig link and sliding it forward until its saddle arms straddle the dock and its front wall meets the dock's rear face, then drop the phone stand's foot into the boost's pocket. It sets the camera 120mm further back as well as higher and nose-down, so the platter no longer fills the frame; the extra distance lowers the camera's elevation angle over the platter, and boost_lift (up to 60mm) is the adjustment that raises it again.",
-    "Lift it straight out to go back to the close, low view. Never link the boost to the platter \u2014 it must stay free to turn."
+    "Lift it straight out to go back to the close, low view. Never link the boost to the platter \u2014 it must stay free to turn.",
+    "The optional setback spacer prints flat on the bed with no supports: its floor plate lands on the bed, every wall rises off it and the top is open. At the default 100mm shift it is about 63cm3 (~78g), 140 x 94 x 30mm.",
+    "Fit the spacer by dropping its saddle over the rig link's dock from above, then sliding the scan boost back until its saddle straddles the spacer's rail and its front wall meets the rail's rear end wall. That moves the camera another 100mm back from the platter with the boost's height and pitch unchanged, so a taller or overhanging object stays in frame through a full rotation. The extra distance lowers the camera's elevation angle again \u2014 raise boost_lift if it drops too far.",
+    "Customize the setback spacer with the same stand_w, stand_lift, base_d, stand_gap and link_clear as the rig link and the boost, or its rail will not match the boost's saddle."
   ],
   "mating_pairs": [
     [
@@ -29,6 +32,10 @@
     ],
     [
       "scan_boost.stl",
+      "rig_link.stl"
+    ],
+    [
+      "scan_setback.stl",
       "rig_link.stl"
     ]
   ],
