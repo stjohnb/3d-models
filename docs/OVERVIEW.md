@@ -19,7 +19,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── macbook-pro-laptop-stand/  # Parametric vertical laptop dock with swept arch frame
 ├── nz-ski-fields/        # Topographic terrain model of the NZ ski-fields region (3-part split)
 ├── power-workshop/       # Fisher-Price Power Workshop replacement parts
-├── scanning-rig/         # Photogrammetry rig: hand-rotated turntable + generic leaning phone stand + connecting link + optional camera setback/boost plinth + optional further-setback spacer
+├── scanning-rig/         # Photogrammetry rig: hand-rotated turntable + generic leaning phone stand + keyed connecting link with a low rail + camera setback/boost plinth (the stand's only mount) + optional height/angle riser + optional further-setback spacer
 ├── sink-tray/            # Sink tray foot
 ├── toothbrush/           # Toothbrush/toothpaste holder system
 ├── ukulele-wall-hook/    # Single-piece wall-mounted yoke that cradles a ukulele neck
@@ -59,7 +59,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── test_scan_colmap.py     # Tests for scan_colmap's argv builders and sparse-model selection; also validates option names against a real colmap when one is on PATH
 │   ├── scan_mesh.py            # Platter-plane fit, mm scaling, cropping and STL export for scan_pipeline
 │   ├── test_scan_mesh.py       # Tests for scan_mesh; only imports numpy/trimesh, both in the `default` devShell, so runs in CI's unit-test step
-│   ├── scan_reference.py       # Watertight, size-budgeted reference meshes from a cleaned scan (convex hull / slab-hull union) for scan_pipeline
+│   ├── scan_reference.py       # Watertight, size-budgeted reference meshes from a cleaned scan (convex hull / axis-aware slab-hull union) for scan_pipeline
 │   ├── test_scan_reference.py  # Tests for scan_reference; only imports numpy/trimesh/manifold3d, all in the `default` devShell, so runs in CI's unit-test step
 │   ├── external_assets.py      # Assets a project's .scad files reference from outside the project dir (used by CI's source-zip and parameter-manifest steps)
 │   ├── test_external_assets.py # Tests for external_assets
@@ -142,7 +142,7 @@ generated artifacts produced by CI.
 | `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons; single-slot and dual-slot (two laptops side by side) variants |
 | `nz-ski-fields/` | Topographic NZ terrain model split into three separately-printable parts (lake/terrain/snow); viewer shows them as a coloured composite assembly |
 | `power-workshop/` | Fisher-Price Power Workshop replacement parts sharing a square-peg connection |
-| `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings), a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased), a `rig_link` connecting the two so hand-turning cannot slide the base out from under the fixed masking ellipse, an optional `scan_boost` plinth that sets the camera back 120mm and higher when the platter fills the frame, and an optional `scan_setback` spacer that inserts between the link and the boost for another 100mm of setback when the platter still fills the frame |
+| `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings), a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased), a `rig_link` connecting the two so hand-turning can neither slide the base out from under the fixed masking ellipse nor twist it inside the collar (two keys in the collar bore lock into notches in the base rim), a `scan_boost` plinth standing behind the link's low rail that carries the rig's only stand pocket, an optional `scan_riser` that drops into the boost's own pocket and re-presents an identical one higher up to correct the camera's elevation over the platter without changing the boost, and an optional `scan_setback` spacer that inserts between the link and the boost for another 50mm of setback when the platter still fills the frame |
 | `sink-tray/` | Single-file sink tray foot with counterbore |
 | `toothbrush/` | Multi-part holder system with dovetail-attached clips and a removable drip tray |
 | `ukulele-wall-hook/` | Single-piece wall-mounted yoke with two upturned prongs that cradle a ukulele neck behind the headstock |
@@ -417,7 +417,7 @@ Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
 `esp32-display-case` (`case_back`, `case_front`), `hex-connector` (`hex_connector`),
 `macbook-pro-laptop-stand` (`laptop_stand`, `dual_laptop_stand`),
 `nz-ski-fields` (`lake`, `terrain`, `snow`),
-`scanning-rig` (`turntable_base`, `turntable_platter`, `phone_stand`, `rig_link`, `scan_boost`, `scan_setback`),
+`scanning-rig` (`turntable_base`, `turntable_platter`, `phone_stand`, `rig_link`, `scan_boost`, `scan_riser`, `scan_setback`),
 `sink-tray` (`tray_foot`), `ukulele-wall-hook` (`ukulele_hook`), and
 `vacuum-hose` (`adapter`, `reducer`). Adding one
 for a new model is just a matter of dropping a `<basename>.parameters.json` next
@@ -477,12 +477,15 @@ both:
   the OpenMVS mesh as an open shell — a single low camera ring never sees the
   underside of the object — so `trimesh.is_watertight` is `False` and OpenSCAD's
   CSG rejects it as an operand. The `reference` stage
-  (`scripts/scan_reference.py`) closes it, either as a convex hull (default;
-  tiny, always available, right for convex-ish objects) or as a union of
-  overlapping per-slab convex hulls (`--reference-mode slabs`), which keeps
-  concavity that varies with Z. Both are watertight by construction. Quadric
-  decimation is deliberately not offered: it lowers the face count but leaves
-  the boundary open.
+  (`scripts/scan_reference.py`) closes it, by default as a union of
+  overlapping per-slab convex hulls taken perpendicular to the mesh's
+  principal axis (`--reference-mode slabs`, `--reference-axis auto`), which
+  keeps concavity that varies along the object's own length — including for
+  an object lying flat, where that axis is horizontal rather than Z (issue
+  #487) — or, for convex-ish objects, as a single convex hull
+  (`--reference-mode hull`; tiny, always available). Both are watertight by
+  construction. Quadric decimation is deliberately not offered: it lowers the
+  face count but leaves the boundary open.
 - **`*.stl` is gitignored.** `.gitignore` carves these back out with
   `!scans/**/*.stl`. The rejected "committed revision snapshots" pattern (#198)
   covered *derived outputs* of committed `.scad` sources, which CI can always
@@ -616,7 +619,7 @@ Reusable how-to guides for common development tasks live in `playbooks/`.
   scanning-rig capture video to reconstruct a mesh. Covers the `nix develop
   .#scan` shell, the two-step platter-ellipse confirmation via
   `roi-preview.jpg`, the seven pipeline stages and their measured wall-clock cost at 720p and 4K, the
-  `--mask-mode roi` no-ML fallback, how the platter's known 150 mm diameter
+  `--mask-mode roi` no-ML fallback, how the platter's known 222 mm diameter
   sets the exported scale, capture guidance (the camera must not move, the scene must stay rigid, and the platter needs non-repeating marks), and
   the `--capture-mode holds` selector for step-and-hold captures on a marked
   platter.

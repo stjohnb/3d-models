@@ -1,22 +1,22 @@
 {
   "parameters": [
     {
-      "name": "boost_setback",
-      "label": "Setback — how far back the camera moves (mm)",
+      "name": "boost_floor_h",
+      "label": "Pocket floor height — fit scan_riser on top for elevation (mm)",
       "type": "number",
-      "min": 100,
-      "max": 200,
+      "min": 25,
+      "max": 110,
       "step": 5,
-      "default": 120
+      "default": 90
     },
     {
-      "name": "boost_lift",
-      "label": "Boost lift — pocket floor rise (mm)",
+      "name": "boost_setback",
+      "label": "Pocket setback behind the rig link's rail (mm)",
       "type": "number",
-      "min": 20,
-      "max": 60,
-      "step": 5,
-      "default": 20
+      "min": 10,
+      "max": 120,
+      "step": 2,
+      "default": 26
     },
     {
       "name": "boost_tilt",
@@ -28,53 +28,26 @@
       "default": 20
     },
     {
-      "name": "stand_lift",
-      "label": "Stand lift — must match rig link (mm)",
+      "name": "rail_w",
+      "label": "Rail outer width — must match rig link (mm)",
       "type": "number",
-      "min": 0,
-      "max": 50,
-      "step": 1,
-      "default": 25
-    },
-    {
-      "name": "base_d",
-      "label": "Turntable base diameter — must match rig link (mm)",
-      "type": "number",
-      "min": 160,
-      "max": 220,
-      "step": 1,
-      "default": 166
-    },
-    {
-      "name": "stand_gap",
-      "label": "Gap from collar to stand dock — must match rig link (mm)",
-      "type": "number",
-      "min": 3,
-      "max": 60,
-      "step": 1,
-      "default": 6
-    },
-    {
-      "name": "link_clear",
-      "label": "Collar-to-base clearance — must match rig link (mm)",
-      "type": "number",
-      "min": 0.2,
-      "max": 1,
-      "step": 0.05,
-      "default": 0.4
-    },
-    {
-      "name": "stand_w",
-      "label": "Stand width — must match phone stand (mm)",
-      "type": "number",
-      "min": 60,
-      "max": 120,
+      "min": 30,
+      "max": 80,
       "step": 5,
-      "default": 80
+      "default": 40
+    },
+    {
+      "name": "rail_h",
+      "label": "Rail height — must match rig link (mm)",
+      "type": "number",
+      "min": 8,
+      "max": 30,
+      "step": 1,
+      "default": 12
     },
     {
       "name": "boost_clear",
-      "label": "Plinth-to-dock clearance (mm)",
+      "label": "Plinth-to-rail clearance (mm)",
       "type": "number",
       "min": 0.2,
       "max": 1,

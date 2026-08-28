@@ -1,4 +1,4 @@
-// Scanning Rig - Turntable-to-stand link (base collar + spar + stand dock)
+// Scanning Rig - Turntable-to-boost link (keyed base collar + spar + low rail)
 // Render this file to generate rig_link.stl
 //
 // Authored about the platter axis so it sits in assembled position against

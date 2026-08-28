@@ -5,7 +5,7 @@ Operator tool — not used by CI.
 The camera is stationary and the object sits on a rotating platter, so the
 platter's image position is fixed and gets specified once as an ellipse. The
 platter itself is always kept: it rotates rigidly with the object and carries
-trackable texture (and its known 150 mm diameter is what sets scale later).
+trackable texture (and its known 222 mm diameter is what sets scale later).
 Only the column of pixels above it varies per frame, so that is the only part
 a per-frame salient-object segmentation has to decide.
 

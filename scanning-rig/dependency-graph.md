@@ -13,9 +13,9 @@ graph TD
   rig_link["rig_link.scad"]
   scan_boost["scan_boost.scad"]
   scanning_rig_assembly["scanning_rig_assembly.scad"]
-  scanning_rig_boost_assembly["scanning_rig_boost_assembly.scad"]
   _scanning_rig(["_scanning_rig.scad"])
   scanning_rig_setback_assembly["scanning_rig_setback_assembly.scad"]
+  scan_riser["scan_riser.scad"]
   scan_setback["scan_setback.scad"]
   turntable_base["turntable_base.scad"]
   turntable_platter["turntable_platter.scad"]
@@ -23,8 +23,8 @@ graph TD
   rig_link -->|include| _scanning_rig
   scan_boost -->|include| _scanning_rig
   scanning_rig_assembly -->|include| _scanning_rig
-  scanning_rig_boost_assembly -->|include| _scanning_rig
   scanning_rig_setback_assembly -->|include| _scanning_rig
+  scan_riser -->|include| _scanning_rig
   scan_setback -->|include| _scanning_rig
   turntable_base -->|include| _scanning_rig
   turntable_platter -->|include| _scanning_rig

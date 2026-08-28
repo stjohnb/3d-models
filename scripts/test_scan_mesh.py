@@ -15,6 +15,7 @@ import unittest
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 from scan_mesh import (
+    crop_reasons,
     crop_to_object,
     fit_plane_ransac,
     fit_platter,
@@ -92,8 +93,8 @@ class FitPlatterTests(unittest.TestCase):
     def test_platter_frame_sets_millimetre_scale(self):
         import numpy
 
-        frame = platter_frame(punched_disc(), platter_diameter=150.0)
-        self.assertAlmostEqual(frame["mm_per_unit"], 75.0, delta=4.0)
+        frame = platter_frame(punched_disc(), platter_diameter=222.0)
+        self.assertAlmostEqual(frame["mm_per_unit"], 111.0, delta=6.0)
         self.assertAlmostEqual(frame["radius_units"], 1.0, delta=0.05)
         numpy.testing.assert_allclose(
             frame["rotation"] @ frame["rotation"].T, numpy.eye(3), atol=1e-9
@@ -110,7 +111,7 @@ class CropTests(unittest.TestCase):
         drop.apply_translation([0, 0, -5])
         mesh = trimesh.util.concatenate([keep, drop])
 
-        cropped = crop_to_object(mesh, z_min=1.0, z_max=200.0, r_max=72.0)
+        cropped = crop_to_object(mesh, z_min=1.0, z_max=200.0, r_max=108.0)
         self.assertGreater(float(cropped.bounds[0][2]), 0.0)
         self.assertAlmostEqual(float(cropped.bounds[1][2]), 15.0, places=3)
 
@@ -121,6 +122,31 @@ class CropTests(unittest.TestCase):
         mesh.apply_translation([200, 0, 10])
         cropped = crop_to_object(mesh)
         self.assertEqual(len(cropped.faces), 0)
+
+
+class CropReasonsTests(unittest.TestCase):
+    def test_counts_agree_with_the_crop(self):
+        import trimesh
+
+        keep = trimesh.creation.box(extents=(10, 10, 10))
+        keep.apply_translation([0, 0, 10])
+        drop = trimesh.creation.box(extents=(10, 10, 10))
+        drop.apply_translation([0, 0, -5])
+        mesh = trimesh.util.concatenate([keep, drop])
+
+        reasons = crop_reasons(mesh, z_min=1.0, z_max=200.0, r_max=72.0)
+        cropped = crop_to_object(mesh.copy(), z_min=1.0, z_max=200.0, r_max=72.0)
+        self.assertEqual(reasons["kept"], len(cropped.faces))
+
+    def test_radial_clip_is_reported(self):
+        import trimesh
+
+        mesh = trimesh.creation.box(extents=(10, 10, 10))
+        mesh.apply_translation([100, 0, 10])
+
+        reasons = crop_reasons(mesh, z_min=1.0, z_max=200.0, r_max=72.0)
+        self.assertEqual(reasons["dropped_beyond_r_max"], reasons["faces"])
+        self.assertEqual(reasons["kept"], 0)
 
 
 class ComponentTests(unittest.TestCase):

@@ -76,6 +76,11 @@ class ParseArgsTests(unittest.TestCase):
         args = parse_args(["a.MOV", "--capture-mode", "holds"])
         self.assertEqual(args.capture_mode, "holds")
 
+    def test_scale_defaults_match_the_scanning_rig_platter(self):
+        args = parse_args(["a.MOV"])
+        self.assertEqual(args.platter_diameter, 222.0)
+        self.assertEqual(args.r_max, 108.0)
+
     def test_bad_capture_mode_is_rejected(self):
         with self.assertRaises(SystemExit):
             with contextlib.redirect_stderr(io.StringIO()):
@@ -83,8 +88,9 @@ class ParseArgsTests(unittest.TestCase):
 
     def test_reference_defaults(self):
         args = parse_args(["/captures/IMG_3814.MOV"])
-        self.assertEqual(args.reference_mode, "hull")
-        self.assertEqual(args.reference_slabs, 12)
+        self.assertEqual(args.reference_mode, "slabs")
+        self.assertEqual(args.reference_slabs, 16)
+        self.assertEqual(args.reference_axis, "auto")
         self.assertEqual(args.reference_max_bytes, 512000)
         self.assertEqual(
             args.reference_out,
@@ -155,7 +161,7 @@ class RunCleanPlatterSourceTests(unittest.TestCase):
     capture with "PLY is unexpected length!".
     """
 
-    def _fakes(self, calls):
+    def _fakes(self, calls, dropped_beyond_r_max=0):
         mesh = types.SimpleNamespace(
             faces=[0, 1, 2],
             bounds=[[0.0, 0.0, 0.0], [1.0, 1.0, 1.0]],
@@ -170,6 +176,11 @@ class RunCleanPlatterSourceTests(unittest.TestCase):
             "mm_per_unit": 150.0, "plane_inliers": None,
         }
         scan_mesh.scale_transform = lambda frame: None
+        scan_mesh.crop_reasons = lambda m, z_min, z_max, r_max: {
+            "faces": len(m.faces), "dropped_below_z_min": 0,
+            "dropped_above_z_max": 0, "dropped_beyond_r_max": dropped_beyond_r_max,
+            "kept": len(m.faces) - dropped_beyond_r_max,
+        }
         scan_mesh.crop_to_object = lambda m, z_min, z_max, r_max: m
         scan_mesh.keep_largest_components = lambda m, count: m
         scan_mesh.export_stl = lambda m, path: None
@@ -206,6 +217,32 @@ class RunCleanPlatterSourceTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     with contextlib.redirect_stderr(io.StringIO()):
                         run_clean(args)
+
+    def test_warns_when_r_max_clips_beyond_the_warn_fraction(self):
+        # 1/3 of the fake mesh's faces dropped beyond --r-max is well over
+        # RADIAL_CLIP_WARN_FRACTION (0.02), so the object-overhang warning
+        # must fire (#487).
+        calls = []
+        with tempfile.TemporaryDirectory() as tmp:
+            work_dir = self._work_dir(tmp)
+            args = parse_args(["cap.MOV", "--work-dir", str(work_dir), "--quiet"])
+            out = io.StringIO()
+            with mock.patch.dict(sys.modules, self._fakes(calls, dropped_beyond_r_max=1)):
+                with contextlib.redirect_stdout(out):
+                    run_clean(args)
+            self.assertIn("clipped 1/3 faces", out.getvalue())
+            self.assertIn(f"--r-max {args.r_max}", out.getvalue())
+
+    def test_no_warning_when_r_max_clipping_is_within_budget(self):
+        calls = []
+        with tempfile.TemporaryDirectory() as tmp:
+            work_dir = self._work_dir(tmp)
+            args = parse_args(["cap.MOV", "--work-dir", str(work_dir), "--quiet"])
+            out = io.StringIO()
+            with mock.patch.dict(sys.modules, self._fakes(calls, dropped_beyond_r_max=0)):
+                with contextlib.redirect_stdout(out):
+                    run_clean(args)
+            self.assertNotIn("clipped", out.getvalue())
 
 
 class SelectHoldIndicesTests(unittest.TestCase):
@@ -283,13 +320,20 @@ class RunReferenceTests(unittest.TestCase):
         reference = types.SimpleNamespace(
             faces=[0, 1, 2, 3],
             bounds=[[0.0, 0.0, 0.0], [1.0, 1.0, 2.0]],
+            volume=1.0,
         )
-        mesh = types.SimpleNamespace(faces=list(range(9)))
+        mesh = types.SimpleNamespace(
+            faces=list(range(9)),
+            vertices=[[0, 0, 0], [1, 0, 0], [0, 1, 0]],
+            convex_hull=types.SimpleNamespace(volume=2.0),
+        )
         trimesh = types.ModuleType("trimesh")
         trimesh.load = lambda path, process=True: mesh
 
         scan_reference = types.ModuleType("scan_reference")
-        scan_reference.build_reference = lambda m, mode, slabs: reference
+        scan_reference.build_reference = lambda m, mode, slabs, axis: reference
+        scan_reference.axis_vector = lambda m, name: [0.0, 0.0, 1.0]
+        scan_reference.tightness = lambda ref, src: (0.5, 2.0)
         scan_reference.assert_watertight = lambda m: m
         scan_reference.write_reference = lambda m, path, max_bytes: (
             pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -344,7 +388,9 @@ class RunReferenceTests(unittest.TestCase):
             # to the public repo.
             self.assertEqual(report["video"], "cap.MOV")
             self.assertEqual(report["reference"]["mode"], "slabs")
-            self.assertEqual(report["reference"]["slabs"], 12)
+            self.assertEqual(report["reference"]["slabs"], 16)
+            self.assertEqual(report["reference"]["axis_mode"], "auto")
+            self.assertEqual(report["reference"]["tightness"], 0.5)
             self.assertEqual(report["reference"]["faces"], 4)
             self.assertTrue(report["reference"]["watertight"])
 

@@ -1,0 +1,13 @@
+{
+  "parameters": [
+    { "name": "panel_t", "label": "Drawer front thickness (mm)", "type": "number", "min": 12, "max": 30, "step": 0.5, "default": 22 },
+    { "name": "rear_t", "label": "Fixing plate thickness (mm)", "type": "number", "min": 3.5, "max": 8, "step": 0.5, "default": 4 },
+    { "name": "rear_h", "label": "Fixing plate height (mm)", "type": "number", "min": 20, "max": 80, "step": 1, "default": 45 },
+    { "name": "base_t", "label": "Base thickness (mm)", "type": "number", "min": 4, "max": 10, "step": 0.5, "default": 5 },
+    { "name": "lip_t", "label": "Toe lip thickness (mm)", "type": "number", "min": 3, "max": 8, "step": 0.5, "default": 4 },
+    { "name": "lip_h", "label": "Toe lip drop (mm)", "type": "number", "min": 15, "max": 40, "step": 1, "default": 16 },
+    { "name": "web_drop", "label": "Corner web depth (mm)", "type": "number", "min": 0, "max": 8, "step": 0.5, "default": 5 },
+    { "name": "width", "label": "Bracket width (mm)", "type": "number", "min": 60, "max": 250, "step": 5, "default": 120 },
+    { "name": "screw_holes", "label": "Screw fixing holes", "type": "boolean", "default": true }
+  ]
+}

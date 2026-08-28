@@ -4,7 +4,7 @@ Operator tool — not used by CI.
 
 Structure-from-motion recovers geometry only up to an arbitrary similarity
 transform: the reconstruction has no scale, and no idea which way is up. Both
-come from the platter, whose diameter is known (`platter_d = 150` in
+come from the platter, whose diameter is known (`platter_d = 222` in
 `scanning-rig/_scanning_rig.scad`) and whose surface is the dominant plane in
 the reconstructed mesh. Fitting that plane gives the up axis and the origin;
 fitting the platter's radius within it gives millimetres per reconstruction
@@ -117,7 +117,7 @@ def fit_platter(points, plane):
     return centre, radius
 
 
-def platter_frame(points, platter_diameter=150.0):
+def platter_frame(points, platter_diameter=222.0):
     """Derive the platter's coordinate frame and scale from the reconstructed mesh's vertices.
 
     Returns `origin` (the platter centre), `rotation` (3x3, taking the plane
@@ -157,11 +157,35 @@ def scale_transform(frame):
     return matrix
 
 
-def crop_to_object(mesh, z_min=1.0, z_max=200.0, r_max=72.0):
+def crop_reasons(mesh, z_min=1.0, z_max=200.0, r_max=108.0):
+    """Face counts each crop bound would drop, for the scan report.
+
+    Counted per criterion and independently: a face can fail more than one
+    test, so the three `dropped_*` counts do not sum to `faces - kept`. The
+    radial count is the one worth watching — an object overhanging the platter
+    loses its tips silently (issue #487).
+    """
+    import numpy
+
+    centroids = mesh.triangles.mean(axis=1)
+    radius = numpy.hypot(centroids[:, 0], centroids[:, 1])
+    below = centroids[:, 2] < z_min
+    above = centroids[:, 2] > z_max
+    beyond = radius > r_max
+    return {
+        "faces": int(len(mesh.faces)),
+        "dropped_below_z_min": int(below.sum()),
+        "dropped_above_z_max": int(above.sum()),
+        "dropped_beyond_r_max": int(beyond.sum()),
+        "kept": int((~(below | above | beyond)).sum()),
+    }
+
+
+def crop_to_object(mesh, z_min=1.0, z_max=200.0, r_max=108.0):
     """Drop everything that is not the object. Bounds are in millimetres.
 
     Applied after the transform and scale, so the platter is the z=0 plane and
-    the object stands on it. `r_max = 72` is the 75 mm platter radius less
+    the object stands on it. `r_max = 108` is the 111 mm platter radius less
     3 mm, which drops the rim, its tick marks, and any gripping fingers.
     """
     import numpy

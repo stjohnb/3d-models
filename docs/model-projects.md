@@ -437,19 +437,20 @@ width, default sized to fit an iPhone 15 Pro bare or in a case).
 | `turntable_base.scad` | Renderable — base plate with V-ridge race, centring spindle, and an index pointer on the exposed rim; prints as-is, Z-up, no supports |
 | `turntable_platter.scad` | Renderable — platter with underside V-groove, spindle clearance bore, rim finger-grip scallops, and numbered rotation tick marks; prints as-is, top face up (groove-side down), no supports |
 | `phone_stand.scad` | Renderable — leaning phone cradle; single side profile `linear_extrude()`d along Z, print-oriented as authored (see below) |
-| `rig_link.scad` | Renderable — collar + spar + stand dock that ties the turntable base to the phone stand (issue #434, see below); authored about the platter axis, not its own centroid |
-| `scan_boost.scad` | Renderable — optional setback plinth that stands on the desk behind the rig link's dock and re-presents its stand pocket further back, higher and pitched nose-down (issues #436, #444, see below) |
-| `scan_setback.scad` | Renderable — optional spacer that straddles the rig link's dock and presents a dock-shaped rail `setback_shift` further back, so the scan boost's own saddle grips it and the whole boost moves back (issue #465, see below) |
-| `scanning_rig_assembly.scad` | Renderable — preview-only assembly (platter dropped onto the base with a display-only gap, `rig_link()`, phone stand docked into the link at `stand_lift`); the inner `rotate([90, 0, 0])` on `phone_stand()` stands the stand up and keeps the assembly internally Z-up-consistent |
-| `scanning_rig_boost_assembly.scad` | Renderable — preview-only assembly, same as `scanning_rig_assembly.scad` but with `scan_boost()` behind the dock and the phone stand lifted, set back and pitched onto the boost's tilted pocket floor |
-| `scanning_rig_setback_assembly.scad` | Renderable — preview-only assembly, `scanning_rig_boost_assembly.scad` with the spacer fitted and the boost translated `setback_shift` further back |
+| `rig_link.scad` | Renderable — collar + spar + low rail that ties the turntable base to the phone stand (issues #434, #468, see below); the collar bore carries two keys that lock into notches in the base rim; authored about the platter axis, not its own centroid |
+| `scan_boost.scad` | Renderable — setback plinth that stands on the desk behind the rig link's rail and carries the rig's only stand pocket, set back and pitched nose-down, at its own baseline `boost_floor_h` (issues #436, #444, #468, see below) |
+| `scan_riser.scad` | Renderable — optional height/angle correction that drops into the scan boost's existing pocket and re-presents an identical one `riser_h` higher, for the phone stand to drop into instead (issue #468 review, see below) |
+| `scan_setback.scad` | Renderable — optional spacer that straddles the rig link's rail and presents a matching rail `setback_shift` further back, so the scan boost's own saddle grips it and the whole boost moves back (issues #465, #468, see below) |
+| `scanning_rig_assembly.scad` | Renderable — preview-only assembly (platter dropped onto the base with a display-only gap, `rig_link()`, `scan_boost()` behind the rail, `scan_riser()` dropped into the boost's pocket, phone stand dropped into the riser's tilted pocket via `boost_local()`); the inner `rotate([90, 0, 0])` on `phone_stand()` stands the stand up and keeps the assembly internally Z-up-consistent. The boost is always fitted, because since #468 it is the rig's only stand mount |
+| `scanning_rig_setback_assembly.scad` | Renderable — preview-only assembly, `scanning_rig_assembly.scad` with the spacer fitted and the boost/riser translated `setback_shift` further back |
 | `turntable_base.parameters.json` | Customizer manifest — `base_d`, `race_r`, `spindle_d`, `foot_pads` |
 | `turntable_platter.parameters.json` | Customizer manifest — `platter_d`, `race_r`, `spindle_d`, `race_clear`, `bore_clear`, `tick_count`, `numerals` |
 | `phone_stand.parameters.json` | Customizer manifest — `slot_w`, `lean`, `stand_w`, `backrest_h`, `lip_h`, `foot_rear` |
-| `rig_link.parameters.json` | Customizer manifest — `stand_lift`, `stand_gap`, `base_d`, `stand_w`, `foot_rear`, `collar_wrap`, `link_clear`, `dock_clear` |
-| `scan_boost.parameters.json` | Customizer manifest — `boost_setback`, `boost_lift`, `boost_tilt`, `stand_lift`, `base_d`, `stand_gap`, `link_clear`, `stand_w`, `boost_clear` (deliberately no `foot_rear`/`dock_clear` — see below) |
-| `scan_setback.parameters.json` | Customizer manifest — `setback_shift`, `setback_clear`, `stand_lift`, `base_d`, `stand_gap`, `link_clear`, `stand_w` |
-| `meta.json` | Project metadata (description, tags: photogrammetry/scanning/utility/desk, difficulty: beginner, version 1.3.0, `mating_pairs`: `[[rig_link.stl, turntable_base.stl], [scan_boost.stl, rig_link.stl], [scan_setback.stl, rig_link.stl]]`, `printing_notes`: support-free orientations, groove lubrication, slot-width tuning, landscape-scan overhang tip, tick-numeral engraving depth, rig-link bed size and drop-in assembly, anti-slip pad recesses, scan-boost fit and size, scan-setback fit and size) |
+| `rig_link.parameters.json` | Customizer manifest — `rail_len`, `rail_w`, `rail_h`, `stand_gap`, `base_d`, `collar_wrap`, `link_clear` (deliberately no key parameters — see below) |
+| `scan_boost.parameters.json` | Customizer manifest — `boost_floor_h`, `boost_setback`, `boost_tilt`, `rail_w`, `rail_h`, `boost_clear` (deliberately no `foot_rear`/`dock_clear`/`stand_w` — see below) |
+| `scan_riser.parameters.json` | Customizer manifest — `riser_h` only (deliberately no wall/kerb thickness — see below) |
+| `scan_setback.parameters.json` | Customizer manifest — `setback_shift`, `setback_clear`, `rail_w`, `rail_h` |
+| `meta.json` | Project metadata (description, tags: photogrammetry/scanning/utility/desk, difficulty: beginner, version 3.0.0, `mating_pairs`: `[[rig_link.stl, turntable_base.stl], [scan_boost.stl, rig_link.stl], [scan_setback.stl, rig_link.stl]]` — `scan_riser.stl` deliberately excluded, see below — `printing_notes`: support-free orientations, groove lubrication, slot-width tuning, landscape-scan overhang tip, camera centring and elevation, tick-numeral engraving depth, rig-link bed size and keyed drop-in assembly, anti-slip pad recesses, scan-boost fit/size/stability, scan-riser fit and elevation, scan-setback fit and size) |
 | `dependency-graph.md` | Auto-generated `include` dependency graph — every renderable includes `_scanning_rig.scad` |
 
 **Turntable fit**: the platter's V-groove is the ridge triangle grown by
@@ -486,7 +487,7 @@ labels don't overlap.
 ellipse against the first frame of a capture and applies it to every frame,
 so the whole masking design assumes the turntable base never moves. Operator
 feedback (issue #414) found that hand-turning the platter tends to drag the
-166mm base a few millimetres across the desk — at 4K's ~12 px/mm, a 2-3mm
+238mm base a few millimetres across the desk — at 4K's ~12 px/mm, a 2-3mm
 slide shifts the rim 25-35 px, silently corrupting masks for every frame
 captured after the slide. `rig_link.scad` fixes this structurally by tying
 the base to the phone stand so they move as one rigid assembly: if the whole
@@ -497,16 +498,9 @@ degrees by default, must stay > 180) around the base rim: past 180 degrees
 the wrap gives in-plane form closure, so the base can only be lifted
 straight up out of the collar, never slid out sideways, while its 160-degree
 mouth (facing away from the stand) leaves the platter reachable by hand. The
-dock is a hollow plinth whose top is a 5mm perimeter ledge inset from a 5mm
-kerb — the hollow core tapers to the ledge footprint at 45 degrees so the
-ledge is corbelled rather than bridged, and the phone stand's foot drops
-into the resulting pocket and is captured on all four sides. The dock floor
-height (`stand_lift`) doubles as the camera-elevation control that the #414
-scan-quality analysis asked for: raising the phone raises the camera above
-the platter without changing its horizontal distance, and for an iPhone 15
-Pro this puts elevation at roughly 35 degrees at `stand_lift = 0`, 41
-degrees at the 25mm default, and 44 degrees at `stand_lift = 40` — inside
-the 40-45 degree target the analysis recommended. `rig_link.scad` is
+link's far end is a low open-top rail (`rail_w` wide, `rail_h` tall) that the
+scan boost's saddle drops over; the link carries no stand pocket of its own
+(#468). `rig_link.scad` is
 deliberately authored about the platter axis rather than its own centroid,
 so it renders in assembled position against `turntable_base.stl` for CI's
 `mating_pairs` interference check; the viewers call `geometry.center()`, so
@@ -514,44 +508,48 @@ the off-centre origin is invisible there. The link must never connect to the
 platter itself — only the base and the stand — so the platter stays free to
 turn by hand.
 
-**Scan boost (issues #436, #444)**: an optional, removable plinth that stands
-on the desk directly behind the rig link's dock and re-presents the dock's
-drop-in stand pocket further back (`boost_setback`), higher (`boost_lift`)
-and pitched nose-down toward the turntable (`boost_tilt`), so the camera
-moves back from a platter that is filling the frame. It is located by a
-saddle: a cross wall that butts the dock's rear face, fixing the camera
-distance, and two arms that hug the dock's outer side walls, fixing Y and
-blocking yaw. `boost_setback` moves the pocket — and so the camera —
-rearward by exactly that many mm at unchanged height and pitch, defaulting
-to 120mm (#444). Removing the boost restores today's assembly exactly — no
-existing part changes shape.
+**Scan boost (issues #436, #444, #468)**: a removable plinth that stands on
+the desk directly behind the rig link's rail and carries the rig's only
+drop-in stand pocket, set back behind that rail (`boost_setback`), raised to
+an absolute height above the desk (`boost_floor_h`) and pitched nose-down
+toward the turntable (`boost_tilt`). It is located by a saddle: a cross wall
+that butts the rail's rear face, fixing the camera distance, and two arms
+that hug the rail's outer side walls, fixing Y and blocking yaw. Since #468
+the link has no dock to fall back on, so the boost is always fitted;
+`boost_setback` defaults to 26mm, measured behind the rail's rear face
+(`rail_x1`) — the pocket front position feeds `cam_run0` directly (see
+below), so its effect on the camera's horizontal distance is tracked there
+rather than as a frozen x coordinate here. `boost_floor_h` defaulted to 45mm
+pre-#486 — the pre-#468 height (old `stand_lift` 25 plus `boost_lift` 20) an
+already-printed boost was built to — and is now 90mm (#486; see
+`cam_rise0`/`cam_run0` below). An earlier #468 draft made this an absolute-height
+elevation control and defaulted it to 150mm, but that redesigns the plinth
+itself (roughly double the height, a different print entirely), obsoleting
+whatever boost a user already has; a review of that draft asked to keep
+reusing the existing part and add a separate piece for the elevation
+correction instead — see **Scan riser** below.
 
-An earlier version of this part plugged into the dock pocket rather than
-standing on the desk, but that construction cannot be stretched to a 120mm
+An earlier version of this part plugged into a dock pocket rather than
+standing on the desk, but that construction cannot be stretched to this much
 setback: the loaded stand's centre of mass would land well behind the rig's
-own desk footprint, and the plug's few millimetres of engagement in the dock
-pocket cannot resist that tipping couple — it would rock back and lift out.
-Reaching the desk from behind the dock also makes any downward-facing plug
-an unprintable floating island once the print's lowest plane becomes the
-desk instead of the plug's underside. So the boost now stands on the desk on
-its own footprint, located rather than loaded by the saddle, and the old
-`boost_lift > boost_plug_h + boost_step + ledge_t + boost_ledge` clearance
-constraint (a consequence of the plug/flare construction) no longer applies.
-The customizer manifest still floors `boost_lift` at 20mm, so the part
-remains a lift as well as a setback, and floors `boost_setback` at 100mm,
-since the pocket front must clear the plinth's own front face by
-`boost_wall`. That floor is only safe while nothing else can inflate the
-requirement, so unlike `rig_link.parameters.json` the boost's manifest does
-not expose `foot_rear` or `dock_clear`: both feed `pocket_x`, and at their
-own slider extremes they would push the minimum setback to ~132mm, past both
-the 100mm floor and the 120mm default, and the part would fail to render in
-the customizer with only an assert message to explain it. The remaining
-`boost_clear` slider tops out at 1mm, so the worst case stays at 98mm.
+own desk footprint, and the plug's few millimetres of engagement cannot
+resist that tipping couple — it would rock back and lift out. Reaching the
+desk from behind the link also makes any downward-facing plug an unprintable
+floating island once the print's lowest plane becomes the desk instead of the
+plug's underside. So the boost stands on the desk on its own footprint,
+located rather than loaded by the saddle. `boost_setback` is now measured
+from the rail's rear face, which is also where the plinth's own front face
+lands, so its only floor is `boost_clear + boost_wall` (~3.35mm at the
+defaults) and the manifest can start it at 10mm. `pocket_x`/`pocket_y` are
+still sized by `foot_rear`, `stand_w` and `dock_clear`, none of which the
+boost's manifest exposes — deliberate, and worth keeping that way, since a
+customized pocket that no longer matches the printed stand is a silent trap
+rather than an assert.
 
 The hollow core narrows through a corbelled ledge (the same trick
-`rig_dock()` uses) to a tilted pocket that takes the same phone-stand foot as
-the dock. The corbel is cut in the pocket's tilted frame, so its inset and
-rise are not equal the way `rig_dock()`'s are: insetting `boost_ledge` over
+the dock used) to a tilted pocket that takes the phone stand's foot. The
+corbel is cut in the pocket's tilted frame, so its inset and rise are not
+equal the way an untilted corbel's would be: insetting `boost_ledge` over
 an equal rise would be 45 degrees locally but `45 + boost_tilt` from vertical
 globally — a 65-degree overhang inside a closed cavity at the default tilt.
 The rise is stretched to `boost_ledge * tan(45 + boost_tilt)`
@@ -560,30 +558,211 @@ The rise is stretched to `boost_ledge * tan(45 + boost_tilt)`
 lower hull starts no further forward than a 45-degree run down from the
 corbel's front lip (`boost_core_x0`): at large setbacks the plinth outruns
 the pocket, and the nose is left solid rather than roofed by a near-flat
-ceiling. The extra distance lowers the camera's elevation angle
-over the platter; `boost_lift`, up to 60mm, is the adjustment that
-compensates by raising the camera back up. As with the dock, gravity settles
-the tilted foot against the pocket's downhill (front) kerb wall, with the
-fore-aft slack landing at the rear. The boost must never link to the
-platter — only to the rig link's dock and the phone stand's foot — so the
-platter stays free to turn.
+ceiling. At the shipped defaults that clamp is inactive (`boost_lip_x -
+boost_lip_z` = 181.4mm, well forward of `boost_core_x0` = 229.85mm), so the
+plinth stays a shell — the margin is about 48.5mm at the shipped 90mm default
+and shrinks as `boost_floor_h` decreases, because a lower floor pulls
+`boost_lip_z` up toward `boost_core_x0`; drop `boost_floor_h` toward the
+manifest's 25mm floor and the clamp goes active. Gravity settles the tilted
+foot against the pocket's downhill (front) kerb wall, with the fore-aft slack
+landing at the rear. The boost must never link to the platter — only to the
+rig link's rail and the phone stand's foot — so the platter stays free to
+turn.
 
-**Scan setback spacer (issue #465)**: framing tests at the boost's 120mm
-setback showed the 150mm platter spanning ~77% of a 4K portrait frame with
-the base plate clipped at both edges, and a tube-sized object touching the
-frame edge at some rotation angles. The setback spacer is a second optional
-piece that inserts between the rig link's dock and the boost: it straddles
-the dock the same way the boost's own saddle does, and re-presents a
-dock-shaped rail (`dock_w` wide, top at `stand_lift + kerb_h`) `setback_shift`
-further back, so the boost's existing saddle grips the rail instead of the
-dock, unchanged. Dropping the boost onto the spacer therefore moves the whole
-boost — and the camera — rearward by exactly `setback_shift` (100mm default)
-at unchanged height and pitch; the target is the platter at 50-60% of frame
-width. The spacer carries no load of its own — the rig link and the boost
-both stand on the desk under their own weight — its only jobs are fixing the
-boost's distance with a hard butt joint at the rail's rear wall, and keeping
-the boost coupled to the link so the whole rig still slides as one rigid body
-and `scan_masks.py`'s single fixed platter ellipse (issue #434) stays valid.
+**Scan riser (issue #468 review)**: a #468 draft made the scan boost's own
+`boost_floor_h` the camera-elevation control and defaulted it to 150mm to
+clear the `ry/rx >= 0.64` floor (see below) — but that redesigns the plinth
+itself, and a reviewer asked to keep reusing whatever boost is already
+printed rather than obsolete it. The riser is a second, separate piece that
+does the elevation correction instead: it drops into the boost's *existing*
+foot pocket, in exactly the footprint and at exactly the fit the phone
+stand's own foot has there today (same `dock_clear` per side, same 1mm proud
+of a kerb), and re-presents an identical pocket `riser_h` further up — the
+phone stand then drops into the riser's pocket instead of the boost's. The
+boost does not change shape at all.
+
+Unlike `boost_floor_h`, which is a pure vertical lift, `riser_h` is measured
+along `boost_local()`'s already-tilted local Z, so it also pulls the camera
+slightly closer to the turntable as it rises (`riser_h * sin(boost_tilt)`)
+while lifting it (`riser_h * cos(boost_tilt)`) — `riser_checks()` echoes the
+combined prediction, factoring both terms in, alongside `boost_checks()`'s
+boost-alone figure. The riser is solid apart from its own top pocket, unlike
+the boost's shelled, corbelled plinth: shelling it the same way would need a
+floor plate roofing its own cavity over the tower's full footprint with
+nothing under it — an unsupported bridge, not a corbel, since (unlike the
+boost's core, which stays open all the way down to the desk) the riser's
+cavity would be fully enclosed. Slicer infill settings, not this source
+model, are what actually control how much plastic a solid region prints
+with. It is authored in its own flat frame rather than `boost_local()`'s
+tilted one — the boost's pocket floor is already flat *within* that tilted
+frame, the same reason the phone stand's foot drops in flush today, so a
+flat-bottomed riser seats against it at any `boost_tilt` and still prints
+upright rather than at `boost_tilt` off the bed. `scan_riser.stl` is
+deliberately absent from `meta.json`'s `mating_pairs`, for the same reason
+`phone_stand.stl` is: both are authored in their own local frame rather than
+the rig's shared assembly frame, so CI's interference check — which compares
+mating STLs as exported, assuming a shared frame — cannot check them.
+
+**Scan setback spacer (issues #465, #486)**: framing tests at the boost's
+120mm setback originally showed the (then) 150mm platter spanning ~77% of a
+4K portrait frame with the base plate clipped at both edges, and a tube-sized
+object touching the frame edge at some rotation angles. The setback spacer is
+a piece that inserts between the rig link's rail and the boost: it straddles
+that rail the same way the boost's own saddle does, and re-presents an
+identical rail (`rail_w` wide, `rail_h` tall) `setback_shift` further back, so
+the boost's existing saddle grips the spacer's rail instead of the link's,
+unchanged. Dropping the boost onto the spacer therefore moves the whole
+boost — and the camera — rearward by exactly `setback_shift` at unchanged
+height and pitch. At the 222mm platter (#486) `setback_shift` defaults to
+135mm and is no longer optional equipment — see **Bed-limited sizing** and
+**Framing is a constraint, not a comment** below. The spacer carries no load
+of its own — the rig link and the boost both stand on the desk under their
+own weight — its only jobs are fixing the boost's distance with a hard butt
+joint at the rail's rear wall, and keeping the boost coupled to the link so
+the whole rig still slides as one rigid body and `scan_masks.py`'s single
+fixed platter ellipse (issue #434) stays valid.
+
+**Anti-rotation keys, low rail, and camera elevation (issue #468)**: three
+defects reported from real use.
+
+The collar was a plain 200-degree arc around a plain cylindrical rim, so
+although the base could not be *lifted* or *slid* out, it was free to *spin*
+inside the collar. Hand-turning the platter twists the base with it, which
+swings the index pointer off the rig axis and rotates the base annulus that
+`scan_masks.py`'s fixed ellipse assumes is static. The base rim now carries
+two notches and the collar bore two matching ribs, both derived from the same
+`key_angle`/`key_w`/`key_depth`/`key_clear` variables in `_scanning_rig.scad`
+and exposed in *neither* customizer manifest, so the two halves cannot drift
+apart. They sit at ±60 degrees off +X, well inside the collar's wrap and
+clear of the index pointer at 0 degrees; the rib is `key_clear` (0.35mm)
+narrower than the notch on each tangential face and `link_clear` (0.4mm)
+outboard of the notch floor radially. Because the notches are prisms through
+the full plate thickness, the base still lifts straight out. The keys line up
+at exactly one rotation, which is also the rotation that puts the pointer on
+the rig axis, so the assembly is self-indexing. `link_checks()` asserts that
+the keys stay inside the collar's wrap and that the notch floor stays outside
+the platter rim.
+
+The link's stand dock — a 97 x 87 x 30mm hollow plinth — is replaced by
+`rig_rail()`, a 40mm-wide, 12mm-tall open-top channel. The dock's pocket was
+never used: since #444 the stand always mounts on the scan boost, so the dock
+was carrying a 30mm-tall empty box through the near field of every capture.
+`rail_len` is 97mm precisely so the rail's rear face stays at x = 226.5mm,
+where the dock's was — that face is the boost's stop, so the camera's
+horizontal distance is unchanged. The rail is open-topped so nothing bridges;
+do not close it with a lid. One accepted consequence: the boost's and
+spacer's saddle engagement drops from 30mm to `rail_h` (12mm). Yaw is still
+blocked by `boost_grip` (40mm) against `boost_clear` and the desk still
+carries the load, so the rail only locates — but the boost does lift off it
+more easily than before.
+
+Camera elevation had collapsed to ~21 degrees once the #465 spacer was
+fitted, and that turned out to break scans outright rather than merely soften
+them. On a step-and-hold capture of uniform-grey pliers (verified ellipse
+`1095,1531,820,300`, inked platter numerals), `--capture-mode continuous`
+registered 18 of 150 frames and fragmented into 7 models, and
+`--capture-mode holds` registered 2 of 54 — the pre-numeral aliasing
+signature. Near edge-on the platter's numerals foreshorten to nothing,
+leaving only the rotationally-periodic knurl to match against. A
+feature-rich object survives this (a toothpaste tube scanned 150/150 in the
+same session); a plain one does not. So `ry/rx >= 0.64` is a hard floor the
+shipped defaults must *land* at, not a range they must merely allow.
+
+The rig's own dimensions give a calibrated model. With the phone's rear
+camera `cam_z_lead` (96mm) up the backrest's inner face and `cam_x_lead`
+(6mm) behind the boost's pocket front, the camera sits `cam_rise0 =
+boost_floor_h + cam_z_lead - base_t - platter_t` mm above a platter top 14mm
+above the desk (`base_t + platter_t` is unchanged at 6 + 8), and `cam_run0 +
+setback_shift` mm out from the platter axis (`cam_run0 = boost_x0 +
+cam_x_lead`) — for the boost alone, with no riser fitted, `setback_shift = 0`.
+At the shipped `boost_floor_h = 90`, `cam_rise0` is 172mm and `cam_run0` is
+258.5mm, giving `atan(172/258.5)` = 33.6 degrees, `ry/rx` 0.554. Both
+`cam_run0` and `cam_rise0` are declared right after `boost_x0` in
+`_scanning_rig.scad` precisely so a change to `boost_x0` or `boost_floor_h`
+propagates automatically — the pre-#486 version of this model froze the
+run at a literal `222.4`, which is exactly the staleness that let the #486
+platter scale-up outgrow the frame silently (see **Framing is a constraint,
+not a comment** below).
+
+The riser adds `riser_h` along `boost_local()`'s tilted local Z rather than a
+plain vertical lift, so it changes both terms: height gains
+`riser_h * cos(boost_tilt)` and distance loses `riser_h * sin(boost_tilt)` —
+`elevation = atan((cam_rise0 + riser_h * cos(boost_tilt)) /
+(cam_run0 + setback_shift - riser_h * sin(boost_tilt)))`, echoed by
+`riser_checks()` alongside `boost_checks()`'s boost-alone figure, both now
+also echoing `cam_frame_frac()` — the fraction of frame width the platter
+fills.
+
+| Config | `riser_h` | distance | slant range | elevation | `ry/rx` | platter/frame |
+|---|---|---|---|---|---|---|
+| boost alone, no spacer, no riser | — | 258.5 | 310.5mm | 33.6° | 0.554 | 94% |
+| boost + riser (new default) | 140 | 210.6 | 369.5mm | 55.2° | **0.822** | 79% |
+| boost + riser + spacer @ 135 (shipped) | 140 | 345.6 | 460.0mm | 41.3° | **0.660** | 63% |
+| boost + riser + spacer @ 150 (manifest max) | 140 | 360.6 | 471.4mm | 40.1° | 0.644 | 62% |
+
+Boost alone, with no riser, sits under the 0.64 floor at any setback — the
+riser is not optional equipment for a usable capture. `riser_h` (40-170mm) is
+the elevation control the customizer exposes, default 140; `boost_floor_h`
+(25-110mm, default 90) is the plinth's own baseline height. The 300mm-ish
+total camera height the 222mm platter needs is deliberately split between
+these two rather than put entirely into one part: a riser tall enough to do
+the whole job alone would be roughly 200mm on a 96mm x 86mm footprint — an
+increasingly top-heavy tower for that footprint, more easily knocked
+mid-capture — whereas spreading the height into the wide, desk-borne
+`scan_boost` plinth as well keeps `riser_h` inside its existing manifest
+ceiling.
+
+`setback_shift` defaults to 135mm and, at the 222mm platter, is mandatory
+rather than optional: without it boost + riser alone fills 79% of the frame
+width, an object cannot clear the frame edge through a full rotation, and
+`ry/rx` (0.822) is well past the point where headroom to spare stops
+mattering — the platter itself, not the ring, becomes the binding constraint.
+With the spacer at 135mm the platter fills 63% of the frame — parity with
+what the 150mm platter had pre-#486 — at `ry/rx` 0.660, still comfortably
+above the 0.64 floor. `boost_checks()` and `riser_checks()` both `echo()`
+their predicted elevation, `ry/rx` and frame fraction at render time, so a
+customizer download or a CI log says what geometry was actually asked for.
+The model is fitted to a single measured ellipse, so treat the echoes as
+predictions and confirm against a fresh `roi-preview.jpg`; if they land well
+off, the `cam_z_lead`/`cam_x_lead` camera-position assumptions are the terms
+to re-fit.
+
+**Bed-limited sizing (issue #486)**: the platter and base are sized to the
+largest turntable that fits a 250mm bed, not to any margin above it. The
+constraint chain, in order: `rig_link`'s collar OD is `base_d + 2 *
+link_clear + 2 * collar_wall`, which must clear the 250mm print bed —
+238 + 2(0.5) + 2(4) = 247.0mm at the shipped `base_d`. The link's actual
+footprint is slightly larger still once the rail and collar mouth are
+accounted for: 247.95 x 246.88mm, measured on the exported STL, leaving
+about 4mm clearance per side on a Bambu Lab A1's 256 x 256mm plate — no
+skirt, brim, or slicer exclusion margin fits inside that. The base rim must
+also stay 8mm proud of the platter for the index pointer, which spans
+`base_d/2 - 2` to `base_d/2 - 7`; at `base_d = 238` that is 117 down to
+112mm, so `platter_d` must be 222mm, not simply `base_d - 12`. Every other
+turntable dimension (`race_r`, `race_clear`, `spindle_d`, `grip_flutes`,
+`foot_pad_r`, `key_w`, `key_depth`, `link_clear`, the numeral parameters) is
+derived from or scaled alongside those two, and is exercised in
+`_scanning_rig.scad`'s own `link_checks()`/`boost_checks()`/`riser_checks()`
+asserts rather than left to informal proportion.
+
+**Framing is a constraint, not a comment**: before #486, the relationship
+between platter size and frame width existed only as prose in this file and
+in `playbooks/scan_a_capture.md` — nothing in `_scanning_rig.scad` itself
+would have failed loudly if a platter scale-up outgrew the camera's field of
+view, which is exactly what a first draft of the #486 scale-up did (the
+222mm platter at the pre-#486 camera geometry framed at 82%, worse than the
+77% that motivated creating the setback spacer in the first place).
+`_scanning_rig.scad` now declares `cam_fov_tan = 0.3803` — half the
+tangent of a 4K portrait phone camera's horizontal field of view, back-solved
+from the #465 measurement of the 150mm platter filling ~77% of frame at a
+256mm boost-alone slant — and a `cam_frame_frac(rise, run)` function that
+divides `platter_d` by twice the tangent-scaled slant. Both `boost_checks()`
+and `riser_checks()` echo the result at render time. Treat ~0.60 as the
+threshold: below it, the platter has margin to spare inside the frame at
+every rotation angle; approaching or exceeding it (as boost + riser alone
+does, at 79%, or as an under-sized setback would) risks the platter or an
+overhanging object clipping the frame edge partway through a revolution. Fit
+or extend the setback spacer whenever `cam_frame_frac()` reads above ~0.60.
 
 **Phone stand profile**: `stand_profile()` draws the side view in XY with
 +Y up and +X rearward (the lean direction), then `phone_stand()` extrudes it
@@ -624,7 +803,9 @@ vertical backplate, dovetail-attached clips, and a removable drip tray.
 | `Toothbrush assembly.scad` | Renderable — assembly preview (holder + tray) |
 | `Toothbrush backplate.scad` | Renderable — backplate with dovetail rails; the sole file in the repo keeping a top-level `rotate([-90, 0, 0])`, and it is a *print* orientation: `toothbrush_backplate()` stands upright in the library and this lays it on its back, flat on the bed (allowlisted in `scripts/test_scad_orientation.py`) |
 | `Toothbrush clip test.scad` | Renderable — single brush clip, oriented for test printing |
-| `Toothpaste clip test.scad` | Renderable — single paste clip, oriented for test printing |
+| `Toothpaste clip.scad` | Renderable — single paste clip, oriented for test printing |
+| `Toothpaste hanger.scad` | Renderable — cap-up paste hanger (backing block + two-prong cap-neck fork), oriented for test printing; mounts on the same rail as `Toothpaste clip.scad` |
+| `Toothpaste hanger.parameters.json` | In-browser customizer manifest for `Toothpaste hanger` |
 | `meta.json` | Project metadata (description, tags, difficulty) |
 | `dependency-graph.md` | Auto-generated `include`/`use` dependency graph |
 
@@ -654,7 +835,22 @@ alignment pegs are already printed, so `base_depth` (55 mm) and `peg_y`
 (30 mm) are unchanged and `tray_shift_y` (7.5 mm) offsets the shell from the
 tray's local origin, which stays on the peg line. The grooves and `Toothbrush
 assembly.scad`'s placement are therefore unaffected, at the cost of the
-tray's front 15 mm overhanging the base's front edge.
+tray's front 15 mm overhanging the base's front edge. The cap-up toothpaste
+hanger (`paste_hanger_piece()`, issue #476) defaults `cap_neck_d` to 27.4 mm
+and `cap_flange_d` to 33.7 mm, the caliper-measured narrowest and widest
+sections of the cap (issue #484), plus `prong_t` at 4 mm — all three exposed
+in the customizer. `fork_z_axis` is derived from `fork_web + neck_slot_w / 2`
+rather than hard-coded, so the cap's flange always clears the arm face
+regardless of the `cap_neck_d` the customizer is set to. `mouth_flare` is
+likewise derived, as `max(0, min(3, (cap_flange_d - neck_slot_w)/2 -
+flange_bearing))`, so the insertion funnel can never open wider than the
+flange — a fixed flare would otherwise let the cap drop straight through
+instead of being guided into the slot. The `scans/toothpaste` reference mesh
+is deliberately not imported —
+it is a convex hull contaminated with platter geometry out to the capture's
+85 mm crop radius, so it cannot supply the cap's neck waist (a concavity a
+hull can't carry) and would only be usable as clearance geometry, not as a
+`difference()` operand for the fork.
 
 **Rejected: reworking the clips themselves to grip the brush.** Issue #371
 also asked for a fix to the clips sliding brushes to the ground, and PR #373

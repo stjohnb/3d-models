@@ -1,0 +1,18 @@
+{
+  "description": "Toe-operated pull for a pull-out kitchen bin. A Z-shaped bracket screws to the inside face of the drawer front, wraps its bottom edge, and drops a short lip flush with the front face at floor level, so a toe hooked behind the lip opens the bin with no hands. Nothing projects into the room: the bracket is no deeper than the drawer front panel itself.",
+  "tags": ["kitchen", "household", "accessibility"],
+  "version": "1.0.0",
+  "difficulty": "beginner",
+  "hardware": [
+    { "item": "4 x 16 mm countersunk wood screw", "quantity": 2, "notes": "Driven from inside the drawer through the fixing plate into the panel's back face. 16mm is deliberate: 4mm of it is plate, leaving 12mm in a 22mm panel with no risk of breaking through the painted front." }
+  ],
+  "printing_notes": [
+    "Print exactly as exported, standing on the profile face with the bracket's width vertical. Every face is then a vertical wall, so no supports are needed anywhere and the layers run across the bending load at the lip root rather than along it.",
+    "Use a 5mm brim: the part is 120mm tall on a 26 x 66mm footprint.",
+    "4 perimeters and 40% infill. This part takes a repeated pulling load from a foot.",
+    "The two screw holes are bored across the layers, so each has a 4.5mm bridge over it. Slow the bridging speed if your printer struggles; the holes are through-holes and clean up with a 4.5mm drill if needed.",
+    "Measure the drawer front before printing: the base is sized to run exactly the panel thickness, 22mm by default. Set panel_t in the customizer if yours differs, or the base will either stop short of the front face or stand proud of it.",
+    "Check there is clearance behind the panel's bottom edge for the fixing plate - it stands 4mm into the drawer by default - and that the plinth is recessed far enough that a toe fits behind the lip.",
+    "For a no-drilling installation set screw_holes to false and bond the flat inner face of the fixing plate to the panel with VHB tape."
+  ]
+}

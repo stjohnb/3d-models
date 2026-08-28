@@ -33,28 +33,37 @@
 $fn = 64;
 
 // === Turntable parameters (mm) ===
-platter_d   = 150;  // rotating platter diameter
-base_d      = 166;  // base plate diameter — keep >= platter_d + 12 so the rim
+platter_d   = 222;  // rotating platter diameter
+base_d      = 238;  // base plate diameter — keep >= platter_d + 12 so the rim
                     // stays visible around the platter for the index pointer
 base_t      = 6;    // base plate thickness
 platter_t   = 8;    // platter thickness — must clear the groove apex by >= 3mm;
                     // below ~6mm the V-groove breaks through the top face, which
                     // is why platter_t is not exposed in the customizer manifest
-race_r      = 55;   // V-race ring centreline radius — must match on both parts
+race_r      = 82;   // V-race ring centreline radius — must match on both parts
 ridge_h     = 4;    // V-ridge height; 45-degree flanks, so support-free
-race_clear  = 0.3;  // groove-vs-ridge clearance
-spindle_d   = 16;   // centring spindle diameter
+race_clear  = 0.4;  // groove-vs-ridge clearance
+spindle_d   = 20;   // centring spindle diameter
 spindle_up  = 7;    // spindle protrusion above the base top — stays 1mm below
                     // the platter top face at the default platter_t
 bore_clear  = 0.3;  // platter bore radial clearance over the spindle
 tick_count  = 24;   // rotation tick marks (24 => 15-degree steps)
-grip_flutes = 60;   // finger-grip scallops around the platter rim
+grip_flutes = 88;   // finger-grip scallops around the platter rim
 numerals    = true; // engrave a numeral in each tick sector (see below)
 foot_pads      = true; // recess stick-on anti-slip pads into the base underside
 foot_pad_d     = 12;   // pad recess diameter
 foot_pad_depth = 1.2;  // pad recess depth (leaves 4.8mm of plate above it)
 foot_pad_count = 3;    // three pads self-level on an uneven desk
-foot_pad_r     = 62;   // pad centre radius — clear of the spindle and the V-race
+foot_pad_r     = 100;  // pad centre radius — clear of the spindle and the V-race
+
+// Anti-rotation keys (issue #468). Two notches in the base rim take two ribs on
+// the rig link's collar bore, so hand-turning the platter cannot twist the base
+// inside the collar. Both parts derive them from these SAME variables, and
+// neither customizer manifest exposes them, so they cannot drift apart.
+key_angle = 60;   // key centre, degrees off +X — clear of the index pointer at 0
+key_w     = 14;   // key width, tangential
+key_depth = 4;    // key depth, radially into the base rim
+key_clear = 0.35; // per-face clearance, rib vs notch
 
 // === Phone stand parameters (mm unless noted) ===
 slot_w         = 14;  // phone slot width: bare iPhone 15 Pro is 8.25, most cases <= 13
@@ -71,48 +80,83 @@ port_gap_w     = 24;  // cable notch width through the lip and slot floor
 
 // === Rig link parameters (mm unless noted) ===
 // The link ties the turntable base to the phone stand so hand-turning cannot
-// drag the base across the desk. Both ends are drop-in captures, so neither
-// existing part changes shape. See docs/model-projects.md.
-link_clear  = 0.4;  // radial clearance, collar bore vs base rim
+// drag the base across the desk. The collar end is a drop-in capture, keyed
+// against rotation; the far end is a low open-top rail that the scan boost (or
+// the setback spacer) drops its saddle over. The link carries no stand pocket —
+// the stand always mounts on the scan boost (#468). See docs/model-projects.md.
+link_clear  = 0.5;  // radial clearance, collar bore vs base rim
 collar_wall = 4;    // collar wall thickness
 collar_wrap = 200;  // collar arc (degrees) — MUST stay > 180 for form closure
 spar_w      = 16;   // spar width
 spar_h      = 10;   // spar height
-stand_gap   = 6;    // clear gap, collar OD to the dock's front face
-stand_lift  = 25;   // dock floor height above the desk — sets camera elevation
-dock_clear  = 0.5;  // pocket clearance per side around the stand foot
-dock_wall   = 3;    // dock wall thickness
-dock_ledge  = 5;    // ledge width the stand foot rests on
-ledge_t     = 4;    // ledge thickness
-kerb_h      = 5;    // kerb height above the dock floor (stand foot is 7mm)
+stand_gap   = 6;    // clear gap, collar OD to the rail's front face
+rail_w    = 40;  // rail outer width — the boost/setback saddles grip these faces
+rail_h    = 12;  // rail height above the desk
+rail_len  = 97;  // rail length; its REAR face is the boost's stop. rail_x1 is
+                 // derived from collar_r_out, not frozen — see cam_run0.
+rail_wall = 3;   // floor / wall thickness
 
 // === Scan boost parameters (mm unless noted) ===
-// Optional setback plinth (issues #436, #444). It stands on the desk directly
-// behind the rig link's dock, straddling the dock's rear end so its distance
-// from the turntable repeats between captures, and presents the same drop-in
-// stand pocket boost_setback further back and boost_lift higher, pitched
-// nose-down. Remove it and the stand drops straight back into the link's dock.
-boost_setback = 120;  // pocket shift rearward from the dock's own pocket (#444)
-boost_lift    = 20;   // pocket-floor rise above the dock floor, at the pocket front
+// Optional setback plinth (issues #436, #444, #468). It stands on the desk
+// directly behind the rig link's rail, straddling the rail's rear end so its
+// distance from the turntable repeats between captures, and carries the only
+// drop-in stand pocket in the rig, boost_setback behind that rail and with its
+// floor an absolute boost_floor_h above the desk, pitched nose-down.
+boost_setback = 26;   // pocket front behind the rail's REAR face; see boost_x0
+                      // and cam_run0 for where that puts the camera.
+boost_floor_h = 90;   // pocket floor height above the desk at the pocket front.
+                      // This is the boost's OWN baseline height. The 222mm
+                      // platter (#486) needs a camera roughly 300mm above the
+                      // platter top; putting 45mm of that into this wide
+                      // desk-borne plinth keeps riser_h inside its existing
+                      // manifest ceiling rather than needing a ~200mm tower.
+                      // Fit scan_riser on top of it for the camera-elevation
+                      // correction; see riser_checks() for the combined
+                      // prediction. Boost alone this is only ~34 degrees
+                      // (ry/rx ~0.55), under the 0.64 floor below which
+                      // low-texture objects stop registering — the riser is not
+                      // optional equipment.
 boost_tilt    = 20;   // nose-down pitch handed to the docked stand (degrees)
-boost_clear   = 0.35; // clearance, plinth vs the rig link's dock
+boost_clear   = 0.35; // clearance, plinth vs the rig link's rail
+dock_clear    = 0.5;  // stand-foot pocket clearance per side (scan boost)
+ledge_t       = 4;    // ledge thickness
 boost_wall    = 3;    // shell wall thickness
 boost_ledge   = 5;    // top ledge width the stand foot rests on
 boost_kerb_h  = 6;    // kerb height above the pocket floor (stand foot is 7mm)
-boost_grip    = 40;   // saddle arm length hugging the dock's outer side walls
+boost_grip    = 40;   // saddle arm length hugging the rail's outer side walls
 
 // === Scan setback spacer parameters (mm unless noted) ===
-// Optional second stage (issue #465). Even with the boost's 120mm setback the
-// 150mm platter still spans ~77% of a 4K portrait frame and the base plate is
-// clipped at both edges, so an object overhanging the platter leaves frame at
-// some rotation angles. This spacer straddles the rig link's dock and presents
-// a dock-shaped rail setback_shift further back; the scan boost's own saddle
-// then grips that rail instead of the dock, moving the boost — and the camera —
-// rearward by exactly setback_shift with height and pitch unchanged.
-setback_shift = 100;  // extra setback handed to the scan boost (#465)
+// A spacer (issue #465). Even with the boost's setback the 222mm platter
+// still spans ~79% of a 4K portrait frame and the base plate is clipped at
+// both edges, so an object overhanging the platter leaves frame at some
+// rotation angles. This spacer straddles the rig link's rail and presents a
+// matching rail setback_shift further back; the scan boost's own saddle then
+// grips that rail instead of the link's, moving the boost — and the camera —
+// rearward by exactly setback_shift with height and pitch unchanged. At the
+// 222mm platter (#486) it is required for framing, not optional.
+setback_shift = 135;  // extra setback handed to the scan boost (#465, halved in
+                      // #468, re-derived for #486). 135 with the scan_riser
+                      // fitted at its default riser_h gives a 460mm slant
+                      // range at ry/rx 0.66 — parity with the pre-#486 63%
+                      // framing. See riser_checks().
 setback_wall  = 3;    // wall / floor thickness
-setback_clear = 0.35; // clearance, spacer vs the rig link's dock
-setback_grip  = 40;   // saddle arm length hugging the dock's outer side walls
+setback_clear = 0.35; // clearance, spacer vs the rig link's rail
+setback_grip  = 40;   // saddle arm length hugging the rail's outer side walls
+
+// === Scan riser parameters (mm unless noted) ===
+// Height-only correction (issue #468 review): rather than redesign the scan
+// boost's own plinth height — which would obsolete whatever boost the user
+// has already printed — this drops into the boost's EXISTING foot pocket
+// exactly where the phone stand's foot sits today, and re-presents an
+// identical pocket riser_h further up the SAME boost_tilt ramp, for the phone
+// stand to drop into instead. The boost itself does not change shape.
+riser_h      = 140; // added height, boost's pocket floor to the riser's own
+                    // pocket floor, along boost_local()'s tilted Z. See
+                    // riser_checks() for the resulting camera-elevation
+                    // prediction.
+riser_wall   = 3;   // wall thickness around the new pocket
+riser_kerb_h = 6;   // kerb height above the riser's pocket floor (stand foot
+                    // is 7mm)
 
 // === Platter numeral parameters (mm) ===
 // The platter rim is rotationally PERIODIC: knurl teeth and evenly-spaced ticks
@@ -127,9 +171,9 @@ setback_grip  = 40;   // saddle arm length hugging the dock's outer side walls
 // openscad-wasm customizer ships no font bundle (scripts/fetch_openscad_wasm.py
 // omits the 8.1MB openscad.fonts.js), so text() would render the numerals in
 // CI's STL but silently drop them from any customizer download.
-numeral_h      = 7;    // glyph cap height (radial extent)
-numeral_w      = 4;    // per-digit cell width (tangential)
-numeral_stroke = 1;    // segment thickness — >= 2 nozzle widths so it prints
+numeral_h      = 10;   // glyph cap height (radial extent)
+numeral_w      = 6;    // per-digit cell width (tangential)
+numeral_stroke = 1.5;  // segment thickness — >= 2 nozzle widths so it prints
 numeral_kern   = 1;    // gap between the two digits of a 2-digit label
 numeral_depth  = 0.5;  // engrave depth below the platter top face
 numeral_gap    = 3;    // radial gap from the tick marks' inner edge
@@ -149,40 +193,51 @@ collar_r_out = collar_r_in + collar_wall;
 foot_len     = foot_front + foot_rear;
 pocket_x     = foot_len + 2 * dock_clear;
 pocket_y     = stand_w + 2 * dock_clear;
-dock_x0      = collar_r_out + stand_gap;         // dock front face, on the +X axis
-dock_x1      = dock_x0 + 2 * dock_wall + pocket_x;
-dock_w       = pocket_y + 2 * dock_wall;
-stand_origin_x = dock_x0 + dock_wall + dock_clear + foot_rear;  // docked stand's
-                                                 // profile origin (assembly preview).
-                                                 // Uses foot_rear, not foot_front: the
-                                                 // assembly previews drop the stand in
-                                                 // mirror([1, 0, 0])'d, so the long rear
-                                                 // foot — not the cradle — lands against
-                                                 // the dock's front wall. That puts the
-                                                 // backrest (and a phone's camera, which
-                                                 // rests against it) nearest the platter
-                                                 // instead of facing away from it.
+rail_x0      = collar_r_out + stand_gap;         // rail front face, on the +X axis
+rail_x1      = rail_x0 + rail_len;               // rail rear face — the boost's stop
+stand_pocket_x = dock_clear + foot_rear;         // docked stand's profile origin,
+                                                 // measured from the pocket front and
+                                                 // mirrored, so the long rear foot —
+                                                 // not the cradle — lands against the
+                                                 // pocket's front wall. That puts the
+                                                 // backrest (and a phone's camera,
+                                                 // which rests against it) nearest the
+                                                 // platter instead of facing away.
 
-// Scan boost derived. The plinth's front face butts the dock's rear face, so
-// boost_setback MUST leave the pocket front behind that face by at least
-// boost_wall: boost_setback >= dock_wall + pocket_x + boost_clear + boost_wall
-// (~97.35mm at the defaults). The customizer manifest floors boost_setback at
-// 100 and deliberately exposes no slider that can push the requirement above
-// that floor: foot_rear and dock_clear, which size pocket_x, are not offered
-// on scan_boost, so the only term that still moves is boost_clear (max 1mm,
-// giving 98mm worst case). boost_checks() below is the backstop for hand edits;
-// it is called from scan_boost() rather than run here at top level, because
-// rig_link and phone_stand include this library too and their own manifests do
-// expose foot_rear / dock_clear — a top-level assert would fail their renders
-// over a variable belonging to a part they never build.
-dock_pocket_x0 = dock_x0 + dock_wall;             // the dock's own pocket front
-boost_x0       = dock_pocket_x0 + boost_setback;  // boost pocket front, on the +X axis
-boost_floor_z  = stand_lift + boost_lift;         // pocket floor at its front edge
-boost_out_y    = pocket_y + 2 * boost_wall;       // plinth width, flush with the dock's
-boost_body_x0  = dock_x1 + boost_clear;           // plinth front face
+// Scan boost derived. boost_setback is measured from the rail's REAR face,
+// which is also where the plinth's own front face lands, so the pocket front
+// must clear that face by boost_clear + boost_wall.
+// boost_checks() below is the backstop for hand edits; it is called from
+// scan_boost() rather than run here at top level, because rig_link and
+// phone_stand include this library too and a top-level assert would fail their
+// renders over a variable belonging to a part they never build.
+boost_x0       = rail_x1 + boost_setback;         // boost pocket front, on the +X axis
+
+// Calibrated camera model (#468 review, re-derived for #486). The phone's rear
+// camera sits cam_z_lead above the boost's pocket floor and cam_x_lead behind
+// the pocket front; the platter top is base_t + platter_t above the desk. Both
+// leads are stand geometry, not rig size, so they survive the scale-up — but
+// the run must be derived from boost_x0, never frozen at the old 222.4.
+cam_x_lead = 6;
+cam_z_lead = 96;
+cam_run0   = boost_x0 + cam_x_lead;                            // 258.5 at defaults
+cam_rise0  = boost_floor_h + cam_z_lead - base_t - platter_t;  // 172 at defaults
+
+// Framing. tan(half the 4K portrait horizontal FOV, 41.6 deg), back-solved from
+// the #465 measurement: the 150mm platter filled ~77% of frame width at the
+// 256mm boost-alone slant. Fit the setback spacer while the fraction is above
+// ~0.60 — see playbooks/scan_a_capture.md. This lived only in prose before
+// #486, which is how a platter scale-up could silently outgrow the frame.
+cam_fov_tan = 0.3803;
+function cam_frame_frac(rise, run) =
+    platter_d / (2 * cam_fov_tan * sqrt(rise * rise + run * run));
+
+boost_floor_z  = boost_floor_h;                   // pocket floor at its front edge
+boost_out_y    = pocket_y + 2 * boost_wall;       // plinth width
+boost_body_x0  = rail_x1 + boost_clear;           // plinth front face
 // Corbel under the pocket ledge. The corbel is cut in boost_local()'s tilted
 // frame, so insetting boost_ledge over an equal boost_ledge of rise — 45
-// degrees locally, the way rig_dock() does it in the global frame — would
+// degrees locally, the way an untilted corbel would in the global frame — would
 // print at 45 + boost_tilt from vertical on the cavity's rear face (65 at the
 // 20-degree default): a real overhang inside a closed cavity. Stretching the
 // rise to boost_ledge * tan(45 + boost_tilt) lands that rear face at exactly
@@ -196,8 +251,8 @@ boost_body_x1  = boost_x0 + pocket_x * cos(boost_tilt)
                  + boost_corbel_z * sin(boost_tilt) + boost_wall;
 boost_body_h   = boost_floor_z + (boost_body_x1 - boost_x0) * tan(boost_tilt)
                  + boost_kerb_h + 10;             // trimmed back by the kerb plane
-boost_saddle_y = dock_w + 2 * (boost_clear + boost_wall);
-boost_saddle_h = stand_lift + kerb_h;             // flush with the dock's top
+boost_saddle_y = rail_w + 2 * (boost_clear + boost_wall);
+boost_saddle_h = rail_h;                          // flush with the rail's top
 boost_hole_x   = pocket_x - 2 * boost_ledge;
 boost_hole_y   = pocket_y - 2 * boost_ledge;
 // Front lip of the corbel's underside, in the global frame, and the front edge
@@ -206,23 +261,23 @@ boost_hole_y   = pocket_y - 2 * boost_ledge;
 // the pocket by more than the corbel lip stands above the desk, and that
 // ceiling flattens past 45 degrees. Starting the core no further forward than a
 // 45-degree run down from the lip leaves the plinth's nose solid instead of
-// unprintably roofed — the same trade rig_dock() documents when its own taper
-// degenerates. At the 120mm default the clamp is inactive.
+// unprintably roofed. At the shipped defaults the clamp is inactive.
 boost_lip_x    = boost_x0 + boost_corbel_z * sin(boost_tilt);
 boost_lip_z    = boost_floor_z - boost_corbel_z * cos(boost_tilt);
 boost_core_x0  = max(boost_body_x0 + boost_wall, boost_lip_x - boost_lip_z);
 BOOST_BIG      = 600;                             // half-space / through-cut size
 
-// Scan setback derived. The rail's outer side faces are dock_w apart and its
-// top is flush with the dock's, so the boost's saddle grips it with exactly the
-// geometry it was cut for. setback_shift is measured from the dock's rear face,
-// which is also where the boost's saddle bottoms out, so the boost's shift is
-// setback_shift exactly — the boost_clear slack at the butt joint is present in
-// both configurations and cancels.
-setback_saddle_y = dock_w + 2 * (setback_clear + setback_wall);
-setback_h        = stand_lift + kerb_h;   // rail top, flush with the dock top
-setback_rail_x0  = dock_x1 + setback_clear + setback_wall;  // rail front
-setback_rail_x1  = dock_x1 + setback_shift;                 // rail rear = new stop
+// Scan setback derived. The spacer's rail repeats the link's rail exactly —
+// same rail_w across the outer side faces, same rail_h top — so the boost's
+// saddle grips it with exactly the geometry it was cut for. setback_shift is
+// measured from the link rail's rear face, which is also where the boost's
+// saddle bottoms out, so the boost's shift is setback_shift exactly — the
+// boost_clear slack at the butt joint is present in both configurations and
+// cancels.
+setback_saddle_y = rail_w + 2 * (setback_clear + setback_wall);
+setback_h        = rail_h;                // rail top, flush with the link rail's
+setback_rail_x0  = rail_x1 + setback_clear + setback_wall;  // rail front
+setback_rail_x1  = rail_x1 + setback_shift;                 // rail rear = new stop
 
 // Numerals sit just inside the tick band. The ticks are cubes spanning
 // platter_d/2 - 6 .. platter_d/2 + 2 radially, so tick_inner_r is their inner
@@ -337,6 +392,14 @@ module turntable_base() {
                 rotate([0, 0, i * 360 / foot_pad_count])
                     translate([foot_pad_r, 0, -0.1])
                         cylinder(d = foot_pad_d, h = foot_pad_depth + 0.1);
+
+        // Anti-rotation key notches (#468) — vertical prisms through the full
+        // plate thickness, so the base still lifts straight out of the collar.
+        for (m = [0, 1])
+            mirror([0, m, 0])
+                rotate([0, 0, key_angle])
+                    translate([base_d / 2 - key_depth, -key_w / 2, -0.1])
+                        cube([key_depth + 1, key_w, base_t + 0.2]);
     }
 }
 
@@ -440,45 +503,36 @@ module phone_stand() {
 }
 
 // === Rig link ===
-// Prints flat on the bed as authored: every face is either vertical, a top
-// face, or a 45-degree taper under the dock ledge, so nothing needs support.
-module rig_dock() {
-    hole_x  = pocket_x - 2 * dock_ledge;
-    hole_y  = pocket_y - 2 * dock_ledge;
-    ledge_z = stand_lift - ledge_t;
-    taper_z = ledge_z - dock_ledge;
-    difference() {
-        translate([dock_x0, -dock_w / 2, 0])
-            cube([dock_x1 - dock_x0, dock_w, stand_lift + kerb_h]);
+// Prints flat on the bed as authored: every face is either vertical or a top
+// face, so nothing needs support.
 
-        // Hollow core. Full pocket footprint at the bottom, tapering in at 45
-        // degrees to the ledge footprint, so the ledge is corbelled rather than
-        // bridged and the plinth stays a shell (52cm3 total, not 115, at the
-        // 25mm default). Below stand_lift = ledge_t + dock_ledge (9mm) taper_z
-        // goes negative, the lower cube is empty, and the hull degenerates to
-        // the ledge plate alone — the plinth is then solid under the ledge
-        // rather than shelled. That is deliberate: it costs filament, but a
-        // shortened taper would inset dock_ledge over less than dock_ledge of
-        // rise, i.e. a steeper-than-45-degree cavity overhang needing support.
-        // The ledge itself is unaffected, so the foot still lands at stand_lift.
-        union() {
-            hull() {
-                translate([dock_x0 + dock_wall, -pocket_y / 2, -0.1])
-                    cube([pocket_x, pocket_y, taper_z + 0.1]);
-                translate([dock_x0 + dock_wall + dock_ledge, -hole_y / 2, ledge_z - 0.01])
-                    cube([hole_x, hole_y, 0.01]);
-            }
-            translate([dock_x0 + dock_wall + dock_ledge, -hole_y / 2, ledge_z - 0.01])
-                cube([hole_x, hole_y, stand_lift + kerb_h + 0.2]);
-        }
+// Open-top channel — the same outer section scan_setback presents, because both
+// are gripped by the same saddle. Floor on the bed, walls vertical off it, top
+// open: nothing bridges, so no supports. No stand pocket: the stand always
+// mounts on scan_boost (#468).
+module rig_rail() {
+    translate([rail_x0, -rail_w / 2, 0]) cube([rail_len, rail_w, rail_wall]);
+    for (m = [0, 1])
+        mirror([0, m, 0])
+            translate([rail_x0, rail_w / 2 - rail_wall, 0])
+                cube([rail_len, rail_wall, rail_h]);
+    // End walls: the front takes the spar, the rear is the boost's stop face.
+    translate([rail_x0, -rail_w / 2, 0]) cube([rail_wall, rail_w, rail_h]);
+    translate([rail_x1 - rail_wall, -rail_w / 2, 0]) cube([rail_wall, rail_w, rail_h]);
+}
 
-        // Foot pocket: the phone stand's foot plate drops in here.
-        translate([dock_x0 + dock_wall, -pocket_y / 2, stand_lift])
-            cube([pocket_x, pocket_y, kerb_h + 0.1]);
-    }
+// Geometry preconditions for rig_link(). A module called from rig_link() rather
+// than a top-level assert, for the same reason boost_checks() is.
+module link_checks() {
+    assert(key_angle > 0 && key_angle + 15 < collar_wrap / 2,
+           "key_angle must sit well inside the collar's wrap");
+    assert(base_d / 2 - key_depth > platter_d / 2 + 1,
+           "key notch must stay outside the platter rim");
 }
 
 module rig_link() {
+    link_checks();
+
     union() {
         // Collar around the turntable base rim. The wrap exceeds 180 degrees,
         // so the base is captured in-plane and can only be lifted straight out.
@@ -488,12 +542,22 @@ module rig_link() {
                 translate([collar_r_in, 0])
                     square([collar_wall, collar_h]);
 
-        // Spar, desk level. Overlaps 1mm into the collar and runs through the
-        // dock's front wall so both joints are solid.
-        translate([collar_r_out - 1, -spar_w / 2, 0])
-            cube([dock_x0 - collar_r_out + 1 + dock_wall, spar_w, spar_h]);
+        // Key ribs — mirror image of the base's notches, key_clear per face
+        // tangentially and link_clear radially (collar_r_in - key_depth is
+        // link_clear outboard of the notch floor at base_d/2 - key_depth). Do
+        // not "tidy" either expression.
+        for (m = [0, 1])
+            mirror([0, m, 0])
+                rotate([0, 0, key_angle])
+                    translate([collar_r_in - key_depth, -(key_w / 2 - key_clear), 0])
+                        cube([key_depth + collar_wall, key_w - 2 * key_clear, collar_h]);
 
-        rig_dock();
+        // Spar, desk level. Overlaps 1mm into the collar and runs through the
+        // rail's front end wall so both joints are solid.
+        translate([collar_r_out - 1, -spar_w / 2, 0])
+            cube([rail_x0 - collar_r_out + 1 + rail_wall, spar_w, spar_h]);
+
+        rig_rail();
     }
 }
 
@@ -505,11 +569,15 @@ module rig_link() {
 // every tilted face is an upward-facing top face. Nothing hangs downward, so no
 // supports.
 //
-// The plinth stands on the desk behind the rig link's dock rather than plugging
-// into it (#444): at a 120mm setback the loaded stand's centre of mass sits well
-// behind the rig's own desk footprint, and a plug in the dock pocket could not
-// resist that couple — it would rock back and lift out. The saddle only locates
-// the plinth; the desk carries the load.
+// The plinth stands on the desk behind the rig link's rail rather than plugging
+// into it (#444): the loaded stand's centre of mass sits well behind the rig's
+// own desk footprint, and a plug in a pocket could not resist that couple — it
+// would rock back and lift out. The saddle only locates the plinth; the desk
+// carries the load.
+//
+// This is now the rig's ONLY stand mount (#468) — the link's old dock is gone —
+// and boost_floor_h is an absolute height above the desk rather than a lift
+// above a dock floor, because it is what sets the camera's elevation angle.
 //
 // boost_local() is the tilted frame of the boost's pocket: local z = 0 is the
 // pocket floor plane, local +x runs rearward (away from the turntable) and
@@ -525,10 +593,22 @@ module boost_local() {
 // own geometry only, and the other parts in this library must stay renderable
 // across their own manifests' ranges.
 module boost_checks() {
-    assert(boost_setback >= dock_wall + pocket_x + boost_clear + boost_wall,
-           "boost_setback too small for the current pocket/clearance settings");
+    assert(boost_setback >= boost_clear + boost_wall,
+           "boost_setback too small to clear the plinth's own front wall");
+    assert(boost_floor_h > boost_corbel_z,
+           "boost_floor_h too small to fit the pocket's corbel above the desk");
     assert(boost_tilt >= 0 && boost_tilt < 45,
            "boost_tilt must be at least 0 and under 45 degrees");
+    // Predicted camera elevation (#468), for the setback spacer fitted at the
+    // current setback_shift — set setback_shift = 0 to read the boost-alone
+    // figure. Calibrated against a measured roi-preview ellipse; a prediction,
+    // not a guarantee — always confirm on roi-preview.jpg.
+    echo(str("scan_boost: predicted elevation ",
+             atan(cam_rise0 / (cam_run0 + setback_shift)),
+             " deg with the setback spacer at ", setback_shift,
+             "mm, ry/rx ", sin(atan(cam_rise0 / (cam_run0 + setback_shift))),
+             ", platter fills ", cam_frame_frac(cam_rise0, cam_run0 + setback_shift),
+             " of frame width"));
 }
 
 module scan_boost() {
@@ -536,16 +616,16 @@ module scan_boost() {
 
     difference() {
         union() {
-            // Saddle — a U in plan view dropped over the dock's rear end. The
-            // cross wall butts the dock's rear face (setting camera distance),
+            // Saddle — a U in plan view dropped over the rail's rear end. The
+            // cross wall butts the rail's rear face (setting camera distance),
             // the arms hug its outer side walls (setting Y, blocking yaw).
             difference() {
-                translate([dock_x1 - boost_grip, -boost_saddle_y / 2, 0])
+                translate([rail_x1 - boost_grip, -boost_saddle_y / 2, 0])
                     cube([boost_grip + boost_clear + boost_wall,
                           boost_saddle_y, boost_saddle_h]);
-                translate([dock_x1 - boost_grip - 1, -(dock_w / 2 + boost_clear), -1])
+                translate([rail_x1 - boost_grip - 1, -(rail_w / 2 + boost_clear), -1])
                     cube([boost_grip + boost_clear + 1,
-                          dock_w + 2 * boost_clear, boost_saddle_h + 2]);
+                          rail_w + 2 * boost_clear, boost_saddle_h + 2]);
             }
 
             // Plinth, trimmed by the tilted kerb-top plane.
@@ -558,9 +638,9 @@ module scan_boost() {
             }
         }
 
-        // Foot pocket — same pocket_x x pocket_y as the dock's, so the same
-        // stand foot drops in. Gravity settles the tilted foot against the
-        // downhill (front) kerb wall; the fore-aft slack lands at the rear.
+        // Foot pocket — pocket_x x pocket_y, sized to the phone stand's foot.
+        // Gravity settles the tilted foot against the downhill (front) kerb
+        // wall; the fore-aft slack lands at the rear.
         boost_local()
             translate([0, -pocket_y / 2, 0])
                 cube([pocket_x, pocket_y, BOOST_BIG]);
@@ -568,8 +648,8 @@ module scan_boost() {
         // Hollow core, open to the desk. Rises from the plinth's inner
         // footprint (front edge clamped by boost_core_x0 so this ceiling stays
         // at or under 45 degrees), closes in to the pocket footprint under the
-        // ledge, then corbels in again to the hole footprint — the same trick
-        // rig_dock() uses, so the ledge is corbelled rather than bridged. The
+        // ledge, then corbels in again to the hole footprint, so the ledge is
+        // corbelled rather than bridged. The
         // corbel's rise is boost_corbel_rise, not boost_ledge: it is cut in the
         // tilted frame, so a 45-degree local corbel would print at
         // 45 + boost_tilt globally. See the derived block.
@@ -600,9 +680,11 @@ module scan_boost() {
 // Prints flat on the bed as authored: floor plate on the bed, every wall
 // vertical off it, open top. Nothing bridges and nothing hangs, so no supports.
 //
-// It carries no load — the rig link and the boost both stand on the desk on
-// their own. Its only jobs are to fix the boost's distance (rail rear face is a
-// hard stop) and to keep the boost tied to the link, so the whole rig still
+// It drops its saddle over the rig link's rail and presents an identical rail
+// setback_shift further back. It carries no load — the rig link and the boost
+// both stand on the desk on their own. Its only jobs are to fix the boost's
+// distance (rail rear face is a hard stop) and to keep the boost tied to the
+// link, so the whole rig still
 // slides as one body and scan_masks.py's single fixed platter ellipse stays
 // valid (issue #434).
 
@@ -619,29 +701,101 @@ module scan_setback() {
     setback_checks();
 
     union() {
-        // Saddle over the dock's rear end — the same grip the boost's saddle
-        // uses: cross wall butts the dock's rear face, arms hug its side walls.
+        // Saddle over the link rail's rear end — the same grip the boost's
+        // saddle uses: cross wall butts the rail's rear face, arms hug its
+        // side walls.
         difference() {
-            translate([dock_x1 - setback_grip, -setback_saddle_y / 2, 0])
+            translate([rail_x1 - setback_grip, -setback_saddle_y / 2, 0])
                 cube([setback_grip + setback_clear + setback_wall,
                       setback_saddle_y, setback_h]);
-            translate([dock_x1 - setback_grip - 1, -(dock_w / 2 + setback_clear), -1])
+            translate([rail_x1 - setback_grip - 1, -(rail_w / 2 + setback_clear), -1])
                 cube([setback_grip + setback_clear + 1,
-                      dock_w + 2 * setback_clear, setback_h + 2]);
+                      rail_w + 2 * setback_clear, setback_h + 2]);
         }
 
         // Rail — an open-top channel the same outer width and height as the
-        // dock, so the boost cannot tell the difference. Floor plate on the
-        // desk ties the two side walls together and keeps the channel square.
-        translate([setback_rail_x0, -dock_w / 2, 0])
-            cube([setback_rail_x1 - setback_rail_x0, dock_w, setback_wall]);
+        // rig link's, so the boost cannot tell the difference. Floor plate on
+        // the desk ties the two side walls together and keeps the channel square.
+        translate([setback_rail_x0, -rail_w / 2, 0])
+            cube([setback_rail_x1 - setback_rail_x0, rail_w, setback_wall]);
         for (m = [0, 1])
             mirror([0, m, 0])
-                translate([setback_rail_x0, dock_w / 2 - setback_wall, 0])
+                translate([setback_rail_x0, rail_w / 2 - setback_wall, 0])
                     cube([setback_rail_x1 - setback_rail_x0, setback_wall, setback_h]);
 
         // Rear end wall — the boost's new stop face, and the rail's stiffener.
-        translate([setback_rail_x1 - setback_wall, -dock_w / 2, 0])
-            cube([setback_wall, dock_w, setback_h]);
+        translate([setback_rail_x1 - setback_wall, -rail_w / 2, 0])
+            cube([setback_wall, rail_w, setback_h]);
     }
+}
+
+// === Scan riser ===
+// Prints flat on the bed as authored: floor plate on the bed, every wall
+// vertical off it, open top. Solid rather than shelled like the boost and the
+// setback spacer — the boost's own hollow core stays open all the way down to
+// the desk (see scan_boost()), so its "roof" is only ever the corbelled ledge
+// under the pocket. A shelled riser would instead need a fully-enclosed
+// floor plate roofing its own cavity, spanning the tower's whole footprint
+// with nothing under it: an unsupported bridge, not a corbel. Solid avoids
+// that outright; slicer infill settings, not this source model, are what
+// actually control how much plastic a solid region prints with.
+//
+// Authored in its OWN flat frame, not boost_local()'s tilted one: the boost's
+// pocket floor is already flat within that tilted frame (the same reason the
+// phone stand's foot drops in flush today), so a flat-bottomed riser seats
+// against it regardless of boost_tilt, and the riser itself still prints
+// upright rather than at boost_tilt off the bed. Its seat spur reproduces the
+// phone stand's own foot footprint exactly, so it drops into the boost's
+// existing pocket the same way the stand does today; its own new pocket,
+// riser_h above that seat, then takes the stand instead.
+module scan_riser() {
+    riser_checks();
+
+    difference() {
+        union() {
+            // Seat spur — the phone stand's own foot footprint, so it drops
+            // into the boost's existing pocket exactly as the stand does
+            // today: flush with the pocket floor, 1mm proud of the kerb.
+            translate([0, -stand_w / 2, 0])
+                cube([foot_len, stand_w, stand_base_t]);
+
+            // Tower, offset out by riser_wall on every side for its own
+            // pocket's straight walls. A short (riser_wall + dock_clear) step
+            // up from the spur — well within an FDM printer's self-supporting
+            // overhang span, so this prints without support like the rest of
+            // the rig.
+            translate([-riser_wall, -stand_w / 2 - riser_wall, stand_base_t])
+                cube([foot_len + 2 * riser_wall, stand_w + 2 * riser_wall,
+                      riser_h + riser_kerb_h - stand_base_t]);
+        }
+
+        // New open-top pocket for the phone stand's foot, riser_h above the
+        // boost's own pocket floor — the camera-elevation correction (#468
+        // review). Same per-side dock_clear the boost's own pocket gives the
+        // foot, riser_kerb_h kerb holds it 1mm proud, same fit as today.
+        translate([-dock_clear, -stand_w / 2 - dock_clear, riser_h])
+            cube([foot_len + 2 * dock_clear, stand_w + 2 * dock_clear,
+                  riser_kerb_h + BOOST_BIG]);
+    }
+}
+
+// Geometry precondition for scan_riser(). A module called from scan_riser()
+// rather than a top-level assert, for the same reason boost_checks() is.
+module riser_checks() {
+    assert(riser_h > stand_base_t,
+           "riser_h too small to clear the seat spur it stands on");
+    // Predicted camera elevation with the riser fitted (#468 review). The
+    // riser adds height along the boost's own tilted local Z, which also
+    // pulls the camera slightly closer to the turntable as it rises — unlike
+    // boost_floor_h, which is a pure vertical lift. Calibrated against the
+    // same measured ellipse boost_checks() uses; a prediction, not a
+    // guarantee — always confirm on roi-preview.jpg.
+    riser_dz = riser_h * cos(boost_tilt);
+    riser_dx = riser_h * sin(boost_tilt);
+    echo(str("scan_riser: predicted elevation ",
+             atan((cam_rise0 + riser_dz) / (cam_run0 + setback_shift - riser_dx)),
+             " deg with the setback spacer at ", setback_shift,
+             "mm, ry/rx ", sin(atan((cam_rise0 + riser_dz) / (cam_run0 + setback_shift - riser_dx))),
+             ", platter fills ", cam_frame_frac(cam_rise0 + riser_dz, cam_run0 + setback_shift - riser_dx),
+             " of frame width"));
 }

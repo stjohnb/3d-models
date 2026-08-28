@@ -63,6 +63,35 @@ clip_forward    = 10;          // how far clips are moved forward from backplate
 arm_width       = 8;           // X dimension of connecting arms
 arm_height      = 8;           // Y dimension of connecting arms (becomes Z in assembly)
 
+// ---- Cap-up toothpaste hanger (issue #476) ----
+// The tube hangs cap-up: two prongs straddle the cap's narrowest section, the
+// cap's flange rests on the prong tops, the tube dangles below. Dimensions come
+// from scans/toothpaste (tube ~155mm). The scan mesh is deliberately NOT
+// imported: its convex hull swallowed platter geometry out to the 85mm crop
+// radius, so difference()-ing it would carve a 155mm pancake. The 36mm figure
+// once used here was that scan hull's bounding box; the caliper measurement is
+// 33.7 mm (issue #484).
+cap_flange_d   = 33.7;  // WIDEST section next to the waist — flange rests on the prong tops
+cap_neck_d     = 27.4;  // THINNEST part of the cap — measure yours with calipers
+neck_clearance = 1.0;   // total diametral slip fit in the slot
+prong_t        = 4;     // prong thickness (vertical) — must fit the cap's neck groove
+prong_w        = 5;     // prong width (lateral)
+prong_reach    = 18;    // prong length forward of the neck axis
+nub_r          = 0.75;  // retention nub radius on each prong's inner face
+flange_bearing = 1.5;   // min prong-top overlap under the flange, per side
+fork_web       = 8;     // solid material behind the slot's closed end
+
+neck_slot_w  = cap_neck_d + neck_clearance;                 // 28.4
+fork_outer_w = neck_slot_w + 2 * prong_w;                   // 38.4
+fork_z_back  = grip_outer_x - clip_forward - grip_wall;     // 21 — meets the arm block
+fork_z_axis  = fork_z_back - fork_web - neck_slot_w / 2;    // -1.2 — neck centreline
+fork_z_mouth = fork_z_axis - prong_reach;                   // -19.2
+fork_z_nub   = fork_z_axis - neck_slot_w / 2;               // -15.4 — neck's front tangent
+// Mouth flare is derived, not fixed: a mouth wider than the flange lets the cap
+// drop through the funnel instead of being guided in. Cap it so at least
+// flange_bearing of prong top stays under the flange even at the mouth.
+mouth_flare  = max(0, min(3, (cap_flange_d - neck_slot_w) / 2 - flange_bearing));  // 1.15
+
 // ---- Dovetail Joint Parameters (mm) ----
 dt_width_base   = 10;          // wide end (at front, away from plate — locks clip on)
 dt_width_tip    = 7;           // narrow end (at plate face)
@@ -294,6 +323,61 @@ module paste_clip_piece() {
     }
 }
 
+// ---- Cap-neck fork: two prongs either side of the cap's thinnest part ----
+// U-slot open toward the front (-z). Closed end is a half-round the neck nests
+// into; a flared mouth funnels the cap in; two nubs at the neck's front tangent
+// give a light snap so a knock can't lift the tube out.
+module paste_hanger_fork() {
+    union() {
+        difference() {
+            // Blank — overlaps 1mm into the backing block so the union is solid
+            translate([-fork_outer_w / 2, -prong_t / 2, fork_z_mouth])
+                cube([fork_outer_w, prong_t, fork_z_back + 1 - fork_z_mouth]);
+
+            // Neck pocket: half-round closed end hulled forward to the tangent
+            hull() {
+                translate([0, -(prong_t / 2 + 0.5), fork_z_axis]) rotate([-90, 0, 0])
+                    cylinder(d = neck_slot_w, h = prong_t + 1);
+                translate([-neck_slot_w / 2, -(prong_t / 2 + 0.5), fork_z_nub])
+                    cube([neck_slot_w, prong_t + 1, 0.01]);
+            }
+
+            // Flared mouth, from the tangent plane out to the front face
+            hull() {
+                translate([-neck_slot_w / 2, -(prong_t / 2 + 0.5), fork_z_nub])
+                    cube([neck_slot_w, prong_t + 1, 0.01]);
+                translate([-(neck_slot_w / 2 + mouth_flare), -(prong_t / 2 + 0.5),
+                           fork_z_mouth - 0.01])
+                    cube([neck_slot_w + 2 * mouth_flare, prong_t + 1, 0.01]);
+            }
+        }
+
+        // Retention nubs — full cylinders centred on the slot walls; the outer
+        // half merges into the prong, the inner half is the pinch.
+        for (sx = [-1, 1])
+            translate([sx * neck_slot_w / 2, -prong_t / 2, fork_z_nub])
+                rotate([-90, 0, 0]) cylinder(r = nub_r, h = prong_t);
+    }
+}
+
+// ---- Cap-up paste hanger piece (replaces paste_clip_piece on the rail) ----
+// Backing block is the full fork width, not the 14mm arm the clips use: the
+// cap and the hanging tube occupy every mm above and below the fork, so the
+// only place to put stiffening material is behind the cap.
+module paste_hanger_piece() {
+    z_plate_face = grip_outer_x - plate_thickness;             // 30
+    z_arm_start  = grip_outer_x - clip_forward - grip_wall;    // 21
+    difference() {
+        union() {
+            translate([-fork_outer_w / 2, -width / 2, z_arm_start])
+                cube([fork_outer_w, width, z_plate_face - z_arm_start]);
+            paste_hanger_fork();
+        }
+        translate([0, 0, z_plate_face])
+            dovetail_channel(width + 1);
+    }
+}
+
 // ---- Backplate with dovetail rails (for separate printing) ----
 module toothbrush_backplate() {
     // Solid base
@@ -361,6 +445,6 @@ module toothbrush_holder() {
     translate([base_length/2 - plate_center_x, grip_outer_x, paste_top_z - width/2])
     rotate([90, 0, 0])
     {
-        translate([paste_offset, 0, 0]) paste_clip_piece();
+        translate([paste_offset, 0, 0]) paste_hanger_piece();
     }
 }

@@ -1,17 +1,35 @@
 {
   "parameters": [
     {
-      "name": "stand_lift",
-      "label": "Stand lift — raises camera elevation (mm)",
+      "name": "rail_len",
+      "label": "Rail length — sets the boost's distance (mm)",
       "type": "number",
-      "min": 0,
-      "max": 50,
+      "min": 60,
+      "max": 140,
       "step": 1,
-      "default": 25
+      "default": 97
+    },
+    {
+      "name": "rail_w",
+      "label": "Rail outer width — must match boost and spacer (mm)",
+      "type": "number",
+      "min": 30,
+      "max": 80,
+      "step": 5,
+      "default": 40
+    },
+    {
+      "name": "rail_h",
+      "label": "Rail height above the desk (mm)",
+      "type": "number",
+      "min": 8,
+      "max": 30,
+      "step": 1,
+      "default": 12
     },
     {
       "name": "stand_gap",
-      "label": "Gap from collar to stand dock (mm)",
+      "label": "Gap from collar to rail (mm)",
       "type": "number",
       "min": 3,
       "max": 60,
@@ -22,28 +40,10 @@
       "name": "base_d",
       "label": "Turntable base diameter — must match base (mm)",
       "type": "number",
-      "min": 160,
-      "max": 220,
+      "min": 234,
+      "max": 240,
       "step": 1,
-      "default": 166
-    },
-    {
-      "name": "stand_w",
-      "label": "Stand width — must match phone stand (mm)",
-      "type": "number",
-      "min": 60,
-      "max": 120,
-      "step": 5,
-      "default": 80
-    },
-    {
-      "name": "foot_rear",
-      "label": "Rear foot length — must match phone stand (mm)",
-      "type": "number",
-      "min": 50,
-      "max": 110,
-      "step": 1,
-      "default": 78
+      "default": 238
     },
     {
       "name": "collar_wrap",
@@ -61,15 +61,6 @@
       "min": 0.2,
       "max": 1,
       "step": 0.05,
-      "default": 0.4
-    },
-    {
-      "name": "dock_clear",
-      "label": "Stand foot pocket clearance (mm)",
-      "type": "number",
-      "min": 0.2,
-      "max": 1.5,
-      "step": 0.1,
       "default": 0.5
     }
   ]

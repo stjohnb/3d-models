@@ -1,10 +1,12 @@
 {
-  "description": "Modular wall-mounted toothbrush holder system with dovetail joints, clips, and a deep drip tray with brush-head drying spikes and support spikes that keep parked brushes off the tray floor.",
+  "description": "Modular wall-mounted toothbrush holder system with dovetail joints, clips, a cap-up toothpaste hanger, and a deep drip tray with brush-head drying spikes and support spikes that keep parked brushes off the tray floor.",
   "hero": "Toothbrush assembly.stl",
   "tags": ["organizer", "bathroom", "modular"],
-  "version": "1.4.0",
+  "version": "1.5.1",
   "difficulty": "intermediate",
   "printing_notes": [
-    "The tray's two corner head pegs and two support spikes all print vertically with no supports. The support spikes taper to a fine point — slow the last few layers, or print with a second object on the plate, so each tip has time to cool."
+    "The tray's two corner head pegs and two support spikes all print vertically with no supports. The support spikes taper to a fine point — slow the last few layers, or print with a second object on the plate, so each tip has time to cool.",
+    "Toothpaste hanger.stl slides onto the same backplate rail as Toothpaste clip.stl — print one or the other, not both. It prints dovetail-face-down with the two prongs pointing up, no supports; slow the perimeters on the prongs, they are slender 5 x 4 mm columns.",
+    "The fork is sized for a cap measuring 27.4 mm at its narrowest waist and 33.7 mm at its widest (caliper-measured, issue #484). Measure your own cap and re-render from the customizer with both cap_neck_d and cap_flange_d set to it — the flange must stay meaningfully wider than the neck or the tube has nothing to hang from. prong_t must be no thicker than the groove between the cap's flange and the tube shoulder."
   ]
 }

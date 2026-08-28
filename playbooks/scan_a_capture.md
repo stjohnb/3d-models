@@ -29,7 +29,7 @@ The whole masking design assumes the camera never moves, so the platter sits at 
    wrote .cache/scan/IMG_3814/roi-preview.jpg — open it and confirm the ellipse sits on the platter rim
    ```
 
-2. Open `roi-preview.jpg`. The green ellipse should sit **inside** the platter rim, not on the base. `scanning-rig/_scanning_rig.scad` has `platter_d = 150` and `base_d = 166`, so a static base annulus and the raised index pointer surround the rotating platter. Those do not turn with the object; including them injects static geometry into a scene that has to be entirely rigid with the platter, and SfM will fight itself over it. Inset the ellipse by several pixels rather than tracing the outermost visible circle.
+2. Open `roi-preview.jpg`. The green ellipse should sit **inside** the platter rim, not on the base. `scanning-rig/_scanning_rig.scad` has `platter_d = 222` and `base_d = 238`, so a static base annulus and the raised index pointer surround the rotating platter. Those do not turn with the object; including them injects static geometry into a scene that has to be entirely rigid with the platter, and SfM will fight itself over it. Inset the ellipse by several pixels rather than tracing the outermost visible circle.
 
 3. Rerun with the ellipse you confirmed. The suggestion is never applied unattended:
 
@@ -81,7 +81,7 @@ Both OpenMVS stages are invoked with `-w <work-dir>/mvs`, the folder holding `sc
 
 ## What `clean` does, and what to do when it looks wrong
 
-Structure-from-motion recovers geometry only up to an arbitrary similarity transform: the reconstruction has no scale and no idea which way is up. Both come from the platter. `clean` RANSAC-fits the dominant plane in the reconstructed mesh's vertices (`mvs/scene_dense_mesh.ply` — that plane is the platter surface), measures the platter's radius within it, and — knowing `platter_d = 150` from `scanning-rig/_scanning_rig.scad` — converts the whole scene to millimetres with the platter centred at the origin and its surface at z=0. The fit is seeded, so the same capture always exports at the same scale. The fit deliberately reads the mesh rather than the dense cloud: `DensifyPointCloud` attaches per-vertex list properties (`view_indices`, `view_weights`) to `scene_dense.ply`, and trimesh's PLY reader rejects those with `PLY is unexpected length!`.
+Structure-from-motion recovers geometry only up to an arbitrary similarity transform: the reconstruction has no scale and no idea which way is up. Both come from the platter. `clean` RANSAC-fits the dominant plane in the reconstructed mesh's vertices (`mvs/scene_dense_mesh.ply` — that plane is the platter surface), measures the platter's radius within it, and — knowing `platter_d = 222` from `scanning-rig/_scanning_rig.scad` — converts the whole scene to millimetres with the platter centred at the origin and its surface at z=0. The fit is seeded, so the same capture always exports at the same scale. The fit deliberately reads the mesh rather than the dense cloud: `DensifyPointCloud` attaches per-vertex list properties (`view_indices`, `view_weights`) to `scene_dense.ply`, and trimesh's PLY reader rejects those with `PLY is unexpected length!`.
 
 Everything after that is cropping, all in millimetres:
 
@@ -89,9 +89,9 @@ Everything after that is cropping, all in millimetres:
 |------|---------|---------------|
 | `--z-min` | `1.0` | The platter surface itself |
 | `--z-max` | `200.0` | Background reconstructed above the object |
-| `--r-max` | `72.0` | The rim, its tick marks, and fingers — the 75 mm platter radius less 3 mm. Anything overhanging the platter goes too: a ~200 mm pair of wooden pliers on the 150 mm platter lost its handle tips. Raise `--r-max` for an object larger than the platter and accept the rim and finger geometry that comes back with it. |
+| `--r-max` | `108.0` | The rim, its tick marks, and fingers — the 111 mm platter radius less 3 mm. Anything overhanging the platter goes too — on the 222 mm platter a ~200 mm object now fits inside the rim. Raise `--r-max` for an object larger than the platter and accept the rim and finger geometry that comes back with it. |
 | `--keep-components` | `1` | Every connected component but the largest by surface area |
-| `--platter-diameter` | `150.0` | Nothing; it is the scale reference, for a non-standard platter |
+| `--platter-diameter` | `222.0` | Nothing; it is the scale reference, for a non-standard platter |
 | `--mm-per-unit` | — | Skips the platter fit entirely. The mesh then keeps the reconstruction's own axes, so the crop bounds no longer mean "above the platter" — widen them or expect an empty result |
 
 `clean` writes `<work-dir>/scan-report.json` with the numbers worth checking before printing: `mm_per_unit`, `platter_radius_units`, `plane_inlier_count`, face counts before and after cropping, and the final `bbox_mm`. If the bounding box is not roughly the size of the real object, the platter fit is what to distrust first.
@@ -133,12 +133,22 @@ holder body no matter how you store it. `reference` closes it (issue #439):
 
 | Mode | What it does | When |
 |------|--------------|------|
-| `hull` (default) | Convex hull of the cleaned mesh | Convex-ish objects — a toothpaste tube, a bottle, a battery. ~1k faces, ~50 KB. Loses every concavity |
-| `slabs` | Slices the mesh into `--reference-slabs` overlapping horizontal slabs, hulls each, and boolean-unions them | When concavity matters and it varies with height — a waisted handle, a taper, a stepped body. Larger file; each slab is still convex in plan |
+| `slabs` (default) | Slices the mesh into `--reference-slabs` overlapping slabs perpendicular to `--reference-axis` (default `auto` = the mesh's principal axis), hulls each, and boolean-unions them | When concavity matters and it varies along the object's long axis — a waisted handle, a taper, a stepped body. Larger file; each slab is still convex in plan |
+| `hull` | Convex hull of the cleaned mesh | Convex-ish objects — a bottle, a battery. ~1k faces, ~50 KB. Loses every concavity. Rerun with `--reference-mode hull` by hand if `slabs` fails or blows the size budget — there is no automatic fallback |
 
-Neither mode preserves a concavity that a horizontal slice cannot see (a hole
-bored sideways through the middle stays filled). If you need that, the scan is
-not the right tool — measure the feature and model it.
+Neither mode preserves a concavity that a slice perpendicular to the slab axis
+cannot see (a hole bored sideways through the middle stays filled). If you
+need that, the scan is not the right tool — measure the feature and model it.
+
+The Z-only slab axis was why the toothpaste tube (#487) came back as a
+lozenge: the pipeline's original `slabs` mode always sliced along Z, but the
+tube lay flat on the platter, so its shape varied along a horizontal axis, not
+Z — every slab was already close to convex, and the reference was barely
+different from `hull`. `--reference-axis auto` (the default) fixes this by
+slicing perpendicular to the mesh's own principal axis instead of a fixed one.
+The `tightness` figure written to `scan-report.json` (1.0 = no better than the
+convex hull) is how to check whether a mode was worth it, before ever loading
+the STL into a viewer.
 
 The stage refuses to write a mesh over `--reference-max-bytes` (default
 512000), deleting the partial file: these get committed, so the budget is the
@@ -150,7 +160,7 @@ disposable work dir. `--install-as <name>` also copies it — with a sanitised
 
 ```bash
 python3 scripts/scan_pipeline.py ~/captures/IMG_3826.MOV \
-    --only reference --reference-mode slabs --install-as pliers
+    --only reference --install-as pliers
 ```
 
 The name must be within `[A-Za-z0-9._ -]`, the same charset CI enforces on
@@ -174,8 +184,10 @@ The reconstruction is only as good as the video, and the failure modes are almos
 - **The platter must carry non-repeating marks.** The knurl and tick texture is rotationally periodic, so hold-to-hold matches alias (tooth N matching tooth N+1) and either fragment the reconstruction or produce twin-surface ghosting. `_scanning_rig.scad` engraves a numeral per tick sector (`numerals = true`), but the proven fix is high-contrast ink: sharpie numerals 0–11 on the platter top took a uniform-grey object from 11/150 registered with no dense cloud at all to 150/150 in a single model with a clean, recognisable 87,552-face mesh. Engraved white-on-white numerals rely on shadowing and are untested — if registration is weaker than the sharpie baseline, ink the engraving (it makes a good stencil).
 - **Keep the phone and the desk absolutely still.** This matters more than anything else on the list. The fixed-ellipse masking design rests entirely on the camera not moving; if the phone shifts partway through, the ellipse stops matching the platter and every mask after that point is wrong. Hand-turning the platter can drag the whole turntable base a couple of millimetres across the desk — the durable fix is `scanning-rig/rig_link.scad`: it collars the base and docks the phone stand so the two move as one rigid assembly, and a slide takes the camera with it instead of leaving it behind. If your rig isn't linked yet, put a non-slip mat or a bit of museum putty under the base as a stopgap, and after the capture compare `roi-preview.jpg`'s ellipse against a late frame from the video — a visible offset means the masks are wrong for the tail of that capture. A slide of ~3–4 mm over one revolution can be absorbed by insetting the ellipse to cover the platter at both extremes of the drift, which works but costs rim coverage.
 - **The scene must stay rigid for the whole revolution — if the object shifts on the platter, restart the recording.** A nudged capture is not self-announcing: one measured example still reported 150/150 frames registered while merging incompatible poses into 2 models and producing unusable spikes (19.5 k faces, a 140 mm-tall bbox for a flat object). Recapturing is faster than trying to salvage post-nudge frames.
-- **Camera elevation ~40–45°** — in `roi-preview.jpg` the ellipse's `ry/rx` ratio is approximately `sin(elevation)`; scan-quality analysis (issue #414) found ~40-45 degrees (`ry/rx` ≈ 0.64-0.71) works best for a single-ring capture. Near-edge-on (~30°) loses top-surface coverage. If you're using `rig_link`, its `stand_lift` customizer parameter is the adjustment — larger values raise the camera and the elevation. `scanning-rig/scan_boost.scad` is a removable plinth that stands behind the rig link and sets the camera 120mm further back as well as higher and pitched nose-down — use it when the platter fills too much of the frame. The extra distance lowers the elevation, so check `ry/rx` on `roi-preview.jpg` after fitting it and raise `boost_lift` if the ratio has fallen below ~0.64. `scanning-rig/scan_setback.scad` is a second removable spacer that inserts between the rig link and the boost and moves the camera another 100mm back; fit it when the platter still fills more than ~60% of the frame width with the boost alone, or when an object overhanging the platter touches the frame edge at some rotation angles. Re-check `ry/rx` on `roi-preview.jpg` afterwards and raise `boost_lift` if it falls below ~0.64.
+- **Camera elevation ~40–45°** — in `roi-preview.jpg` the ellipse's `ry/rx` ratio is approximately `sin(elevation)`; scan-quality analysis (issue #414) found ~40-45 degrees (`ry/rx` ≈ 0.64-0.71) works best for a single-ring capture. Near-edge-on (~30°) loses top-surface coverage. `scanning-rig/scan_boost.scad` is the plinth that stands behind the rig link's rail and carries the phone stand, set back and pitched nose-down; on its own, at its baseline `boost_floor_h`, it is only ~34° (`ry/rx` ~0.55) — under the floor. `scanning-rig/scan_riser.scad` is what fits it for elevation (issue #468 review): it drops into the boost's own pocket and re-presents an identical one `riser_h` higher, without changing the boost's own shape. `scanning-rig/scan_setback.scad` is a spacer that inserts between the rig link and the boost and moves the camera another `setback_shift` back; at the 222mm platter (#486) it is fitted by default and required, not optional — removing it puts the platter at ~79% of frame width, above the point where it can clip the frame edge through a full rotation. Check `ry/rx` on `roi-preview.jpg` after fitting either and increase `riser_h` if it has fallen below ~0.64. Elevation is `atan((cam_rise0 + riser_h * cos(boost_tilt)) / (cam_run0 + setback_shift - riser_h * sin(boost_tilt)))` and `ry/rx = sin(elevation)`, where `cam_run0 = 258.5` and `cam_rise0 = 172` at the shipped `boost_floor_h`, and `riser_h`/`setback_shift` are 0 without the riser or the spacer fitted. The shipped defaults — `boost_floor_h = 90`, `riser_h = 140`, `setback_shift = 135` — give ~0.82 with the boost and riser alone and ~0.66 with the spacer also fitted. Treat 0.64 as a hard floor, not a target: at ~21 degrees a uniform-grey object registered 18/150 continuous frames across 7 fragmented models and 2/54 step-and-holds, because the platter numerals foreshorten to nothing and only the periodic knurl is left to match. A textured object (a printed label) can survive a low camera; a plain one cannot.
 - **Indirect, even light; no direct overhead or spot lights.** The lights are static while the object rotates, so hard shadows and specular highlights sweep across the surface between frames and break photo-consistency. Bounce or diffuse if more light is needed.
 - **Rotation: continuous or step-and-hold.** Slow continuous rotation through one revolution over 60–90 s is the protocol validated first and is the only option on an unmarked platter. Once the platter carries non-repeating marks, step-and-hold plus `--capture-mode holds` is preferable — the selected frames are both hand-free and blur-free by construction; see "`--capture-mode holds`: step-and-hold captures" above. Keep hands out of shot at the increments regardless of which selector you use.
 - **Keep fingers off the platter rim** where you can. The rim's texture is what SfM tracks, and the `clean` stage measures the platter to set scale — a hand across it costs both. Nudge the platter from the underside of the base if the rig allows.
 - **Give the object contrast against the background.** A plain matte backdrop of a different colour from the part is worth more than any amount of post-processing.
+- **One capture is one pose.** The stages in `STAGES` are scoped to a single video and there is no registration stage, so a second video of the object in a different orientation reconstructs into its own independently-scaled platter frame and cannot be fused with the first (#487). If one pose leaves a face unseen, fix it inside one capture instead: stand a long object on end (putty under it) so the ring sees its whole length, or raise the camera elevation (see above).
+- **An object overhanging the platter loses its tips to `--r-max`.** `clean` now warns when the radial bound drops more than 2% of faces — raise `--r-max` and accept the rim geometry that comes back with it, or re-shoot with the object entirely inside the platter.

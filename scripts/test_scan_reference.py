@@ -13,16 +13,20 @@ import pathlib
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
 from scan_reference import (
+    axis_vector,
     build_reference,
     convex_hull_reference,
     install_reference,
+    principal_axis,
     safe_name,
     sanitised_report,
     slab_hull_reference,
+    tightness,
     write_reference,
 )
 
@@ -66,6 +70,27 @@ def waisted_shell():
     return open_shell(trimesh.util.concatenate(parts))
 
 
+def peanut_shell():
+    """Two lobes joined by a thin neck, lying along X — concave along X, not Z.
+
+    Stands in for a scanned object lying flat on the platter: the shape it
+    varies along (X here) is horizontal, not the scan's up axis (issue #487).
+    """
+    import numpy
+    import trimesh
+
+    lobe_a = trimesh.creation.icosphere(subdivisions=2, radius=5.0)
+    lobe_b = trimesh.creation.icosphere(subdivisions=2, radius=5.0)
+    lobe_b.apply_translation([15, 0, 0])
+    neck = trimesh.creation.cylinder(radius=1.5, height=15, sections=24)
+    neck.apply_transform(trimesh.transformations.rotation_matrix(
+        numpy.pi / 2, [0, 1, 0]
+    ))
+    neck.apply_translation([7.5, 0, 0])
+    solid = trimesh.boolean.union([lobe_a, lobe_b, neck], engine="manifold")
+    return open_shell(solid)
+
+
 class ConvexHullTests(unittest.TestCase):
     def test_hull_of_an_open_shell_is_watertight(self):
         import trimesh
@@ -77,6 +102,46 @@ class ConvexHullTests(unittest.TestCase):
         self.assertTrue(hull.is_volume)
 
 
+class PrincipalAxisTests(unittest.TestCase):
+    def test_finds_the_long_axis_of_a_lying_bar(self):
+        import trimesh
+
+        box = trimesh.creation.box(extents=[60, 8, 8])
+        for _ in range(2):
+            box = box.subdivide()
+        axis = principal_axis(box)
+        self.assertGreater(abs(axis[0]), 0.99)
+
+    def test_sign_is_pinned_regardless_of_eighs_raw_sign(self):
+        """numpy.linalg.eigh's sign is arbitrary (LAPACK/version dependent),
+        not just non-deterministic within one process — calling it twice on
+        the same matrix in the same run always agrees. Pin the sign
+        explicitly so the committed mesh doesn't flip across runs or numpy
+        versions (#487)."""
+        import numpy
+        import trimesh
+
+        box = trimesh.creation.box(extents=[60, 8, 8])
+        for _ in range(2):
+            box = box.subdivide()
+
+        real_eigh = numpy.linalg.eigh
+
+        def flipped_eigh(matrix, sign):
+            values, vectors = real_eigh(matrix)
+            vectors = vectors.copy()
+            vectors[:, -1] *= sign
+            return values, vectors
+
+        with mock.patch("numpy.linalg.eigh", side_effect=lambda m: flipped_eigh(m, 1.0)):
+            positive = principal_axis(box)
+        with mock.patch("numpy.linalg.eigh", side_effect=lambda m: flipped_eigh(m, -1.0)):
+            negative = principal_axis(box)
+
+        self.assertEqual(list(positive), list(negative))
+        self.assertGreater(positive[int(numpy.abs(positive).argmax())], 0)
+
+
 class SlabHullTests(unittest.TestCase):
     def test_slab_hull_is_watertight_and_keeps_the_waist(self):
         mesh = waisted_shell()
@@ -86,6 +151,20 @@ class SlabHullTests(unittest.TestCase):
         self.assertTrue(result.is_volume)
         self.assertLess(result.volume, convex_hull_reference(mesh).volume * 0.95)
 
+    def test_slabs_along_x_keep_a_horizontal_waist(self):
+        mesh = peanut_shell()
+        hull_volume = convex_hull_reference(mesh).volume
+
+        # Old behaviour: Z-only slabs cannot see a waist that varies along X.
+        z_result = slab_hull_reference(mesh, slabs=6)
+        self.assertGreaterEqual(z_result.volume, 0.9 * hull_volume)
+
+        # Fix: slabbing along X recovers the waist.
+        x_result = slab_hull_reference(mesh, slabs=6, axis=[1, 0, 0])
+        self.assertTrue(x_result.is_watertight)
+        self.assertTrue(x_result.is_volume)
+        self.assertLess(x_result.volume, 0.5 * hull_volume)
+
     def test_zero_z_extent_raises(self):
         import trimesh
 
@@ -94,6 +173,29 @@ class SlabHullTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             slab_hull_reference(flat)
+
+
+class AxisVectorTests(unittest.TestCase):
+    def test_named_axis_returns_the_unit_vector(self):
+        import trimesh
+
+        box = trimesh.creation.box()
+        self.assertEqual(list(axis_vector(box, "z")), [0.0, 0.0, 1.0])
+
+    def test_unknown_axis_raises(self):
+        import trimesh
+
+        box = trimesh.creation.box()
+        with self.assertRaises(ValueError):
+            axis_vector(box, "bogus")
+
+
+class TightnessTests(unittest.TestCase):
+    def test_hull_is_one(self):
+        shell = waisted_shell()
+        hull = convex_hull_reference(shell)
+        ratio, _hull_volume = tightness(hull, shell)
+        self.assertAlmostEqual(ratio, 1.0, places=3)
 
 
 class BuildReferenceTests(unittest.TestCase):

@@ -15,12 +15,14 @@ graph TD
   _toothbrush_holder(["_toothbrush_holder.scad"])
   Toothbrush_holder["Toothbrush holder.scad"]
   Toothbrush_tray(["Toothbrush tray.scad"])
-  Toothpaste_clip_test["Toothpaste clip test.scad"]
+  Toothpaste_clip["Toothpaste clip.scad"]
+  Toothpaste_hanger["Toothpaste hanger.scad"]
   Toothbrush_assembly -->|include| _toothbrush_holder
   Toothbrush_assembly -->|use| Toothbrush_tray
   Toothbrush_backplate -->|include| _toothbrush_holder
   Toothbrush_clip_test -->|include| _toothbrush_holder
   Toothbrush_holder -->|include| _toothbrush_holder
   Toothbrush_tray -->|include| _toothbrush_holder
-  Toothpaste_clip_test -->|include| _toothbrush_holder
+  Toothpaste_clip -->|include| _toothbrush_holder
+  Toothpaste_hanger -->|include| _toothbrush_holder
 ```

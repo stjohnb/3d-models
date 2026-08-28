@@ -41,13 +41,27 @@ Run the pipeline's last stage on a capture that has already been through
 
 ```bash
 python3 scripts/scan_pipeline.py ~/captures/IMG_3826.MOV \
-    --only reference --reference-mode slabs --install-as pliers
+    --only reference --reference-mode slabs --reference-axis auto --install-as pliers
 ```
 
-`--reference-mode hull` (the default) takes the convex hull: always available,
-tiny, and the right answer for a convex-ish object like a toothpaste tube.
-`--reference-mode slabs` unions per-slab hulls instead, which keeps concavity
-that varies with Z at the cost of a larger file.
+`--reference-mode slabs` (the default) unions per-slab hulls taken
+perpendicular to `--reference-axis` (default `auto`, the mesh's own principal
+axis), which keeps concavity that varies along the object's length at the
+cost of a larger file. `--reference-mode hull` takes the plain convex hull
+instead: always available, tiny, and the right answer for a convex-ish object
+— a bottle, a battery.
+
+### Known limits of `scans/toothpaste`
+
+`scans/toothpaste/toothpaste-reference.stl` is an 806-face `hull` of an
+87,789-face scan — it lost the tube's taper, cap step and flattened crimp
+entirely (issue #487). The capture itself was fine (150/150 frames
+registered), but two things degraded the reference: the camera elevation was
+only ~21° (`ry/rx` ≈ 0.37, well under the 0.64 floor — see
+`playbooks/scan_a_capture.md`), and the tube overhung the 150 mm platter, so
+`--r-max 85` clipped its tips. Regenerate it with
+`--only reference --reference-mode slabs --reference-axis auto --install-as toothpaste --force`
+before designing anything against it.
 
 `--install-as <name>` is what writes into this directory. The report it commits
 is sanitised — the raw one holds the absolute capture path under the operator's

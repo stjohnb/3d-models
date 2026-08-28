@@ -1,5 +1,5 @@
 // =====================================
-// Toothpaste Clip Piece - Test Print
+// Toothpaste Clip Piece
 // Clip + arm + dovetail channel
 // Print with dovetail channel face down on bed
 // =====================================

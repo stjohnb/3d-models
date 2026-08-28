@@ -45,6 +45,7 @@ from scan_masks import (
     suggest_ellipse,
     write_masked_pair,
 )
+from scan_reference import AXIS_NAMES
 
 STAGES = ["frames", "masks", "sfm", "dense", "mesh", "clean", "reference"]
 
@@ -63,6 +64,10 @@ MIN_REGISTERED_FRACTION = 0.60
 # Fewer holds than this means the capture almost certainly was not shot
 # step-and-hold — bail rather than feed SfM a handful of views.
 MIN_HOLDS = 20
+
+# Above this fraction of faces dropped by --r-max, the object overhangs the
+# platter and is losing real geometry, not just rim/finger clutter (#487).
+RADIAL_CLIP_WARN_FRACTION = 0.02
 
 
 def stages_to_run(from_stage, to_stage, only):
@@ -142,8 +147,8 @@ def parse_args(argv=None):
              "the crop bounds are measured in that frame",
     )
     parser.add_argument(
-        "--platter-diameter", type=float, default=150.0,
-        help="Platter diameter in mm, the scale reference (default: 150.0)",
+        "--platter-diameter", type=float, default=222.0,
+        help="Platter diameter in mm, the scale reference (default: 222.0)",
     )
     parser.add_argument(
         "--z-min", type=float, default=1.0,
@@ -154,9 +159,9 @@ def parse_args(argv=None):
         help="Crop faces above this height above the platter, in mm (default: 200.0)",
     )
     parser.add_argument(
-        "--r-max", type=float, default=72.0,
+        "--r-max", type=float, default=108.0,
         help="Crop faces beyond this radius from the platter centre, in mm "
-             "(default: 72.0 — the 75 mm platter radius less 3 mm of rim)",
+             "(default: 108.0 — the 111 mm platter radius less 3 mm of rim)",
     )
     parser.add_argument(
         "--keep-components", type=int, default=1,
@@ -177,13 +182,22 @@ def parse_args(argv=None):
         help="Reference mesh path (default: <output>-reference.stl)",
     )
     parser.add_argument(
-        "--reference-mode", choices=["hull", "slabs"], default="hull",
-        help="hull: convex hull, for convex-ish objects. slabs: union of "
-             "per-slab hulls, which keeps concavity that varies with Z.",
+        "--reference-mode", choices=["hull", "slabs"], default="slabs",
+        help="slabs (default): union of per-slab convex hulls taken "
+             "perpendicular to --reference-axis, which keeps concavity. "
+             "hull: single convex hull — smaller and always available, but "
+             "loses every concavity (issue #487).",
     )
     parser.add_argument(
-        "--reference-slabs", type=int, default=12,
-        help="Horizontal slabs for --reference-mode slabs (default: 12)",
+        "--reference-slabs", type=int, default=16,
+        help="Slabs for --reference-mode slabs (default: 16). Lower it if "
+             "the reference blows --reference-max-bytes.",
+    )
+    parser.add_argument(
+        "--reference-axis", choices=list(AXIS_NAMES), default="auto",
+        help="Slab axis for --reference-mode slabs. auto (default) = the "
+             "mesh's principal axis, which is what a scanned object lying "
+             "flat on the platter needs; z was the old fixed behaviour.",
     )
     parser.add_argument(
         "--reference-max-bytes", type=int, default=512000,
@@ -551,7 +565,13 @@ def run_clean(args):
     """Scale to millimetres off the platter, crop to the object, export STL."""
     import trimesh
 
-    from scan_mesh import crop_to_object, export_stl, keep_largest_components, scale_transform
+    from scan_mesh import (
+        crop_reasons,
+        crop_to_object,
+        export_stl,
+        keep_largest_components,
+        scale_transform,
+    )
 
     scene = _mvs_scene(args.work_dir)
     dense_scene = derived_scene_path(scene, "dense", ".mvs")
@@ -570,6 +590,14 @@ def run_clean(args):
     mesh.apply_transform(scale_transform(frame))
 
     faces_before = int(len(mesh.faces))
+    reasons = crop_reasons(mesh, z_min=args.z_min, z_max=args.z_max, r_max=args.r_max)
+    if reasons["dropped_beyond_r_max"] > RADIAL_CLIP_WARN_FRACTION * reasons["faces"]:
+        print(
+            f"warning: --r-max {args.r_max} clipped "
+            f"{reasons['dropped_beyond_r_max']}/{reasons['faces']} faces — the object "
+            f"overhangs the platter and its tips are gone. Raise --r-max and accept "
+            f"the rim geometry, or re-shoot with the object inside the platter"
+        )
     mesh = crop_to_object(mesh, z_min=args.z_min, z_max=args.z_max, r_max=args.r_max)
     faces_after = int(len(mesh.faces))
     mesh = keep_largest_components(mesh, count=args.keep_components)
@@ -592,6 +620,7 @@ def run_clean(args):
         "plane_inlier_count": int(inliers.sum()) if inliers is not None else None,
         "faces_before_crop": faces_before,
         "faces_after_crop": faces_after,
+        "crop_reasons": reasons,
         "components_kept": args.keep_components,
         "bbox_mm": [[float(v) for v in row] for row in mesh.bounds],
     }
@@ -607,17 +636,25 @@ def run_reference(args):
 
     from scan_reference import (
         assert_watertight,
+        axis_vector,
         build_reference,
         install_reference,
         sanitised_report,
+        tightness,
         write_reference,
     )
 
     _require(args.output, "run the clean stage first")
     mesh = trimesh.load(str(args.output), process=False)
 
+    axis = None
+    if args.reference_mode == "slabs":
+        axis = axis_vector(mesh, args.reference_axis)
+        _log(args, "slab axis (%s): [%.3f, %.3f, %.3f]"
+                   % (args.reference_axis, axis[0], axis[1], axis[2]))
+
     reference = build_reference(
-        mesh, mode=args.reference_mode, slabs=args.reference_slabs
+        mesh, mode=args.reference_mode, slabs=args.reference_slabs, axis=axis
     )
     assert_watertight(reference)
     write_reference(reference, args.reference_out, max_bytes=args.reference_max_bytes)
@@ -628,14 +665,22 @@ def run_reference(args):
         f"{size} bytes, watertight)",
     )
 
+    ratio, _hull_volume = tightness(reference, mesh)
+    if ratio is not None:
+        _log(args, f"tightness {ratio} (1.0 = no better than the convex hull)")
+
     extra = {
         "mode": args.reference_mode,
         "slabs": args.reference_slabs if args.reference_mode == "slabs" else None,
+        "axis_mode": args.reference_axis if args.reference_mode == "slabs" else None,
+        "axis": [round(float(v), 6) for v in axis] if axis is not None else None,
         "faces": int(len(reference.faces)),
         "bytes": int(size),
         "watertight": True,
         "bbox_mm": [[float(v) for v in row] for row in reference.bounds],
         "source_faces": int(len(mesh.faces)),
+        "volume_mm3": round(abs(float(reference.volume)), 1),
+        "tightness": ratio,
     }
 
     if args.install_as:
