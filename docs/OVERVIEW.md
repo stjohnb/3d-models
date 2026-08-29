@@ -12,6 +12,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ```
 ├── adjustable-bracket/   # Two-piece adjustable bracket with bolt slot
 ├── bench-dog-blank/      # Flush plug for countersunk 18mm bench dog holes, with a pliers-grippable recess for removal
+├── bin-foot-opener/      # Toe-operated pull that screws to the inside of a pull-out bin drawer front
 ├── blast-gate/           # Inline sliding blast gate for 51mm PVC vacuum lines
 ├── drawer-organiser/     # Gridfinity-compatible drawer organiser: interlocking baseplate tiles, bins, and full-drawer container layout
 ├── esp32-display-case/   # Two-part snap-fit case for the ESP32-2432S028R display board, w/ stylus holder
@@ -135,6 +136,7 @@ generated artifacts produced by CI.
 |---|---|
 | `adjustable-bracket/` | Two interlocking pieces (M5 bolt through adjustment slot), span ~125–155mm |
 | `bench-dog-blank/` | Flush plug for countersunk 18mm bench dog holes in 18mm plywood, with a recessed pliers-grip bar in the top face for removal |
+| `bin-foot-opener/` | Toe-operated pull that screws to the inside face of a pull-out bin drawer front |
 | `blast-gate/` | Sliding blast gate for 51mm OD PVC vacuum lines; related to `vacuum-hose` |
 | `drawer-organiser/` | Gridfinity-compatible drawer organiser: a 15×10 grid of interlocking 5×5 baseplate tiles covering a 630×424×69mm drawer, plus storage bins, a full-drawer assembly preview, and downloadable bed-splittable container parts |
 | `esp32-display-case/` | Two-part snap-fit case for the ESP32-2432S028R ("Cheap Yellow Display") board, with an integrated snap-in stylus holder |
@@ -404,6 +406,7 @@ degradation is automatic.
 
 Manifests currently ship for `adjustable-bracket` (`piece_a`, `piece_b`),
 `bench-dog-blank` (`bench_dog_blank`),
+`bin-foot-opener` (`bin_foot_pull`),
 `blast-gate` (`gate_body`, `gate_blade`),
 `drawer-organiser` (`drawer_baseplate_5x5`, `drawer_baseplate_5x5_back`,
 `drawer_baseplate_4x5`, `drawer_baseplate_4x5_back`, `drawer_bin_5x5`,
