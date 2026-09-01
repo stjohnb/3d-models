@@ -6,7 +6,7 @@ can check statically:
 * the build-time placeholder markers CI string-replaces in ``index.html``
 * the ``__HASH_ROUTING_*`` markers ``test_hash_routing.mjs`` slices between
 * the ``slugify()`` / ``PUBLIC_REPO`` copies that must stay textually
-  identical across viewers (see CLAUDE.md)
+  identical across viewers (see AGENTS.md)
 * the "no ``innerHTML`` for user data" XSS convention
 
 Run with: python3 -m unittest test_viewer_invariants

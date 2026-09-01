@@ -20,7 +20,7 @@ grounds for bypassing the check — find and fix the root cause first.
 Issues that survey an external tool, article, or benchmark (e.g. an
 OpenSCAD/LLM benchmark writeup, alternative CAD tools) are a recurring input
 to planning in this repo (see the tool-survey issues cited throughout
-[model-projects.md](model-projects.md) and CLAUDE.md's library catalogue).
+[model-projects.md](model-projects.md) and [OPENSCAD_LIBRARIES.md](OPENSCAD_LIBRARIES.md)).
 When such an issue is actually implemented, the owner has been explicit that
 the PR must apply the findings, not just restate them: "This PR should be
 implementing the suggestions rather than reciting them" (#219). Treat a

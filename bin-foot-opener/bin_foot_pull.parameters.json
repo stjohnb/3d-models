@@ -1,7 +1,9 @@
 {
   "parameters": [
     { "name": "base_run", "label": "Base run from panel back face (mm)", "type": "number", "min": 12, "max": 30, "step": 0.5, "default": 15 },
-    { "name": "rear_t", "label": "Fixing plate thickness (mm)", "type": "number", "min": 3.5, "max": 8, "step": 0.5, "default": 4 },
+    { "name": "rear_t", "label": "Fixing plate thickness (mm)", "type": "number", "min": 3, "max": 8, "step": 0.5, "default": 4 },
+    { "name": "relief_h", "label": "Cabinet contact relief height (mm)", "type": "number", "min": 0, "max": 22, "step": 1, "default": 22 },
+    { "name": "relief_t", "label": "Relieved plate thickness (mm)", "type": "number", "min": 1.2, "max": 4, "step": 0.2, "default": 1.6 },
     { "name": "rear_h", "label": "Fixing plate height (mm)", "type": "number", "min": 57, "max": 80, "step": 1, "default": 60 },
     { "name": "base_t", "label": "Base thickness (mm)", "type": "number", "min": 4, "max": 10, "step": 0.5, "default": 5 },
     { "name": "lip_t", "label": "Toe lip thickness (mm)", "type": "number", "min": 3, "max": 8, "step": 0.5, "default": 4 },

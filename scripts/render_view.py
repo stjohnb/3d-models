@@ -51,9 +51,9 @@ VIEW_CHOICES = list(PRESETS.keys()) + ["custom"]
 
 CAPPED_OPENSCAD = pathlib.Path(__file__).resolve().parent / "capped-openscad.sh"
 
-# Modest local defaults — this script runs on the shared ~3.8 GB build host
-# where an uncapped render has frozen the box before (see CLAUDE.md,
-# "Rendering on the constrained build host"). CI sets its own, larger values.
+# Modest local defaults — this script runs on the shared build host where an
+# uncapped render has frozen the box before (see AGENTS.md, "Rendering on the
+# constrained build host"). CI sets its own, larger values.
 DEFAULT_RENDER_MEM_MAX = "2G"
 DEFAULT_RENDER_TIMEOUT = "300"
 

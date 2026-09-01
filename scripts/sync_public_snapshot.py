@@ -25,6 +25,7 @@ DEFAULT_TARGET_REPO = "stjohnb/3d-models"
 SNAPSHOT_EXCLUDES = [
     "ideas",
     "docs/blog-post.md",
+    "docs/agent-notes.md",
     "docs/website-checklist-audit.md",
     ".mcp-claws.json",
 ]

@@ -74,6 +74,49 @@ deep). A full-depth cone could bind and sit proud in a shallower countersink;
 the shaft-plus-shallow-taper shape seats flush on any true 45° countersink at
 least 2.5mm deep.
 
+### bin-foot-opener/
+
+Toe-operated pull for a pull-out kitchen bin drawer front. The part is a
+single support-free `linear_extrude()` of one side profile: fixing plate up
+the drawer's inside face, a short base under the bottom edge, and a recessed
+toe lip dropping at the front. The lip is intentionally tucked behind the
+visible front face rather than sitting flush with it.
+
+| File | Role |
+|------|------|
+| `bin_foot_pull.scad` | Renderable — self-contained single-profile extrusion, no library split and no dependency graph |
+| `bin_foot_pull.parameters.json` | In-browser customizer manifest (`base_run`, `rear_t`, `rear_h`, `base_t`, `lip_t`, `lip_h`, `web_drop`, `width`, `screw_holes`) |
+| `meta.json` | Project metadata (description, tags: kitchen/household/accessibility, difficulty: intermediate, hardware BOM, `printing_notes`) |
+
+**Coordinate system and print orientation**: `x` runs through the panel,
+`x = 0` is the panel's back face and `+x` points into the room; `y` is in-use
+up, `y = 0` at the panel's bottom edge; the extrusion runs along
+`+z = width`. Like `scanning-rig/phone_stand.scad`, the model is authored in
+its print orientation directly, so the exported STL is both support-free and
+viewer-sensible with no top-level viewer-rotation hack.
+
+**Recessed lip is a requirement.** `base_run` defaults to 15mm and the source
+comment explicitly says it must not exceed the real panel thickness. The owner
+measured one drawer front at 22mm during the first pass, but the shipped model
+deliberately moved away from "run the base all the way to the front face":
+keeping the lip recessed is the point. Do not extend the base to the outer
+face unless the requirement itself changes.
+
+**Web instead of end gussets**: the stiffener is one full-width triangular web
+at the base/lip corner, not two side gussets. That is not an aesthetic choice:
+in the chosen print orientation one end gusset would be a horizontal island
+floating in mid-air. `web_run` is therefore clamped from `web_drop` rather than
+asserted, so thin-panel customizer values simply shrink the web instead of
+breaking the model.
+
+**Fastener pattern**: with `screw_holes = true`, `screw_cuts()` bores a 2×2
+grid of countersunk holes through the fixing plate, with rows fixed at 20mm and
+50mm above the drawer bottom. This replaced the earlier proportional placement
+because the owner explicitly called out a real drawer-front detail near the top
+row. The change is why `rear_h` now defaults to 60mm and the manifest floor is
+57mm: at 56mm the countersink head-clearance assert fails. `screw_holes =
+false` is the intended VHB-tape variant, not just a debugging switch.
+
 ### blast-gate/
 
 Inline sliding blast gate for 51mm OD PVC workshop vacuum lines. A sliding

@@ -56,20 +56,29 @@ path-segment-exact: `ideas` excludes `ideas/rejected.md` but not
 |---|---|
 | `ideas/` | Strategy backlog, `rejected.md`, cross-project/LLM-benchmark and Claws notes — "ongoing development" the issue specifically calls out |
 | `docs/blog-post.md` | Unpublished draft — the very document that will reference this snapshot |
+| `docs/agent-notes.md` | Internal operator/automation notes for future agents; not part of the public mirror |
 | `docs/website-checklist-audit.md` | Internal audit, not public-facing |
 | `.mcp-claws.json` | Belt-and-suspenders; already untracked/gitignored |
 
 Everything else is included: all model project directories, `index.html`,
 `embed.html`, `openscad-worker.js`, `scripts/`, `*.schema.json`,
 `filament-colors.json`, `README.md` (substituted — see below), `llms.txt`,
-`robots.txt`, `favicon.svg`, `site.webmanifest`, `CLAUDE.md`,
+`robots.txt`, `favicon.svg`, `site.webmanifest`, `AGENTS.md`, `CLAUDE.md`,
 `.claude/agents/`, `playbooks/`, `docs/OVERVIEW.md`, `docs/ci-pipeline.md`,
 `docs/OPENSCAD_LIBRARIES.md`, and `.github/workflows/`.
 
-`CLAUDE.md` and `.claude/agents/` are kept deliberately — the blog post
-discusses the Claude Code / Claws workflow, so showing that configuration in
-the snapshot is intentional. (`CLAUDE.md` references `ideas/rejected.md`,
-which won't exist in the snapshot — a harmless dangling doc reference.)
+`AGENTS.md`, `CLAUDE.md`, and `.claude/agents/` are kept deliberately — the
+blog post discusses the Claude Code / Claws workflow, so showing that
+configuration in the snapshot is intentional. `AGENTS.md` is the canonical
+root guide, while `CLAUDE.md` remains as a compatibility copy for tools and
+docs that still refer to named sections there. `AGENTS.md` also points
+readers at `docs/claws-automation.md`, which is included in the snapshot
+(it is not in `SNAPSHOT_EXCLUDES`) and resolves normally, and at
+`ideas/rejected.md`, which is excluded via the `ideas/` entry above and goes
+unresolved in the public mirror. `CLAUDE.md` carries the same
+`ideas/rejected.md` references, plus a "Blog voice" section naming
+`docs/blog-post.md`, which is also excluded above — both dangle in the
+snapshot the same way.
 
 ## How to use
 

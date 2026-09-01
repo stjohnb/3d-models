@@ -95,7 +95,8 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── llms.txt              # AI agent discoverability file; served at /3d-models/llms.txt
 ├── meta.schema.json      # JSON Schema for per-project meta.json files
 ├── parameters.schema.json  # JSON Schema for per-model parameter manifests (<basename>.parameters.json)
-├── CLAUDE.md             # Claude guidance: conventions, invariants, and doc pointers for AI agents
+├── AGENTS.md             # Canonical root agent instructions: repo summary, read-first docs, and key invariants
+├── CLAUDE.md             # Claude compatibility guidance; mirrors key root-agent sections still referenced by docs/tools
 ├── .claude/
 │   └── agents/
 │       ├── issue-refiner.md      # Subagent: refines GitHub issues into implementation plans
@@ -121,6 +122,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
     ├── OPENSCAD_LIBRARIES.md   # Catalogue of available third-party OpenSCAD libraries
     ├── claws-automation.md     # How the Claws automation service manages issues, PRs, and docs (auto-maintained)
     ├── requirements.md         # Cross-cutting process/workflow requirements with no single owning subsystem doc
+    ├── agent-notes.md          # Durable operator/automation gotchas verified from current repo behavior
     ├── blog-post.md            # Draft blog post about the project
     ├── website-checklist-audit.md  # specification.website checklist audit
     └── public-snapshot.md      # Policy and usage guide for sync_public_snapshot.py
@@ -520,7 +522,7 @@ was "I think where this would be most useful is for Claude itself when
 iterating on a design, it should be able to render any angle it needs to
 verify its designs, they don't particularly need to be stored as build
 artifacts" (#202) — this is why the script produces no build artifacts and is
-excluded from CI (see also CLAUDE.md's "Local dev tool (not CI)" note).
+excluded from CI.
 
 ### Rendering arbitrary views
 
@@ -629,16 +631,16 @@ Reusable how-to guides for common development tasks live in `playbooks/`.
 
 ## AI Agent Configuration
 
-`CLAUDE.md` at the repo root provides Claude with concise guidance on the
-conventions and invariants to preserve. It points Claude to the authoritative
-docs and lists things never to do (use GitHub-hosted runners, add `innerHTML`
-for user data, hand-edit generated artifacts, etc.).
+`AGENTS.md` at the repo root is the canonical short-form agent guide: what the
+repo is, which docs to read first, and the invariants that matter on almost
+every change. `CLAUDE.md` remains as a compatibility document for existing
+references and public-snapshot consumers that still expect named sections to
+live there while the repo finishes migrating to `AGENTS.md`.
 
 **Claws automation** — an autonomous agent service — manages issues, PRs, and
 documentation for this repo using the subagents below. See
-[claws-automation.md](claws-automation.md) for details, and the "Automation host
-policy" section of `CLAUDE.md` for the constraints on the shared host those runs
-execute on.
+[claws-automation.md](claws-automation.md) for details. Shared-host constraints
+for manual and automated agent work live in the root agent instructions.
 
 **Cross-cutting requirements** — [requirements.md](requirements.md) holds
 process/workflow requirements the owner has stated that don't belong to any
@@ -649,6 +651,11 @@ constraints-with-rationale directly in the doc that owns that subsystem
 (this file, [model-projects.md](model-projects.md),
 [web-viewer.md](web-viewer.md), [ci-pipeline.md](ci-pipeline.md),
 [public-snapshot.md](public-snapshot.md)) rather than in a separate log.
+
+**Durable operator notes** — [agent-notes.md](agent-notes.md) holds verified
+facts that matter to future agents but belong to no feature doc, such as Claws
+automation quirks and CI/PR handling gotchas. Treat it as supporting context,
+not as a substitute for reading the owning subsystem doc.
 
 Three subagent definitions live in `.claude/agents/`:
 

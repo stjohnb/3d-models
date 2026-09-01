@@ -23,7 +23,7 @@ Every render runs under `scripts/capped-openscad.sh`, which defaults to `RENDER_
 RENDER_MEM_MAX=4G python3 scripts/render_view.py power-workshop/drill_socket.scad --view top
 ```
 
-A cap hit (exit 124 for timeout, ≥128 for SIGKILL) means "reduce geometry or resolution," not "retry" — see CLAUDE.md's "Rendering on the constrained build host" section. If `systemd-run --user` is unavailable, the wrapper falls back to `ulimit -v`, which caps virtual address space rather than RSS; OpenSCAD's EGL/llvmpipe path can need more headroom there, so raise `RENDER_MEM_MAX` (e.g. `4G` or higher) rather than assuming the render itself is too heavy.
+A cap hit (exit 124 for timeout, ≥128 for SIGKILL) means "reduce geometry or resolution," not "retry" — see `AGENTS.md`'s "Rendering on the constrained build host" section. If `systemd-run --user` is unavailable, the wrapper falls back to `ulimit -v`, which caps virtual address space rather than RSS; OpenSCAD's EGL/llvmpipe path can need more headroom there, so raise `RENDER_MEM_MAX` (e.g. `4G` or higher) rather than assuming the render itself is too heavy.
 
 ## View presets
 

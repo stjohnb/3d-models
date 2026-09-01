@@ -34,6 +34,7 @@ class TestIsExcluded(unittest.TestCase):
 
     def test_exact_file_match(self):
         self.assertTrue(is_excluded("docs/blog-post.md"))
+        self.assertTrue(is_excluded("docs/agent-notes.md"))
         self.assertTrue(is_excluded("docs/website-checklist-audit.md"))
         self.assertTrue(is_excluded(".mcp-claws.json"))
 

@@ -79,6 +79,11 @@ Everything is CPU-only. COLMAP's `patch_match_stereo` is CUDA-only and hard-erro
 
 Both OpenMVS stages are invoked with `-w <work-dir>/mvs`, the folder holding `scene.mvs`. `InterfaceCOLMAP` stores each image's path relative to the scene file, while `DensifyPointCloud` and `ReconstructMesh` resolve those paths against their working folder — which defaults to wherever you happened to run the pipeline from. Without the flag, `dense` fails a few seconds in with `failed loading image header`; the scene path itself is passed absolute so OpenMVS does not join it onto the working folder as well. `--work-dir` is absolutised at argument-parse time, and `InterfaceCOLMAP` is given absolute `-i`, `-o` and `--image-folder`, because it can only relativise the image folder against the scene file when both are full paths — with a relative work dir it bakes a doubled path into `scene.mvs` and `dense` fails with `failed loading image header` even though `-w` is correct (issue #470). If you have a `scene.mvs` from before this fix, re-run `--from dense` — `run_dense` clears `dense/` and rewrites the scene, so no manual cleanup is needed.
 
+Do not run two OpenMVS `dense`/`mesh` passes over the same work dir at once.
+The `mvs/` folder uses fixed intermediate filenames, so concurrent runs over one
+capture overwrite each other's depth maps and can leave the survivor apparently
+busy but unrecoverable.
+
 ## What `clean` does, and what to do when it looks wrong
 
 Structure-from-motion recovers geometry only up to an arbitrary similarity transform: the reconstruction has no scale and no idea which way is up. Both come from the platter. `clean` RANSAC-fits the dominant plane in the reconstructed mesh's vertices (`mvs/scene_dense_mesh.ply` — that plane is the platter surface), measures the platter's radius within it, and — knowing `platter_d = 222` from `scanning-rig/_scanning_rig.scad` — converts the whole scene to millimetres with the platter centred at the origin and its surface at z=0. The fit is seeded, so the same capture always exports at the same scale. The fit deliberately reads the mesh rather than the dense cloud: `DensifyPointCloud` attaches per-vertex list properties (`view_indices`, `view_weights`) to `scene_dense.ply`, and trimesh's PLY reader rejects those with `PLY is unexpected length!`.

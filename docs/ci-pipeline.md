@@ -72,7 +72,7 @@ entirely): if a tool is missing from `flake.nix`, `nix develop` still
 succeeds (it just doesn't put that tool on `PATH`) and the step that needs it
 fails with a plain `command not found` — so a new tool must be added to
 `flake.nix` before a step can shell out to it, not discovered via a
-preflight check. See "CI dependencies come from flake.nix" in `CLAUDE.md`.
+preflight check. See the root agent instructions in `AGENTS.md`.
 
 ### 1. Verify Dependency Graph
 
