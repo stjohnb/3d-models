@@ -50,4 +50,9 @@ measurement (the connector-fit saga #11→#99; drawer-organiser corrections in
 #309/#313/#315/#326). This is the normal workflow here, not a sign of an
 under-specified issue: implement a reasonable first pass from whatever detail
 exists, and expect — and readily apply — follow-up corrections grounded in a
-real print rather than holding out for a complete spec before starting.
+real print rather than holding out for a complete spec before starting. The
+same pattern applies to a shipped model's fastener/fit details, not just
+first-pass dimensions: bin-foot-opener's countersink and standoff thickness
+were corrected twice after the owner reported the fitted part directly
+(#492) — first "push it thinner," then the precise fix ("only the bottom
+22mm touches the cabinet, and the screw heads back onto nothing").

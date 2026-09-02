@@ -850,7 +850,18 @@ run independently — if multiple fail, all errors are visible.
   ryzen]` rather than any `[self-hosted, linux]` box so the memory cap is
   calibrated against a host of known RAM capacity; `notify-failures.yml` is
   deliberately left unpinned so failure notifications still fire when
-  `ryzen` is down.
+  `ryzen` is down. These caps exist because of a real incident (2026-07-07,
+  PR #271): `nz-ski-fields/assembly.scad` (a `union()` of three `surface()`
+  part trees) rendered unbounded and hard-froze `ryzen`, which was at the
+  time temporarily mis-provisioned with 8G instead of 32G, then went on to
+  OOM the fallback `beefy-actions` runner after roughly 50 minutes. A frozen
+  or killed runner uploads no logs for the step it died on, so a job that
+  shows **no failed step and no fetchable logs** is the signature of a dead
+  runner, not a code failure — don't blindly re-run it, since a second blind
+  run can take down another host the same way; check runner health first.
+  Don't lower `RENDER_MEM_MAX`/`RENDER_TIMEOUT` without re-measuring the
+  heaviest render (`nz-ski-fields/assembly.scad` was ~31 minutes wall clock
+  and >8G peak RSS on a healthy 32G runner) against the new caps.
 - **Library detection**: Uses a three-tier strategy: (1) underscore-prefixed
   files are skipped by convention, (2) OpenSCAD's "top level object is
   empty" / "nothing to export" log output identifies libraries at render

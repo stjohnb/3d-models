@@ -64,10 +64,11 @@ Everything else is included: all model project directories, `index.html`,
 `embed.html`, `openscad-worker.js`, `scripts/`, `*.schema.json`,
 `filament-colors.json`, `README.md` (substituted — see below), `llms.txt`,
 `robots.txt`, `favicon.svg`, `site.webmanifest`, `AGENTS.md`, `CLAUDE.md`,
-`.claude/agents/`, `playbooks/`, `docs/OVERVIEW.md`, `docs/ci-pipeline.md`,
+`.agents/`, `playbooks/`, `docs/OVERVIEW.md`, `docs/ci-pipeline.md`,
 `docs/OPENSCAD_LIBRARIES.md`, and `.github/workflows/`.
 
-`AGENTS.md`, `CLAUDE.md`, and `.claude/agents/` are kept deliberately — the
+`AGENTS.md`, `CLAUDE.md`, and `.agents/` (renamed from `.claude/agents/` in
+#494 to keep the path provider-neutral) are kept deliberately — the
 blog post discusses the Claude Code / Claws workflow, so showing that
 configuration in the snapshot is intentional. `AGENTS.md` is the canonical
 root guide, while `CLAUDE.md` remains as a compatibility copy for tools and

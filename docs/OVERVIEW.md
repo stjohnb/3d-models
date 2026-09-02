@@ -657,7 +657,8 @@ facts that matter to future agents but belong to no feature doc, such as Claws
 automation quirks and CI/PR handling gotchas. Treat it as supporting context,
 not as a substitute for reading the owning subsystem doc.
 
-Three subagent definitions live in `.claude/agents/`:
+Three subagent definitions live in `.agents/` (renamed from `.claude/agents/`
+in #494 to keep the path provider-neutral):
 
 - **`issue-refiner`** — reads the docs and `ideas/rejected.md`, then produces a
   detailed implementation plan for a GitHub issue before any code is written.

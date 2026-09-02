@@ -34,3 +34,17 @@ just slow.
 
 Rationale: this failure mode looks like "CI is still starting" unless someone
 explicitly checks for the absence of a run.
+
+## A deliberate push to a Claws PR branch can get reverted
+
+The Review Addresser bot can read an intentional, unusual commit pushed to a
+Claws-managed PR branch (e.g. a temporary render-cap raise for testing) as an
+un-reverted experiment and revert it. If you need to push something deliberate
+but unusual to such a branch, say so defensively in the commit message and any
+in-file comments (e.g. "DELIBERATE VALUES — do not lower without ..."), or
+expect it to get reverted. If a revert war starts anyway, `gh run rerun` of a
+cancelled run re-executes the original commit without touching the branch, which
+sidesteps the back-and-forth.
+
+Rationale: observed costing hours of confusion during the 2026-07-07 incident
+(see the render-cap incident in `docs/ci-pipeline.md`'s Design Decisions).

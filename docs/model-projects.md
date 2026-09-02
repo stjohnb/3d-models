@@ -85,7 +85,7 @@ visible front face rather than sitting flush with it.
 | File | Role |
 |------|------|
 | `bin_foot_pull.scad` | Renderable — self-contained single-profile extrusion, no library split and no dependency graph |
-| `bin_foot_pull.parameters.json` | In-browser customizer manifest (`base_run`, `rear_t`, `rear_h`, `base_t`, `lip_t`, `lip_h`, `web_drop`, `width`, `screw_holes`) |
+| `bin_foot_pull.parameters.json` | In-browser customizer manifest (`base_run`, `rear_t`, `relief_h`, `relief_t`, `rear_h`, `base_t`, `lip_t`, `lip_h`, `web_drop`, `width`, `screw_holes`) |
 | `meta.json` | Project metadata (description, tags: kitchen/household/accessibility, difficulty: intermediate, hardware BOM, `printing_notes`) |
 
 **Coordinate system and print orientation**: `x` runs through the panel,
@@ -110,12 +110,29 @@ asserted, so thin-panel customizer values simply shrink the web instead of
 breaking the model.
 
 **Fastener pattern**: with `screw_holes = true`, `screw_cuts()` bores a 2×2
-grid of countersunk holes through the fixing plate, with rows fixed at 20mm and
-50mm above the drawer bottom. This replaced the earlier proportional placement
-because the owner explicitly called out a real drawer-front detail near the top
-row. The change is why `rear_h` now defaults to 60mm and the manifest floor is
-57mm: at 56mm the countersink head-clearance assert fails. `screw_holes =
-false` is the intended VHB-tape variant, not just a debugging switch.
+grid of clearance holes through the fixing plate. Row placement is derived,
+not fixed: both rows must land in the full-thickness plate above the relief
+ramp (see below) and clear the top edge, which is why `rear_h` defaults to
+60mm and the manifest floor is 57mm — below that the top-row assert fails.
+`screw_holes = false` is the intended VHB-tape variant, not just a debugging
+switch.
+
+**Relieved contact band (issue #492).** The owner reported that a uniform
+4mm-thick fixing plate held the drawer front proud of its neighbors when
+closed, and pinned down why: only the bottom 22mm of the drawer face actually
+touches the front edge of the cabinet's bottom panel, and the screw heads
+back onto nothing (there is no cabinet material behind them at that height),
+so the countersink was dead weight that had been the only thing forcing
+`rear_t >= 3.5`. The fix is not a uniformly thinner plate — it is a relieved
+band: the plate is thinned to `relief_t` (1.6mm default) over its bottom
+`relief_h` (22mm default), the part of `profile()`'s `back_face` that meets
+the cabinet's bottom panel, and stays full `rear_t` (4mm) above that —
+`relief_top` — for stiffness and screw purchase. Screw holes are no longer
+countersunk at all: the heads bear directly on the plate face above the
+relief band, and `screw_y_lo`/`screw_y_hi` are derived from `relief_top` so
+they always land in the full-thickness region regardless of `relief_h`.
+Setting `relief_h = 0` collapses `back_face` to an empty list and reproduces
+the pre-#492 uniform-thickness profile byte-for-byte.
 
 ### blast-gate/
 
