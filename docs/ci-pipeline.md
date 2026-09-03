@@ -5,11 +5,12 @@ to `main` and on PRs.
 
 ## Workflows
 
-Two workflow files live in `.github/workflows/`:
+One workflow file lives in `.github/workflows/`:
 
 - **`build.yml`** — the main build pipeline, documented in detail below.
-- **`notify-failures.yml`** — monitors `build.yml` for main-branch failures and
-  auto-creates/closes GitHub issues. See [Failure Notification Workflow](#failure-notification-workflow).
+
+Main-branch failures of `build.yml` are not tracked by a workflow in this
+repo. See [Main-branch failure monitoring](#main-branch-failure-monitoring).
 
 ## Trigger and Concurrency (`build.yml`)
 
@@ -848,9 +849,9 @@ run independently — if multiple fail, all errors are visible.
   misclassified as "suspected library" and silently skipped — see the
   Render STL Files step. The build job is pinned to `[self-hosted, linux,
   ryzen]` rather than any `[self-hosted, linux]` box so the memory cap is
-  calibrated against a host of known RAM capacity; `notify-failures.yml` is
-  deliberately left unpinned so failure notifications still fire when
-  `ryzen` is down. These caps exist because of a real incident (2026-07-07,
+  calibrated against a host of known RAM capacity; failure detection lives
+  outside this repo (Claws' `main-build-monitor`, see below), so an outage
+  of `ryzen` itself still gets reported. These caps exist because of a real incident (2026-07-07,
   PR #271): `nz-ski-fields/assembly.scad` (a `union()` of three `surface()`
   part trees) rendered unbounded and hard-froze `ryzen`, which was at the
   time temporarily mis-provisioned with 8G instead of 32G, then went on to
@@ -1087,53 +1088,20 @@ run independently — if multiple fail, all errors are visible.
   the WASM FS as UTF-8; `.png` entries are fetched as `arrayBuffer` and written as
   raw bytes so `surface()` can read them.
 
-## Failure Notification Workflow
+## Main-branch failure monitoring
 
-Defined in `.github/workflows/notify-failures.yml`. Triggers on
-`workflow_run` completion of `Build Models` on the `main` branch — allowing
-it to observe build outcomes without requiring `contents: write` on the
-build workflow itself.
+There is no failure-notification workflow in this repo. Main-branch
+`push`/`schedule` runs of `build.yml` are watched centrally by Claws'
+`main-build-monitor` job (St-John-Software/claws#2778), which:
 
-Both jobs (`notify`, `close-on-success`) run on `[self-hosted, linux]`
-(deliberately *not* pinned to `ryzen` — see "Capped OpenSCAD renders" below)
-and follow the same flake.nix migration as `build.yml`: the only tool either
-job shells out to is `gh`, which comes from the flake's `scripts` devShell,
-entered via a job-level `defaults.run.shell` (`nix develop
-${{ github.workspace }}#scripts --command bash -euo pipefail {0}`). Because
-that devShell is resolved from this repo's own `flake.nix`/`flake.lock`,
-both jobs now start with `actions/checkout@v7` (no `fetch-depth: 0` needed —
-neither job reads git history) followed by the shared `Set up Nix` composite
-action, exactly like steps 0 in `build.yml`. Neither step existed before
-this migration: previously `gh` was assumed to be on the runner host
-directly, so no checkout was required to resolve a devShell.
+- retries the run once when the failure looks transient (dead runner, cancelled
+  job, infrastructure error);
+- otherwise opens a `Build failure: Build Models` issue in this repo, or bumps
+  the existing open one rather than filing duplicates during a prolonged
+  outage;
+- closes that issue with a comment when a later main-branch run of the same
+  workflow succeeds.
 
-### `notify` job (on failure)
-
-Runs when `build.yml` fails on `main`:
-
-1. Creates the `bug` label (`#d73a4a`) if it doesn't already exist — avoids
-   failures in repos where the default label set was not created.
-2. Searches for an existing open issue titled `"Build failure: Build Models"`.
-   If none is found, creates one via `gh issue create` with a link to the
-   failed run URL.
-3. Deduplication prevents a flood of issues during a prolonged outage — only
-   one open issue exists at a time.
-
-### `close-on-success` job (on recovery)
-
-Runs when `build.yml` succeeds on `main`:
-
-Searches for the open failure issue and, if found, closes it with a
-`"Build recovered — closing automatically."` comment. This gives the issue
-a clear lifecycle: opened on first failure, closed on the next successful run.
-
-### Design notes
-
-- **`cancel-in-progress: false`** on both concurrency groups — notification
-  runs must not be cancelled mid-flight (a skipped notification is a missed
-  alert).
-- **`branches: [main]`** on the `workflow_run` trigger scopes the listener to
-  main-branch builds only; PR failures do not generate issues.
-- **No `actions: read` permission** is needed because all required data
-  (`workflow_run.conclusion`, `workflow_run.html_url`) comes directly from the
-  event payload, not from an API call.
+Because the monitor runs in the Claws service rather than on the repo's
+runners, an outage of `ryzen` (the only runner `build.yml` targets) is still
+reported. PR failures never generate issues.

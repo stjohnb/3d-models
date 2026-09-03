@@ -110,9 +110,9 @@
             };
           };
 
-          # Small shell for notify-failures.yml, which only needs gh (plus
-          # the stdenv basics). Separate from `default` so those jobs don't
-          # pay for the OpenSCAD/ImageMagick/AWS closure.
+          # Small gh-only shell (plus the stdenv basics) for lightweight
+          # scripting jobs. Separate from `default` so such jobs don't pay
+          # for the OpenSCAD/ImageMagick/AWS closure.
           scripts = pkgs.mkShell {
             packages = with pkgs; [
               gh

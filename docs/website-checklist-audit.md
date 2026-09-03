@@ -115,7 +115,7 @@ Audit of [specification.website/checklist](https://specification.website/checkli
 | Custom 404 page | 🏗️ Infra-scope | S3/CloudFront error document configuration |
 | Web app manifest | ❌ → ✅ | Added `site.webmanifest` in this PR |
 | Service worker | N/A | Optional; not implemented |
-| Monitoring | ✅ | `notify-failures.yml` opens/closes GitHub issues on build.yml failures |
+| Monitoring | ✅ | Claws' `main-build-monitor` opens/closes `Build failure: Build Models` issues on main-branch build.yml failures |
 
 ## Internationalisation
 

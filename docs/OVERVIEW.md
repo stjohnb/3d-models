@@ -111,8 +111,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   │   └── setup-nix/
 │   │       └── action.yml    # Composite action: puts the runner's system `nix` on PATH or fails fast
 │   └── workflows/
-│       ├── build.yml             # CI: render, validate, thumbnail, deploy
-│       └── notify-failures.yml   # Monitors build.yml; opens/closes failure issues on main
+│       └── build.yml             # CI: render, validate, thumbnail, deploy
 └── docs/
     ├── OVERVIEW.md             # This file — main entry point
     ├── model-projects.md       # Per-project file tables, geometry, and key parameters
@@ -720,16 +719,18 @@ enforcement** pattern — failures are
 recorded early but only block the build at the very end, so the full pipeline
 output is always available.
 
-A separate **`notify-failures.yml`** workflow monitors for `build.yml` failures
-on `main`. On failure it opens a `bug` issue (deduplicated — one open issue at
-a time). On the next successful run it auto-closes the issue with a recovery
-comment.
+Main-branch build failures are monitored centrally by Claws'
+`main-build-monitor` job (see [claws-automation.md](claws-automation.md)),
+which retries a run once when the failure looks transient, otherwise files a
+`Build failure: <workflow>` issue in this repo (one open issue per workflow),
+and closes it with a comment when a later run of the same workflow goes green.
+There is no per-repo notifier workflow.
 
 ## Configuration
 
 | Item | Location | Notes |
 |------|----------|-------|
-| CI runner | `[self-hosted, linux, ryzen]` in `build.yml`; `[self-hosted, linux]` in `notify-failures.yml` | Runner provides only `nix`/`git`/`docker`; OpenSCAD, ImageMagick, ADMesh, qrencode, zip, Python 3, Node.js, and the AWS CLI all come from this repo's `flake.nix` devShells (`default` for `build.yml`, `scripts` for `notify-failures.yml`), entered via `.github/actions/setup-nix` + the job-level `defaults.run.shell`. `build.yml`'s `build` job is pinned to `ryzen` so render memory caps are calibrated to a known host (issue #272) — the label must exist on the runner or the job queues forever |
+| CI runner | `[self-hosted, linux, ryzen]` in `build.yml` | Runner provides only `nix`/`git`/`docker`; OpenSCAD, ImageMagick, ADMesh, qrencode, zip, Python 3, Node.js, and the AWS CLI all come from this repo's `flake.nix` `default` devShell, entered via `.github/actions/setup-nix` + the job-level `defaults.run.shell`. `build.yml`'s `build` job is pinned to `ryzen` so render memory caps are calibrated to a known host (issue #272) — the label must exist on the runner or the job queues forever |
 | Render memory/time caps | `scripts/capped-openscad.sh`; `RENDER_MEM_MAX`/`RENDER_TIMEOUT` env in `build.yml` | Wraps every `openscad` call (STL render: `28G`/`3600s`, sized to the heaviest model's measured cost after the 2026-07-07 runner-freeze incident; thumbnails and orthographic views: `4G`/`120s`). Timeout (124) or SIGKILL (≥128) hard-fails the build before the "suspected library" heuristic can silently swallow it. `scripts/render_view.py` also invokes the wrapper, defaulting to `2G`/`300s` |
 | OpenSCAD version baseline | `.openscad-version` | Committed expected version string; CI warns on mismatch |
 | AWS deployment role | `secrets.AWS_ROLE_ARN` | OIDC role for S3 sync |

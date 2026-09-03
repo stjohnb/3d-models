@@ -144,6 +144,6 @@ reference copy; all development happens here.
 
 ## CI integration
 
-This script is **not** wired into `build.yml` or `notify-failures.yml`. It is
+This script is **not** wired into `build.yml`. It is
 a maintainer tool like `scripts/render_view.py` and
 `scripts/fetch_terrain_heightmap.py`.

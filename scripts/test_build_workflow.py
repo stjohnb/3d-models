@@ -36,7 +36,6 @@ from oembed_helpers import OG_HERO_TILE_COLUMNS, OG_HERO_TILE_ROWS
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 BUILD_YML = REPO_ROOT / ".github" / "workflows" / "build.yml"
-NOTIFY_YML = REPO_ROOT / ".github" / "workflows" / "notify-failures.yml"
 FLAKE_NIX = REPO_ROOT / "flake.nix"
 SCRIPTS_DIR = REPO_ROOT / "scripts"
 OG_FONT = "Liberation-Sans"
@@ -122,25 +121,23 @@ class NixDevShellTests(unittest.TestCase):
 
     def test_no_toolchain_setup_actions(self):
         for forbidden in ("actions/setup-node", "actions/setup-python"):
-            for path in (BUILD_YML, NOTIFY_YML):
-                self.assertNotIn(
-                    forbidden,
-                    code_lines(read(path)),
-                    f"{path.name} must not use {forbidden} — its prebuilt "
-                    "toolchains do not work on the NixOS runners (#348, "
-                    "#356). Add the tool to flake.nix instead.",
-                )
+            self.assertNotIn(
+                forbidden,
+                code_lines(read(BUILD_YML)),
+                f"build.yml must not use {forbidden} — its prebuilt "
+                "toolchains do not work on the NixOS runners (#348, "
+                "#356). Add the tool to flake.nix instead.",
+            )
 
     def test_no_privileged_install(self):
         for forbidden in ("sudo ", "apt-get", "dpkg "):
-            for path in (BUILD_YML, NOTIFY_YML):
-                self.assertNotIn(
-                    forbidden,
-                    code_lines(read(path)),
-                    f"{path.name} must not use {forbidden!r} — the NixOS "
-                    "runners have no apt or sudo, and CI tools belong in "
-                    "flake.nix.",
-                )
+            self.assertNotIn(
+                forbidden,
+                code_lines(read(BUILD_YML)),
+                f"build.yml must not use {forbidden!r} — the NixOS "
+                "runners have no apt or sudo, and CI tools belong in "
+                "flake.nix.",
+            )
 
     def test_build_job_runs_inside_default_devshell(self):
         text = read(BUILD_YML)
@@ -181,15 +178,14 @@ class NixDevShellTests(unittest.TestCase):
     def test_no_pip_installs(self):
         """Issue #423: no unpinned PyPI code on the credentialed runner."""
         for forbidden in ("pip install", "python3 -m venv", "-m virtualenv"):
-            for path in (BUILD_YML, NOTIFY_YML):
-                self.assertNotIn(
-                    forbidden,
-                    code_lines(read(path)),
-                    f"{path.name} must not use {forbidden!r} — the build job "
-                    "holds the deploy AWS role and a write-scoped "
-                    "GITHUB_TOKEN. Python deps come from flake.nix's "
-                    "python3.withPackages, pinned by flake.lock (#423).",
-                )
+            self.assertNotIn(
+                forbidden,
+                code_lines(read(BUILD_YML)),
+                f"build.yml must not use {forbidden!r} — the build job "
+                "holds the deploy AWS role and a write-scoped "
+                "GITHUB_TOKEN. Python deps come from flake.nix's "
+                "python3.withPackages, pinned by flake.lock (#423).",
+            )
 
     def test_default_devshell_provides_python_deps(self):
         flake = read(FLAKE_NIX)
