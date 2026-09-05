@@ -1,5 +1,11 @@
 # Agent notes
 
+**Depth: Reference.** Read this when you need a durable operator/CI/Claws
+automation gotcha that isn't tied to one feature doc — e.g. how Claws review
+signals appear, or PR-branch automation quirks. If your question is about a
+specific subsystem (CI steps, viewer behavior, a model), read that doc
+instead.
+
 Durable, hard-won facts refined from agent memory stores and re-verified
 against the current repo behavior.
 

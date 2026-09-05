@@ -1,5 +1,9 @@
 # CI/CD Pipeline
 
+**Depth: Reference.** Read this when you're touching `build.yml` or any
+build/CI step and need the exact step order, env vars, or validation rules.
+For a repo-wide summary read [OVERVIEW.md](OVERVIEW.md) instead.
+
 Defined in `.github/workflows/build.yml`. Runs on a self-hosted runner on push
 to `main` and on PRs.
 
@@ -735,8 +739,8 @@ and `llms.txt`. Then a Python script:
 
 ### 18. Deploy to S3
 
-Uses OIDC (`aws-actions/configure-aws-credentials@v6`) with the
-`AWS_ROLE_ARN` secret. v6 requires an explicit `role-session-name` input for
+Uses OIDC (`aws-actions/configure-aws-credentials`, SHA-pinned to v6.2.4) with
+the `AWS_ROLE_ARN` secret. v6 requires an explicit `role-session-name` input for
 STS assume-role to succeed (a v4→v6 upgrade broke this silently; fixed by
 passing `github-actions-${{ github.run_id }}`, #291).
 
@@ -745,6 +749,15 @@ passing `github-actions-${{ github.run_id }}`, #291).
 - **Pull requests**: `aws s3 sync ./site s3://…/pr-preview/pr-{N}/{SHA}/`.
   PR deploys are not gated on validation so reviewers can inspect broken
   models in the 3D viewer.
+
+**Action pinning**: every external action in `build.yml` (`actions/checkout`,
+`aws-actions/configure-aws-credentials`, `actions/github-script`) is pinned to
+a full commit SHA with a trailing `# vX.Y.Z` comment, not a mutable tag —
+this step runs with `id-token: write` and mints the OIDC session for the AWS
+deploy role, so a force-moved tag there is a supply-chain path to the deploy
+role (#499). Dependabot's `github-actions` ecosystem (`.github/dependabot.yml`,
+weekly) updates both the SHA and the comment on new releases.
+`scripts/test_build_workflow.py::ActionPinTests` enforces the pin.
 
 ### 19. Commit README Gallery Update (main branch only)
 
@@ -777,7 +790,8 @@ Posts or updates a bot comment on the PR with:
   deployments for the PR in reverse-chronological order, parsed from the
   existing comment text using a regex pattern.
 
-Uses `actions/github-script@v9`. Finds and updates an existing bot comment
+Uses `actions/github-script` (SHA-pinned to v9.0.0). Finds and updates an
+existing bot comment
 (matched by the "Model Preview" heading) to avoid duplicate comments on
 subsequent pushes.
 
@@ -955,6 +969,8 @@ run independently — if multiple fail, all errors are visible.
   (`$HOME/.cache/3d-models/threejs/`) avoids re-downloading on subsequent
   runs, with the cached copy also verified. A
   mismatch is a hard failure, deliberately outside the deferred-enforcement
+  pattern. A missing or malformed pin is equally fatal: `fetch_url()` refuses
+  to download at all unless an expected digest is supplied (issue #498).
   pattern — a tampered runtime must never reach S3 (issue #403).
 - **QR codes in separate directory**: QR PNGs are stored in `site/qr/` rather
   than alongside model thumbnails in `site/`. The OG hero image step no
@@ -1031,7 +1047,9 @@ run independently — if multiple fail, all errors are visible.
   response headers that plain S3 hosting cannot set without a CloudFront
   function. Non-threaded avoids this dependency at the cost of slightly slower
   renders (no SIMD parallelism). Assets are pinned to release `2022.03.20` with
-  SHA-256 verification in `scripts/fetch_openscad_wasm.py`.
+  SHA-256 verification in `scripts/fetch_openscad_wasm.py`. Every file in
+  `ASSET_FILES` must carry a pinned digest in `EXPECTED_HASHES`; an unpinned
+  name raises rather than warning.
 - **Filename allow-list in render step**: Before rendering any `.scad` file,
   the basename is checked against `^[A-Za-z0-9._ -]+$`. Filenames with
   characters outside this set would propagate into generated STL paths, HTML

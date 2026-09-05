@@ -1,5 +1,10 @@
 # Cross-Cutting Requirements
 
+**Depth: Reference.** Read this when you need a process/workflow requirement
+the owner has stated that isn't owned by any single subsystem doc (e.g. how
+to handle CI flakiness, how issues get scoped). Subsystem-specific
+requirements live in the doc that owns that subsystem instead.
+
 Process and workflow constraints the repo owner has stated that don't belong
 to any single subsystem doc. Subsystem-specific constraints (CI checks, viewer
 behavior, per-project geometry) live in [OVERVIEW.md](OVERVIEW.md) or the
@@ -56,3 +61,22 @@ first-pass dimensions: bin-foot-opener's countersink and standoff thickness
 were corrected twice after the owner reported the fitted part directly
 (#492) — first "push it thinner," then the precise fix ("only the bottom
 22mm touches the cabinet, and the screw heads back onto nothing").
+
+## Explicitly rejected feature ideas
+
+### Modeling a shape by tracing/extracting a template from a reference photo
+
+A "pliers" model (issue #145) asked whether image processing could extract a
+template from an uploaded photo instead of working from measurements. Two
+follow-up PRs attempting this were both closed without merging for quality
+reasons: "The model is still very far away from the image... Could we run
+some processing on the image to extract a template?" (#145), "Quite a poor
+attempt" (#147), "the lines seem to jump around a lot, can it be smoothed
+out?" (#155) — and no `pliers` project was ever shipped. Every other model in
+this repo is instead built from caliper-measured, named parametric variables
+(see the Parametric Design Convention in [OVERVIEW.md](OVERVIEW.md)) with
+dimensions refined against a real print, per "Expect dimensional specs to
+arrive iteratively" above. Don't re-propose photo-outline extraction as the
+starting point for a new model's geometry on the strength of this issue
+alone; treat a reference photo as dimensional context to measure from, not
+as a template to trace.

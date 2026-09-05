@@ -74,5 +74,45 @@ class WriteAtomicTests(unittest.TestCase):
             self.assertEqual(f.read(), b"second")
 
 
+class RequireSha256Tests(unittest.TestCase):
+    def test_valid_lowercase_digest_returned_unchanged(self):
+        digest = "a" * 64
+        self.assertEqual(asset_cache.require_sha256(digest, "thing"), digest)
+
+    def test_uppercase_digest_is_lowercased(self):
+        digest = "A" * 64
+        self.assertEqual(asset_cache.require_sha256(digest, "thing"), "a" * 64)
+
+    def test_surrounding_whitespace_is_stripped(self):
+        digest = "b" * 64
+        self.assertEqual(
+            asset_cache.require_sha256(f"  {digest}\n", "thing"), digest
+        )
+
+    def test_none_raises(self):
+        with self.assertRaisesRegex(ValueError, "thing"):
+            asset_cache.require_sha256(None, "thing")
+
+    def test_empty_string_raises(self):
+        with self.assertRaisesRegex(ValueError, "thing"):
+            asset_cache.require_sha256("", "thing")
+
+    def test_non_string_zero_raises(self):
+        with self.assertRaisesRegex(ValueError, "thing"):
+            asset_cache.require_sha256(0, "thing")
+
+    def test_non_string_bytes_raises(self):
+        with self.assertRaisesRegex(ValueError, "thing"):
+            asset_cache.require_sha256(b"a" * 64, "thing")
+
+    def test_too_short_raises(self):
+        with self.assertRaisesRegex(ValueError, "thing"):
+            asset_cache.require_sha256("abc", "thing")
+
+    def test_non_hex_raises(self):
+        with self.assertRaisesRegex(ValueError, "thing"):
+            asset_cache.require_sha256("z" * 64, "thing")
+
+
 if __name__ == "__main__":
     unittest.main()

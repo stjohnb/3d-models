@@ -67,6 +67,44 @@ class FetchAssetTests(unittest.TestCase):
         self.assertEqual(data, payload)
         opener.assert_not_called()
 
+    def test_fetch_asset_requires_pinned_hash(self):
+        opener = mock.Mock(side_effect=AssertionError("should not call network"))
+        with mock.patch.dict(foa.EXPECTED_HASHES, {}, clear=True):
+            with self.assertRaises(ValueError):
+                foa.fetch_asset("openscad.js", opener=opener)
+        opener.assert_not_called()
+        cache_path = os.path.join(foa.cache_dir(), "openscad.js")
+        self.assertFalse(os.path.isfile(cache_path))
+
+    def test_fetch_asset_rejects_malformed_pin(self):
+        opener = mock.Mock(side_effect=AssertionError("should not call network"))
+        with mock.patch.dict(
+            foa.EXPECTED_HASHES, {"openscad.js": "not-a-hash"}, clear=False
+        ):
+            with self.assertRaises(ValueError):
+                foa.fetch_asset("openscad.js", opener=opener)
+        opener.assert_not_called()
+
+    def test_unpinned_name_does_not_reach_cache_read(self):
+        os.makedirs(foa.cache_dir(), exist_ok=True)
+        with open(os.path.join(foa.cache_dir(), "openscad.js"), "wb") as f:
+            f.write(b"attacker")
+        opener = mock.Mock(side_effect=AssertionError("should not call network"))
+        with mock.patch.dict(foa.EXPECTED_HASHES, {}, clear=True):
+            with self.assertRaises(ValueError):
+                foa.fetch_asset("openscad.js", opener=opener)
+        opener.assert_not_called()
+
+
+class PinCoverageTests(unittest.TestCase):
+    def test_every_asset_file_has_a_valid_pinned_hash(self):
+        for name in foa.ASSET_FILES:
+            self.assertIn(name, foa.EXPECTED_HASHES, f"{name} has no pinned hash")
+            digest = foa.EXPECTED_HASHES[name]
+            self.assertRegex(
+                digest, r"^[0-9a-f]{64}$", f"{name} has a malformed pinned hash"
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

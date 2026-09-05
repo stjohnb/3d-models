@@ -1,5 +1,10 @@
 # OpenSCAD Libraries Reference
 
+**Depth: Reference.** Read this before writing new model geometry from
+scratch, to check whether a common pattern (rounded corners, threads, hinged
+enclosures, hardware specs) is already solved by a cataloged library. For
+repo architecture read [OVERVIEW.md](OVERVIEW.md) instead.
+
 A curated catalogue of third-party OpenSCAD libraries (sourced from
 https://openscad.org/libraries.html, snapshot 2026-05-18). Planning and
 implementation tasks should scan this list before writing new geometry from

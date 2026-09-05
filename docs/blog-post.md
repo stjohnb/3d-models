@@ -1,5 +1,10 @@
 # 3D modelling with OpenSCAD
 
+**Depth: Deep dive.** Read this only when editing this blog draft. It's a
+personal-blog piece, not a technical reference — see the "Blog voice" section
+of `AGENTS.md`/`CLAUDE.md` before editing it. For repo architecture read
+[OVERVIEW.md](OVERVIEW.md) instead.
+
 When I was growing up I had a toy workbench with a drill, saw, vice, screwdriver and a handful of bolts. Years later the set was still mostly intact but some of the attachments had gone missing or the connections had come loose, so I decided to try 3D printing some replacement parts.
 
 ![The original Fisher-Price Power Workshop toy set](../power-workshop/images/marketing/1_fcaeafb68a6f965b27370f991b0dff46.jpg)

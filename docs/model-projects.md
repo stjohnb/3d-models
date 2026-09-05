@@ -1,8 +1,78 @@
 # Model Projects
 
+**Depth: Reference.** Read this when you're adding or editing a specific
+model and need its file table, geometry conventions, coordinate system, or
+parameters — or need a pattern shared across projects (bed-splitting,
+interlocking seams, connection systems). For repo-wide architecture, CI, or
+viewer questions, read [OVERVIEW.md](OVERVIEW.md) instead.
+
 Detailed per-project reference: files, geometry conventions, and key
 parameters for every model directory. See [OVERVIEW.md](OVERVIEW.md) for
 repository-wide architecture and patterns.
+
+## Cross-project patterns
+
+Patterns shared by more than one model project. Per-project sections below
+link back here instead of repeating the derivation.
+
+### Bed-Splitting Pattern for Oversized Parts (nz-ski-fields, drawer-organiser)
+
+When a printable part's footprint exceeds a target print bed, the module that
+builds it takes a `split_parts`/`part_index`-style pair of parameters and
+returns one re-centred slice via `intersection()` with a keep-box, rather than
+shipping the oversized geometry as-is. `drawer-organiser` is the fullest
+example: `bin_part()` splits a bin into equal pieces at cell boundaries (`gx`
+must be evenly divisible by `parts`), while `container_part()` splits a
+container using `floor(i*n/parts)`, so an odd cell count splits unevenly at a
+real boundary instead of through the middle of a base pad; both run the outer
+bound of the first/last slice well past the nominal edge to avoid a coincident
+CGAL face at an unflared wall. Every whole-container renderable keeps
+`split_parts`/`part_index` in its customizer manifest for arbitrary bed sizes,
+and its default STL download is still the whole, unsplit shape.
+
+For the container sizes that actually exceed the A1's 250mm bed, though, the
+project ships **dedicated piece renderables** (e.g.
+`drawer_container_left_front.scad` / `_back.scad`) rather than relying on
+end users to run the customizer. These call the lower-level
+`container_slice(gx, gy, h, wall_t, floor_t, ..., c0, c1)` — added in issue
+#319 by factoring it out of `container_part()`, which now just computes
+`floor(i*n/parts)` boundaries and delegates to it — with an explicit cell
+range instead of an even split. The boundaries are hand-picked to land
+**offset from the baseplate tile seams underneath**, so a solid piece
+straddles every grid join (stiffening the assembled floor) and the cut faces
+of adjacent pieces meet over the middle of a single tile, keeping them flush
+even unglued (issue #322); the left container is the sole exception, since
+its 10-cell depth only yields two ≤5-cell pieces by cutting at the seam
+itself, and two pieces were preferred over introducing a third cut. Printing
+an oversized container means printing these named piece files directly (no
+customizer needed) and gluing the cut faces (CA glue) with the baseplate
+itself used as the alignment jig, since the mating pads/sockets hold the
+pieces in register. Full detail, including the print/glue instructions per
+part and the seam-offset cell tables, lives in
+[#drawer-organiser](#drawer-organiser) below and `drawer-organiser/layout.md`.
+
+### Interlocking Tile Seams (drawer-organiser)
+
+Baseplate tiles that must butt together into a larger continuous floor use a
+genderless barbed-tab seam: every tile carries tabs on its +X/+Y edges and the
+matching notches on -X/-Y, so any tile mates with any other tile of the same
+edge length — no separate male/female variants to track. Tabs sit at the
+**centre of each cell** along an edge, not on the cell-junction corners; an
+earlier version (issue #309) put them on the junctions because that looked
+like the thickest run of material, but that material is only a thin rib and
+also the sole thing joining the tile's perimeter rail to its body, so a notch
+sized to hold the tab severed the rail and printed tiles fell apart. At a cell
+centre the rail is backed by material running the full edge length, so a notch
+there only removes a slot without detaching anything. The barb's shoulder is
+perpendicular to the seam (not a dovetail or round jigsaw head, which either
+cam out under load or leave almost no undercut in the ~2mm of available rail
+depth), which also means tiles cannot be pressed together in-plane — a new
+tile must be lowered vertically onto its already-placed neighbours so its tabs
+drop straight into their slots. Clearance is applied to the tab/notch
+**features only**, never to the tile's outer outline, because shrinking the
+outline would drift the 42mm Gridfinity pitch across every seam past the
+0.25mm pad-to-socket clearance and stop a seam-spanning bin from seating. Full
+derivation and measured tolerances in `drawer-organiser/layout.md`.
 
 ### adjustable-bracket/
 
@@ -211,13 +281,12 @@ Transitions" convention below); `plate_height = 4.65`, `height_unit = 7`;
 seam constants `seam_tab_neck_w = 1.6`, `seam_tab_neck_len = 0.6`,
 `seam_tab_head_w = 3.6`, `seam_tab_depth = 2.0`, `seam_tab_root`,
 `seam_tab_fillet`, `seam_clearance = 0.4` (barbed-tab profile, see
-[OVERVIEW.md](OVERVIEW.md#interlocking-tile-seams-drawer-organiser)); drawer
+[Cross-project patterns](#cross-project-patterns) above); drawer
 constants `drawer_bottom_w = 630`, `drawer_top_w = 670`, `drawer_height = 69`,
 `drawer_grid_x = 15`, `drawer_grid_y = 10`, `container_wall_clear = 1.5`.
 
-**Bed-splitting**: see
-[OVERVIEW.md](OVERVIEW.md#bed-splitting-pattern-for-oversized-parts-nz-ski-fields-drawer-organiser)
-for the general pattern shared with `nz-ski-fields`. `bin_part()` splits a bin
+**Bed-splitting**: see [Cross-project patterns](#cross-project-patterns)
+above for the general pattern shared with `nz-ski-fields`. `bin_part()` splits a bin
 along one axis at cell boundaries; `container_part()` does the same for the
 assembly-preview containers. Four of the nine seated containers — left, the
 back-left and back-centre 4×6s, and back-right — exceed a 250mm print bed and

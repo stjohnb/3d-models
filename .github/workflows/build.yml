@@ -59,7 +59,7 @@ jobs:
         shell: nix --extra-experimental-features nix-command --extra-experimental-features flakes develop ${{ github.workspace }}#default --command bash -euo pipefail {0}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           # Full history: scripts/project_dates.py reads each project dir's
           # last-commit date for landing-page recency ordering (#345).
@@ -1066,7 +1066,7 @@ jobs:
           "
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
@@ -1104,7 +1104,7 @@ jobs:
       - name: Comment on PR with thumbnails
         if: github.event_name == 'pull_request'
         continue-on-error: true
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const fs = require('fs');

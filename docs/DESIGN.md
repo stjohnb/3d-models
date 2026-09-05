@@ -1,5 +1,9 @@
 # Visual Design Notes
 
+**Depth: Deep dive.** Read this only when changing `index.html`'s visual
+design — palette tokens, the display typeface, background layers, or motion
+rules. For feature behavior read [web-viewer.md](web-viewer.md) instead.
+
 The repo has no design system; this file records the deliberate choices made
 for the gallery's user-facing chrome so later changes stay coherent instead of
 drifting back to framework defaults. It covers `index.html` only — `embed.html`

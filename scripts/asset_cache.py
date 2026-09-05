@@ -10,9 +10,11 @@ same treatment.
 """
 
 import os
+import re
 
 DEFAULT_CACHE_ROOT = os.path.join("~", ".cache", "3d-models")
 ENV_VAR = "ASSET_CACHE_DIR"
+SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 def cache_root() -> str:
@@ -38,3 +40,23 @@ def write_atomic(path: str, data: bytes) -> None:
     with open(tmp, "wb") as f:
         f.write(data)
     os.replace(tmp, path)
+
+
+def require_sha256(expected, label: str) -> str:
+    """Return the normalised expected digest, or raise ValueError.
+
+    A missing/blank/malformed pin is a hard failure: these fetchers stage
+    executable JS/WASM served as first-party content, so verification must
+    never degrade to advisory (issue #498).
+    """
+    if not expected or not isinstance(expected, str):
+        raise ValueError(
+            f"No pinned SHA-256 for {label} — refusing to fetch unverified bytes. "
+            "Add the digest to the fetcher's hash table and re-run."
+        )
+    if not SHA256_RE.match(expected.strip()):
+        raise ValueError(
+            f"Malformed pinned SHA-256 for {label}: {expected!r} "
+            "(expected 64 hex characters)."
+        )
+    return expected.strip().lower()

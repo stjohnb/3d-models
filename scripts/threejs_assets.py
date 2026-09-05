@@ -8,9 +8,10 @@ files, verified against the SHA-256 hashes below:
 * ``scripts/generate-standalone.py`` inlines the same verified bytes as
   base64 data URIs.
 
-Bumping the version means: change ``THREEJS_VERSION``, recompute all three
-SHA-256 hashes, update the import maps in ``index.html`` and ``embed.html``,
-and update ``docs/OVERVIEW.md``.
+Bumping the version means: change ``THREEJS_VERSION``, run
+``python3 scripts/fetch_threejs.py --print-hashes`` and paste the printed
+digests into ``THREEJS_ASSETS``, update the import maps in ``index.html``
+and ``embed.html``, and update ``docs/OVERVIEW.md``.
 """
 
 import hashlib
@@ -57,11 +58,12 @@ def _cache_path(url: str) -> str:
     return os.path.join(cache_dir(), f"{url_hash}_{basename}")
 
 
-def fetch_url(url: str, expected_sha256: str | None = None) -> bytes:
-    """Download a URL with a single retry, SHA-256 verification, and local cache fallback."""
+def fetch_url(url: str, expected_sha256: str) -> bytes:
+    """Download a URL with a single retry, mandatory SHA-256 verification, and a verified local cache fallback."""
+    expected_sha256 = asset_cache.require_sha256(expected_sha256, url)
     cache_file = _cache_path(url)
 
-    if expected_sha256 and os.path.isfile(cache_file):
+    if os.path.isfile(cache_file):
         try:
             with open(cache_file, "rb") as f:
                 data = f.read()
@@ -87,24 +89,22 @@ def fetch_url(url: str, expected_sha256: str | None = None) -> bytes:
                 with open(cache_file, "rb") as f:
                     data = f.read()
                 # Still verify the cached data
-                if expected_sha256:
-                    actual = hashlib.sha256(data).hexdigest()
-                    if actual != expected_sha256:
-                        raise ValueError(
-                            f"Cached file SHA-256 mismatch for {url}\n"
-                            f"  expected: {expected_sha256}\n"
-                            f"  got:      {actual}"
-                        )
+                actual = hashlib.sha256(data).hexdigest()
+                if actual != expected_sha256:
+                    raise ValueError(
+                        f"Cached file SHA-256 mismatch for {url}\n"
+                        f"  expected: {expected_sha256}\n"
+                        f"  got:      {actual}"
+                    )
                 return data
             raise
-        if expected_sha256:
-            actual = hashlib.sha256(data).hexdigest()
-            if actual != expected_sha256:
-                raise ValueError(
-                    f"SHA-256 mismatch for {url}\n"
-                    f"  expected: {expected_sha256}\n"
-                    f"  got:      {actual}"
-                )
+        actual = hashlib.sha256(data).hexdigest()
+        if actual != expected_sha256:
+            raise ValueError(
+                f"SHA-256 mismatch for {url}\n"
+                f"  expected: {expected_sha256}\n"
+                f"  got:      {actual}"
+            )
         # Cache the verified data for future runs
         asset_cache.write_atomic(cache_file, data)
         return data

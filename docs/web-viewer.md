@@ -1,5 +1,11 @@
 # Web Viewer
 
+**Depth: Reference.** Read this when you're working on `index.html`,
+`embed.html`, standalone viewers, or OEmbed output and need feature-level
+detail (customizer, composite previews, cross-section, deep links,
+accessibility). For repo-wide architecture read [OVERVIEW.md](OVERVIEW.md)
+instead; for visual/palette decisions read [DESIGN.md](DESIGN.md).
+
 Detailed reference for `index.html`, `embed.html`, and the generated
 standalone/OEmbed outputs. See [OVERVIEW.md](OVERVIEW.md) for how these fit
 into the wider repo.
@@ -309,6 +315,59 @@ enforces it:
 source** — it renders at a downsampled 128px heightmap resolution so OpenSCAD's
 default camera looks down onto the coloured terrain for the PNG without the
 cost of the full mesh. Its STL output is no longer loaded by any viewer.
+
+### In-Browser Parametric Customization
+
+Renderable models can ship a sibling `<basename>.parameters.json` manifest
+that exposes a subset of their OpenSCAD variables as live controls in the
+gallery viewer. The schema (`parameters.schema.json`) restricts parameter
+types to `number` and `boolean` — strings are forbidden so values can be
+spliced into `-Dname=value` argv without shell-quoting fragility. CI
+validates every manifest against the schema using the same deferred
+enforcement pattern as `meta.json`; failures go into `.param-failures`
+and exclude the manifest from `models.json`. Per-project manifest lists live
+in each project's section of [model-projects.md](model-projects.md).
+
+The customizer is purely additive: the default precomputed STL still
+loads instantly when the model is opened in a pane. Clicking the **⚙
+Customize** button lazy-loads
+[openscad-wasm](https://github.com/openscad/openscad-wasm) (~5 MB
+non-threaded build, fetched from `site/openscad/`), pulls every `.scad`
+in the project's directory from `site/sources/<project>/` (discovered
+via a per-directory `manifest.json`), writes them into the wasm FS, and
+renders into an in-memory STL when the user clicks **⟳ Re-render**. The
+Three.js viewer's mesh is swapped via `replaceMesh()` and the result is
+offered as a "Download customized STL" Blob URL. Customized STLs are
+never persisted server-side — they live only in the current tab.
+
+Rendering runs in a dedicated Web Worker (`openscad-worker.js`) shared
+by every card on the page. CGAL booleans and STL export happen off the
+main thread, so dragging the 3D view or scrolling the page stays
+responsive even mid-render. The worker processes messages sequentially
+(single-threaded wasm), and the resulting STL bytes are posted back as
+a transferable `Uint8Array` to avoid copies.
+
+Re-rendering is **explicit**, not automatic: editing a slider or
+checkbox updates the displayed value and highlights the changed row,
+but the new geometry isn't generated until the user clicks **⟳
+Re-render** (or presses `R` with the card focused). This lets users
+adjust several parameters at once and pay the render cost just once.
+The first opening of the panel still kicks off an initial render at the
+defaults so the customizer-driven mesh appears immediately.
+
+Known limitations: the non-threaded WASM build is single-threaded and
+noticeably slower than native OpenSCAD (expect 0.5–3s per render for
+small parts); first use adds a ~5 MB asset download; complex models or
+extreme parameter values may take several seconds. Concurrent renders are not possible: clicking Re-render while a render is
+in flight is a no-op (the in-flight render continues and its result is
+applied when it completes). If openscad-wasm fails to load or
+a render fails, the precomputed STL remains visible — graceful
+degradation is automatic.
+
+Binary assets referenced via `surface()` or `import()` (e.g.
+`heightmap.png` in `nz-ski-fields`) are staged to
+`site/sources/<project>/`, listed in `manifest.json`, and fetched as
+`Uint8Array` so they can be written into the wasm FS as raw bytes.
 
 ### 3D Controls
 

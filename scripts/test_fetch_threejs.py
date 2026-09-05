@@ -55,6 +55,25 @@ class StageAssetsTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 fetch_threejs.stage_assets("out")
 
+    def test_stage_assets_passes_pinned_hash(self):
+        stub = b"// stub"
+        fetch_mock = mock.Mock(return_value=stub)
+        with mock.patch.object(fetch_threejs, "fetch_url", fetch_mock):
+            fetch_threejs.stage_assets("out")
+
+        for key, asset in THREEJS_ASSETS.items():
+            calls = [
+                c
+                for c in fetch_mock.call_args_list
+                if c.kwargs.get("expected_sha256") == asset["sha256"]
+                and c.args[:1] == (asset["url"],)
+            ]
+            self.assertEqual(
+                len(calls), 1, f"{key} not called with its pinned sha256"
+            )
+        for c in fetch_mock.call_args_list:
+            self.assertTrue(c.kwargs.get("expected_sha256"))
+
 
 class AssetPathTests(unittest.TestCase):
     def test_asset_paths_match_importmap_prefix(self):
@@ -66,6 +85,12 @@ class AssetPathTests(unittest.TestCase):
             self.assertTrue(
                 THREEJS_ASSETS[key]["path"].startswith("addons/"),
                 f"{key} must resolve under the three/addons/ import-map prefix",
+            )
+
+    def test_every_asset_has_a_valid_pinned_hash(self):
+        for key, asset in THREEJS_ASSETS.items():
+            self.assertRegex(
+                asset["sha256"], r"^[0-9a-f]{64}$", f"{key} has a malformed sha256"
             )
 
 
@@ -120,15 +145,35 @@ class FetchUrlTests(unittest.TestCase):
         self.assertEqual(data, payload)
         never_call.assert_not_called()
 
-    def test_offline_fallback_returns_unpinned_cache(self):
+    def test_fetch_url_requires_expected_sha256(self):
         url = "https://example.invalid/unpinned.js"
-        payload = b"// unpinned cached copy"
-        self._seed_cache(url, payload)
+        self._seed_cache(url, b"cached copy")
+        never_call = mock.Mock(side_effect=AssertionError("should not call network"))
+
+        with mock.patch.object(threejs_assets.urllib.request, "urlopen", never_call):
+            with self.assertRaises(ValueError):
+                threejs_assets.fetch_url(url, expected_sha256=None)
+            with self.assertRaises(ValueError):
+                threejs_assets.fetch_url(url, expected_sha256="")
+        never_call.assert_not_called()
+
+    def test_fetch_url_rejects_malformed_pin(self):
+        url = "https://example.invalid/three.module.min.js"
+        never_call = mock.Mock(side_effect=AssertionError("should not call network"))
+
+        with mock.patch.object(threejs_assets.urllib.request, "urlopen", never_call):
+            with self.assertRaises(ValueError):
+                threejs_assets.fetch_url(url, expected_sha256="deadbeef")
+        never_call.assert_not_called()
+
+    def test_unreachable_cdn_verifies_cached_copy(self):
+        url = "https://example.invalid/tampered.js"
+        self._seed_cache(url, b"tampered")
         offline = mock.Mock(side_effect=OSError("no network"))
 
         with mock.patch.object(threejs_assets.urllib.request, "urlopen", offline):
-            data = threejs_assets.fetch_url(url, expected_sha256=None)
-        self.assertEqual(data, payload)
+            with self.assertRaisesRegex(ValueError, "Cached file SHA-256 mismatch"):
+                threejs_assets.fetch_url(url, expected_sha256="0" * 64)
 
     def test_stale_cache_falls_through_to_network(self):
         url = "https://example.invalid/fresh.js"

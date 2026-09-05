@@ -1,5 +1,10 @@
 # Public Snapshot
 
+**Depth: Deep dive.** Read this only when working on the public-mirror sync
+(`scripts/sync_public_snapshot.py`) or deciding what is/isn't safe to expose
+in the public repo. For everything else read [OVERVIEW.md](OVERVIEW.md)
+instead.
+
 `scripts/sync_public_snapshot.py` builds a sanitized copy of this repository
 and (when explicitly requested) pushes it to the public mirror at
 [github.com/stjohnb/3d-models](https://github.com/stjohnb/3d-models).

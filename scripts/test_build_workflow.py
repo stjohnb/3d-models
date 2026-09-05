@@ -569,5 +569,62 @@ class UnitTestStepCoverageTests(unittest.TestCase):
             )
 
 
+class ActionPinTests(unittest.TestCase):
+    """Issue #499: third-party actions must be pinned to full commit SHAs.
+
+    The build job runs with `id-token: write` and mints an OIDC token for
+    the AWS deploy role in the `Configure AWS credentials` step. A mutable
+    major-version tag there means a force-moved upstream tag, or a
+    compromised action repo, executes arbitrary code inside the credential
+    step of every privileged main-branch deploy with no change in this
+    repo. Tag pins are also invisible to Dependabot when a tag is rewritten
+    in place.
+    """
+
+    USES_RE = re.compile(r"^\s*(?:-\s+)?uses:\s*(\S+)(.*)$", re.MULTILINE)
+    SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+    def _external_uses(self):
+        for ref, rest in self.USES_RE.findall(read(BUILD_YML)):
+            if ref.startswith("./"):
+                continue  # local composite action; already immutable
+            yield ref, rest
+
+    def test_every_external_action_is_sha_pinned(self):
+        for ref, _rest in self._external_uses():
+            self.assertIn("@", ref, f"{ref} has no version reference")
+            _repo, _, version = ref.partition("@")
+            self.assertRegex(
+                version, self.SHA_RE,
+                f"{ref} is pinned to a mutable tag. Pin it to a full "
+                "40-character commit SHA (#499) — the build job holds "
+                "id-token: write and the AWS deploy role.",
+            )
+
+    def test_sha_pins_carry_a_version_comment(self):
+        for ref, rest in self._external_uses():
+            self.assertRegex(
+                rest.strip(), r"^#\s*v\d+\.\d+\.\d+$",
+                f"{ref} must carry a trailing '# vX.Y.Z' comment so the "
+                "human-readable version stays visible and Dependabot can "
+                "update both the SHA and the comment",
+            )
+
+    def test_local_setup_nix_stays_a_path_reference(self):
+        self.assertIn(
+            "uses: ./.github/actions/setup-nix", read(BUILD_YML),
+            "the repo's own composite action must stay a local path "
+            "reference — it cannot and must not be SHA-pinned",
+        )
+
+    def test_aws_credentials_step_is_sha_pinned(self):
+        self.assertRegex(
+            read(BUILD_YML),
+            r"uses: aws-actions/configure-aws-credentials@[0-9a-f]{40}"
+            r" # v\d+\.\d+\.\d+",
+            "the OIDC credential step must be SHA-pinned (#499)",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

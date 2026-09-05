@@ -9,8 +9,10 @@ written; a mismatch is a hard failure — a tampered runtime must never reach
 S3, so this deliberately does not join the deferred-enforcement pattern.
 """
 
+import hashlib
 import os
 import sys
+import urllib.request
 
 from threejs_assets import THREEJS_ASSETS, THREEJS_VERSION, VENDOR_DIR, fetch_url
 
@@ -32,7 +34,21 @@ def stage_assets(vendor_dir: str = VENDOR_DIR) -> list[str]:
     return written
 
 
+def print_hashes() -> int:
+    """Download each asset and print its SHA-256 without staging or caching."""
+    for key, asset in THREEJS_ASSETS.items():
+        req = urllib.request.Request(
+            asset["url"], headers={"User-Agent": "Mozilla/5.0"}
+        )
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = resp.read()
+        print(f'  {key}: "sha256": "{hashlib.sha256(data).hexdigest()}",')
+    return 0
+
+
 def main() -> int:
+    if "--print-hashes" in sys.argv[1:]:
+        return print_hashes()
     print(f"Vendoring Three.js {THREEJS_VERSION} to {VENDOR_DIR}")
     stage_assets()
     # Record the pinned version for diagnostics.

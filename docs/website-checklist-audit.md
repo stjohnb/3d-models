@@ -1,5 +1,9 @@
 # Website Checklist Audit
 
+**Depth: Deep dive.** Read this only when checking or updating this site's
+compliance status against the specification.website checklist. For general
+viewer/site architecture read [web-viewer.md](web-viewer.md) instead.
+
 Audit of [specification.website/checklist](https://specification.website/checklist/) for [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 
 **Key architectural fact**: the site is deployed to a sub-path (s3://www.bstjohn.net/3d-models/ via `aws s3 sync`). This repo controls only files under `/3d-models/` and the HTML markup of `index.html`/`embed.html`. Domain-root paths (`/robots.txt`, `/.well-known/*`), HTTP response headers (HSTS, CSP, compression, caching, HTTP/2-3), and TLS/DNS are all infra-scope (S3/CloudFront/Route53) and outside this repository.
