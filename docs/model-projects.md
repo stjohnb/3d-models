@@ -938,6 +938,13 @@ vertical backplate, dovetail-attached clips, and a removable drip tray.
 | `meta.json` | Project metadata (description, tags, difficulty) |
 | `dependency-graph.md` | Auto-generated `include`/`use` dependency graph |
 
+**File naming**: don't suffix a new test-print-oriented renderable's filename
+with "test" — name it after the part it contains. `Toothpaste clip.scad` and
+`Toothpaste hanger.scad` were both renamed off of a "... test.scad" pattern
+after PR #480 review flagged it: "Why is it 'toothpaste hanger _test_'? ...
+The 'test' bits are superfluous." `Toothbrush clip test.scad` predates that
+feedback and was left as-is — don't treat it as precedent for a new name.
+
 **Key parameters**: `Toothbrush tray.scad` carries two `head_peg()` posts and
 two `support_spike()` posts (module names changed in issue #388;
 `head_spike()` no longer exists). The head pegs are an 8 mm shaft

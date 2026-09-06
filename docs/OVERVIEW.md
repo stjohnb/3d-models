@@ -98,7 +98,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── meta.schema.json      # JSON Schema for per-project meta.json files
 ├── parameters.schema.json  # JSON Schema for per-model parameter manifests (<basename>.parameters.json)
 ├── AGENTS.md             # Canonical root agent instructions: repo summary, read-first docs, and key invariants
-├── CLAUDE.md             # Claude compatibility guidance; mirrors key root-agent sections still referenced by docs/tools
+├── CLAUDE.md             # One-line `@AGENTS.md` include, so the Claude CLI (which only auto-loads CLAUDE.md) picks up the same content
 ├── .agents/
 │   ├── issue-refiner.md      # Subagent: refines GitHub issues into implementation plans
 │   ├── issue-implementer.md  # Subagent: implements approved plans while preserving CI invariants
@@ -417,9 +417,9 @@ Reusable how-to guides for common development tasks live in `playbooks/`.
 
 ## AI Agent Configuration
 
-`AGENTS.md` at the repo root is the canonical short-form agent guide; `CLAUDE.md`
-is a compatibility document for consumers that still expect named sections to
-live there. Claws — an autonomous agent service — manages this repo's issues,
+`AGENTS.md` at the repo root is the canonical agent guide; `CLAUDE.md` is a
+one-line `@AGENTS.md` include, kept because the Claude CLI only auto-loads
+`CLAUDE.md`. Claws — an autonomous agent service — manages this repo's issues,
 PRs, and docs; see [claws-automation.md](claws-automation.md). Cross-cutting
 process requirements live in [requirements.md](requirements.md); durable
 operator/automation gotchas that belong to no feature doc live in

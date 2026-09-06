@@ -76,15 +76,13 @@ Everything else is included: all model project directories, `index.html`,
 #494 to keep the path provider-neutral) are kept deliberately — the
 blog post discusses the Claude Code / Claws workflow, so showing that
 configuration in the snapshot is intentional. `AGENTS.md` is the canonical
-root guide, while `CLAUDE.md` remains as a compatibility copy for tools and
-docs that still refer to named sections there. `AGENTS.md` also points
-readers at `docs/claws-automation.md`, which is included in the snapshot
-(it is not in `SNAPSHOT_EXCLUDES`) and resolves normally, and at
-`ideas/rejected.md`, which is excluded via the `ideas/` entry above and goes
-unresolved in the public mirror. `CLAUDE.md` carries the same
-`ideas/rejected.md` references, plus a "Blog voice" section naming
-`docs/blog-post.md`, which is also excluded above — both dangle in the
-snapshot the same way.
+root guide; `CLAUDE.md` is a one-line `@AGENTS.md` include (kept because the
+Claude CLI only auto-loads `CLAUDE.md`), so the snapshot's copy resolves the
+same way locally. `AGENTS.md` points readers at `docs/claws-automation.md`,
+which is included in the snapshot (it is not in `SNAPSHOT_EXCLUDES`) and
+resolves normally, and at `ideas/rejected.md` and a "Blog voice" section
+naming `docs/blog-post.md` — both excluded via the entries above, so both
+dangle in the snapshot the same way.
 
 ## How to use
 
