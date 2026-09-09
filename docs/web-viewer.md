@@ -286,11 +286,13 @@ project's `meta.json` can declare an `assembly` object (schema-validated by
 
 `stl` names the project STL this composite stands in for; `parts` are
 STL/colour pairs that must already be co-registered (share the same origin
-and footprint) so they can be loaded into one scene with no offset. Every
-viewer computes a `composite` descriptor by matching the model
-against `projectData.assembly.stl`, re-validating each part's `color` against
-`/^#[0-9a-fA-F]{6}$/` as defence-in-depth even though the schema already
-enforces it:
+and footprint) so they can be loaded into one scene with no offset. Both
+`assembly.stl` and every `parts[].stl` are bare basenames pinned by
+`^[A-Za-z0-9._ -]+\.stl$` in `meta.schema.json` (the same pattern as `hero`).
+Every viewer computes a `composite` descriptor by matching the model
+against `projectData.assembly.stl`, re-validating each part's `stl` against
+that same pattern and its `color` against `/^#[0-9a-fA-F]{6}$/` as
+defence-in-depth even though the schema already enforces both:
 
 - **`index.html`**: `createViewer()`'s `setModels(entries, token)` treats a
   composite as one entry with several part geometries: it loads every part
@@ -309,7 +311,10 @@ enforces it:
   time, resolves each part's STL to a base64 blob, and serialises
   `COMPOSITE_PARTS` into the generated HTML. The standalone JS scene-setup
   mirrors `index.html`'s `loadComposite()` logic and also skips the color
-  picker for composite pages.
+  picker for composite pages. `_composite_part_path()` additionally requires
+  the resolved path to stay under `site/` (via `os.path.realpath`) before
+  reading it, since these bytes are base64-inlined into a publicly-deployed
+  standalone viewer (issue #505).
 
 `nz-ski-fields/assembly.scad` still exists, but only as the **thumbnail
 source** — it renders at a downsampled 128px heightmap resolution so OpenSCAD's

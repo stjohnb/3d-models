@@ -14,6 +14,12 @@ that assume a project is self-contained:
 The first is fixed by adding what this prints to the zip; the second by
 refusing the combination in the parameter-manifest validation step.
 
+Paths that escape the repository root or land under `.git/` are dropped, not
+bundled — `render_cache.is_contained()` already enforces this in
+`collect_inputs`, and this module re-applies the same check as a second,
+independent layer since these paths are handed straight to `zip` for a
+publicly deployed artifact.
+
 Pure stdlib, no third-party deps.
 """
 
@@ -22,7 +28,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from render_cache import collect_inputs
+from render_cache import collect_inputs, is_contained
 
 
 def external_assets_for(scad_path, project_dir):
@@ -36,11 +42,16 @@ def external_assets_for(scad_path, project_dir):
     """
     prefix = os.path.normpath(project_dir) + os.sep
     _scad_files, asset_files, _unresolved = collect_inputs(scad_path)
-    return sorted(
-        rel
-        for rel in (os.path.relpath(asset) for asset in asset_files)
-        if not rel.startswith(prefix)
-    )
+    external = []
+    for asset in asset_files:
+        if not is_contained(asset):
+            continue
+        rel = os.path.relpath(asset)
+        if rel.startswith(".." + os.sep) or rel == "..":
+            continue
+        if not rel.startswith(prefix):
+            external.append(rel)
+    return sorted(external)
 
 
 def external_assets(project_dir):

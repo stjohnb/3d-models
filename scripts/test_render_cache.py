@@ -92,6 +92,64 @@ class RenderCacheTestCase(unittest.TestCase):
         without_include = compute_key("a.scad", VERSION)
         self.assertNotEqual(with_include, without_include)
 
+    def test_local_asset_still_collected(self):
+        self._write("h.png", b"\x89PNG\x00\x01\x02\x03", mode="wb")
+        self._write("a.scad", 'surface(file="h.png");\n')
+        scad_files, asset_files, unresolved = collect_inputs("a.scad")
+        rels = {os.path.relpath(p) for p in asset_files}
+        self.assertIn("h.png", rels)
+        self.assertEqual(unresolved, set())
+
+    def test_traversal_asset_is_excluded(self):
+        with tempfile.TemporaryDirectory() as outside:
+            outside_file = os.path.join(outside, "outside.stl")
+            with open(outside_file, "w") as f:
+                f.write("secret")
+            target = os.path.relpath(outside_file, self._tmp.name)
+            self._write("a.scad", 'import("%s");\n' % target)
+            scad_files, asset_files, unresolved = collect_inputs("a.scad")
+            self.assertEqual(asset_files, set())
+            self.assertIn(target, unresolved)
+
+    def test_git_directory_asset_is_excluded(self):
+        self._write(".git/config", "[remote]\n")
+        self._write("a.scad", 'import(".git/config");\n')
+        scad_files, asset_files, unresolved = collect_inputs("a.scad")
+        self.assertEqual(asset_files, set())
+        self.assertIn(".git/config", unresolved)
+
+    def test_traversal_include_is_excluded(self):
+        with tempfile.TemporaryDirectory() as outside:
+            outside_file = os.path.join(outside, "_evil.scad")
+            with open(outside_file, "w") as f:
+                f.write("module m() { cube(1); }\n")
+            target = os.path.relpath(outside_file, self._tmp.name)
+            self._write("a.scad", "include <%s>\n" % target)
+            scad_files, asset_files, unresolved = collect_inputs("a.scad")
+            rels = {os.path.relpath(p) for p in scad_files}
+            self.assertEqual(rels, {"a.scad"})
+            self.assertIn(target, unresolved)
+
+    def test_traversal_asset_does_not_hash_file_contents(self):
+        with tempfile.TemporaryDirectory() as outside:
+            outside_file = os.path.join(outside, "outside.stl")
+            with open(outside_file, "w") as f:
+                f.write("secret-a")
+            target = os.path.relpath(outside_file, self._tmp.name)
+            self._write("a.scad", 'import("%s");\n' % target)
+            before = compute_key("a.scad", VERSION)
+            with open(outside_file, "w") as f:
+                f.write("secret-b")
+            after = compute_key("a.scad", VERSION)
+            self.assertEqual(before, after)
+
+    def test_directory_asset_is_excluded(self):
+        self._write("sub/x.txt", "x")
+        self._write("a.scad", 'import("sub");\n')
+        scad_files, asset_files, unresolved = collect_inputs("a.scad")
+        self.assertEqual(asset_files, set())
+        self.assertIsInstance(compute_key("a.scad", VERSION), str)
+
 
 if __name__ == "__main__":
     unittest.main()

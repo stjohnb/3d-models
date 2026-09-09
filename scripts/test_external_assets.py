@@ -104,5 +104,47 @@ class PerRenderableTests(unittest.TestCase):
             self.assertEqual(external_assets_for("proj/a.scad", "proj"), [])
 
 
+class ContainmentTests(unittest.TestCase):
+    def test_traversal_asset_is_not_bundled(self):
+        with tempfile.TemporaryDirectory() as outside:
+            outside_file = os.path.join(outside, "outside.stl")
+            with open(outside_file, "w") as f:
+                f.write("secret")
+            with tempfile.TemporaryDirectory() as tmp:
+                proj = os.path.join(tmp, "proj")
+                os.makedirs(proj)
+                target = os.path.relpath(outside_file, proj)
+                with open(os.path.join(proj, "a.scad"), "w") as f:
+                    f.write('import("%s");\n' % target)
+                original = os.getcwd()
+                os.chdir(tmp)
+                try:
+                    self.assertEqual(external_assets_for("proj/a.scad", "proj"), [])
+                    self.assertEqual(external_assets("proj"), [])
+                finally:
+                    os.chdir(original)
+
+    def test_git_config_is_not_bundled(self):
+        with tree({
+            "proj/a.scad": 'import("../.git/config");\n',
+            ".git/config": "[remote]\n  url = https://x:TOKEN@github.com/o/r\n",
+        }):
+            self.assertEqual(external_assets_for("proj/a.scad", "proj"), [])
+            self.assertEqual(external_assets("proj"), [])
+
+    def test_scans_reference_still_bundled(self):
+        with tree({
+            "proj/a.scad": 'import("../scans/tube/tube-reference.stl");\n',
+            "scans/tube/tube-reference.stl": "stl",
+        }):
+            self.assertEqual(
+                external_assets_for("proj/a.scad", "proj"),
+                ["scans/tube/tube-reference.stl"],
+            )
+            self.assertEqual(
+                external_assets("proj"), ["scans/tube/tube-reference.stl"]
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

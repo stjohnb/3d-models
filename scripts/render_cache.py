@@ -29,6 +29,35 @@ _INCLUDE_RE = re.compile(r'^\s*(?:include|use)\s+<([^>]*)>')
 _ASSET_RE = re.compile(r'(?:surface|import)\s*\(\s*(?:file\s*=\s*)?"([^"]+)"')
 
 
+def containment_root():
+    """Directory that resolved include/asset paths must stay inside.
+
+    The module is already cwd-rooted (compute_key hashes os.path.relpath(path)
+    with no start), and both callers — build.yml's render step and
+    external_assets.py — run from the repository root.
+    """
+    return os.path.realpath(os.getcwd())
+
+
+def is_contained(path, root=None):
+    """True if path is a regular file inside root and not under a .git dir.
+
+    Containment is checked on os.path.realpath, so neither `..` segments nor a
+    symlink can escape. Any path component named `.git` is rejected outright:
+    the checkout step writes the job token into .git/config, and source zips
+    built from these paths are deployed publicly, so .git must never be
+    bundled or hashed.
+    """
+    if root is None:
+        root = containment_root()
+    real = os.path.realpath(path)
+    if real != root and not real.startswith(root + os.sep):
+        return False
+    if ".git" in os.path.relpath(real, root).split(os.sep):
+        return False
+    return os.path.isfile(real)
+
+
 def collect_inputs(scad_path):
     """BFS the include/use chain from scad_path.
 
@@ -44,6 +73,7 @@ def collect_inputs(scad_path):
     scad_files.add(scad_path)
     visited = set()
     queue = [scad_path]
+    root = containment_root()
 
     while queue:
         current = queue.pop()
@@ -66,19 +96,29 @@ def collect_inputs(scad_path):
                 continue
             target = m.group(1)
             resolved = os.path.normpath(os.path.join(base, target))
-            if os.path.exists(resolved) and resolved.endswith(".scad"):
+            if resolved.endswith(".scad") and is_contained(resolved, root):
                 if resolved not in scad_files:
                     scad_files.add(resolved)
                     queue.append(resolved)
             else:
+                if os.path.exists(resolved) and not is_contained(resolved, root):
+                    sys.stderr.write(
+                        "::warning::%s: refusing out-of-tree include target %r\n"
+                        % (current, target)
+                    )
                 unresolved.add(target)
 
         for m in _ASSET_RE.finditer(text):
             target = m.group(1)
             resolved = os.path.normpath(os.path.join(base, target))
-            if os.path.exists(resolved):
+            if is_contained(resolved, root):
                 asset_files.add(resolved)
             else:
+                if os.path.exists(resolved):
+                    sys.stderr.write(
+                        "::warning::%s: refusing out-of-tree asset target %r\n"
+                        % (current, target)
+                    )
                 unresolved.add(target)
 
     return scad_files, asset_files, unresolved

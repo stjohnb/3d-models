@@ -99,6 +99,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── parameters.schema.json  # JSON Schema for per-model parameter manifests (<basename>.parameters.json)
 ├── AGENTS.md             # Canonical root agent instructions: repo summary, read-first docs, and key invariants
 ├── CLAUDE.md             # One-line `@AGENTS.md` include, so the Claude CLI (which only auto-loads CLAUDE.md) picks up the same content
+├── claws.json            # Opts this repo into Claws automation (`{"enabled": true}`); per-job disables listed here as `disabledJobs`, most are toggled on the Claws dashboard instead — see claws-automation.md
 ├── .agents/
 │   ├── issue-refiner.md      # Subagent: refines GitHub issues into implementation plans
 │   ├── issue-implementer.md  # Subagent: implements approved plans while preserving CI invariants
@@ -112,7 +113,8 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   │   └── setup-nix/
 │   │       └── action.yml    # Composite action: puts the runner's system `nix` on PATH or fails fast
 │   └── workflows/
-│       └── build.yml             # CI: render, validate, thumbnail, deploy
+│       ├── build.yml             # CI: render, validate, thumbnail, deploy
+│       └── pr-preview-cleanup.yml  # CI: delete pr-preview/pr-{N}/ from S3 on PR close
 └── docs/
     ├── OVERVIEW.md             # This file — main entry point
     ├── model-projects.md       # Per-project file tables, geometry, and key parameters
@@ -218,7 +220,7 @@ from downstream consumption (models.json, structured data).
 | `mating_pairs` | `array` of 2-element `string` arrays | Pairs of STL filenames that must fit without geometric overlap (validated by `check_interference.py`) |
 | `complex_interior` | `boolean` | When `true`, CI renders three extra orthographic views (`_top`, `_bottom`, `_front`) to expose internal cavity geometry; used by `power-workshop` and `drawer-organiser` |
 | `hero` | `string` | Rendered STL basename featured as the project's landing-gallery and README thumbnail; defaults to the first STL alphabetically. Set it explicitly on a new multi-model project when there's an obvious representative part, rather than relying on alphabetical luck — standing direction after `scanning-rig`'s thumbnail picked the wrong STL (#372). Deliberately absent for single-model projects and co-equal-parts projects (`adjustable-bracket`, `vacuum-hose`) |
-| `assembly` | `object` `{stl, parts}` | Declares that one project STL's viewer card is a coloured multi-part composite rather than a single mesh — see "Composite Multi-Colour Assembly Previews" below; currently only `nz-ski-fields` uses this |
+| `assembly` | `object` `{stl, parts}` | Declares that one project STL's viewer card is a coloured multi-part composite rather than a single mesh — see "Composite Multi-Colour Assembly Previews" below; currently only `nz-ski-fields` uses this; `stl` values are basename-pinned (`^[A-Za-z0-9._ -]+\.stl$`) |
 
 Metadata is merged into `models.json` at build time. Only viewer-relevant
 fields are propagated (`description`, `tags`, `difficulty`, `version`,
@@ -455,7 +457,7 @@ detail, including every env var and validation rule, is in
 | OpenSCAD version baseline | `.openscad-version` | Committed expected version string; CI warns on mismatch |
 | AWS deployment role | `secrets.AWS_ROLE_ARN` | OIDC role for S3 sync |
 | S3 bucket path | `s3://www.bstjohn.net/3d-models/` | Production deployment target |
-| PR preview path | `s3://…/pr-preview/pr-{N}/{SHA}/` | Per-PR, per-commit previews |
+| PR preview path | `s3://…/pr-preview/pr-{N}/{SHA}/` | Per-PR, per-commit previews; deleted recursively by `pr-preview-cleanup.yml` when the PR closes |
 | Source zip naming | `site/<dir>-source.zip` | Per-project zip of git-tracked source files; referenced as `sourceZip` in `models.json` |
 | Three.js version | `0.170.0` (`scripts/threejs_assets.py`; staged same-origin to `site/vendor/three/0.170.0/` by `scripts/fetch_threejs.py`, import maps in `index.html`/`embed.html`) | STLLoader + OrbitControls; all three assets SHA-256 verified before staging, and `generate-standalone.py` inlines the same verified bytes; unpinned/malformed hash is a hard failure |
 | Viewer max pixel ratio | `MAX_PIXEL_RATIO = 1.5` in `index.html`, `embed.html`, `generate-standalone.py` | Caps Retina drawing-buffer cost; MSAA (`antialias: true`) kept |

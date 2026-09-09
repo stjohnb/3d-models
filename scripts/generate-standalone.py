@@ -27,6 +27,7 @@ from threejs_assets import THREEJS_ASSETS, THREEJS_VERSION, fetch_url
 FILAMENT_COLORS_JSON = "filament-colors.json"
 SCAD_MAP = "site/.scad-map"
 OUTPUT_DIR = "site/standalone"
+SITE_DIR = "site"
 
 
 def b64_data_uri(data: bytes, mime: str) -> str:
@@ -41,6 +42,27 @@ def _js_escape(s: str) -> str:
 def _composite_parts_js(parts) -> str:
     """Serialise composite parts (list of {"stl_b64", "color"}) to a safe JS literal."""
     return _js_escape(json.dumps(parts))
+
+
+def _composite_part_path(part_stl, site_dir=SITE_DIR):
+    """Resolve a composite part STL name to a path inside site_dir, or None.
+
+    Defence-in-depth for issue #505: meta.json's assembly part names are
+    schema-pinned to bare STL basenames, but generate-standalone.py inlines
+    these bytes into a publicly-deployed artifact, so re-validate here.
+    Returns None when the value is not a plain STL basename or when it
+    resolves outside site_dir. Existence is the caller's check.
+    """
+    if not isinstance(part_stl, str):
+        return None
+    if not re.fullmatch(r"[A-Za-z0-9._ -]+\.stl", part_stl):
+        return None
+    part_path = os.path.join(site_dir, part_stl)
+    site_real = os.path.realpath(site_dir)
+    part_real = os.path.realpath(part_path)
+    if not part_real.startswith(site_real + os.sep):
+        return None
+    return part_path
 
 
 def _source_link_html(source):
@@ -768,10 +790,10 @@ def main():
                 print(f"  Warning: invalid composite color {color!r} for {stl}, skipping part")
                 continue
             part_stl = part.get("stl")
-            if not isinstance(part_stl, str) or not part_stl:
-                print(f"  Warning: composite part missing stl filename for {stl}, skipping part")
+            part_path = _composite_part_path(part_stl)
+            if part_path is None:
+                print(f"  Warning: unsafe composite part stl {part_stl!r} for {stl}, skipping part")
                 continue
-            part_path = os.path.join("site", part_stl)
             if not os.path.isfile(part_path):
                 print(f"  Warning: composite part {part_path} not found, skipping")
                 continue

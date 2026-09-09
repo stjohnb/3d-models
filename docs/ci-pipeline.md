@@ -299,6 +299,11 @@ from the key: the precomputed STL uses the defaults baked into the `.scad` (no
 `-D` overrides), so manifests never affect the precomputed geometry. If the
 runner's `$HOME` is ephemeral per job every build is a cold miss (correct, just no
 speedup) — point `RENDER_CACHE_DIR` at a persistent volume to retain the cache.
+Resolved `include`/`use`/`surface`/`import` targets must pass
+`render_cache.is_contained()` — a regular file whose `os.path.realpath` stays
+inside the repository root and has no `.git` path component — or they are
+recorded as an unresolved raw string instead of being hashed or bundled
+(issue #506).
 
 ### 6. Validate STL Meshes
 
@@ -470,7 +475,10 @@ therefore also appends whatever `python3 scripts/external_assets.py "$dir"`
 prints — the committed scan reference meshes under `scans/` that the project
 `import()`s (issue #439). With no such model in the tree yet, this is a no-op. Source zips are deployed alongside
 STLs via the existing `aws s3 sync` step and referenced from `models.json` as
-the optional `sourceZip` field.
+the optional `sourceZip` field. `external_assets.py` re-applies
+`render_cache.is_contained()` to every asset path before printing it, since
+these paths are handed straight to `zip` for an archive deployed publicly on
+every build (issue #506).
 
 ### 9. Render PNG Thumbnails
 
@@ -749,6 +757,19 @@ passing `github-actions-${{ github.run_id }}`, #291).
 - **Pull requests**: `aws s3 sync ./site s3://…/pr-preview/pr-{N}/{SHA}/`.
   PR deploys are not gated on validation so reviewers can inspect broken
   models in the 3D viewer.
+- **PR close**: `.github/workflows/pr-preview-cleanup.yml` runs on
+  `pull_request: [closed]` and executes
+  `aws s3 rm s3://…/pr-preview/pr-{N}/ --recursive`, reclaiming every SHA
+  prefix that PR deployed. Kept out of `build.yml` on purpose: the build job
+  is the full render pipeline and its preview-deploy step is gated only on
+  `github.event_name == 'pull_request'`, so a `closed` event there would
+  re-render everything and re-upload the preview. The cleanup job shares
+  `build.yml`'s `pages-pr-{N}` concurrency group so a close cancels any
+  in-flight build for that PR before the delete. Superseded SHA prefixes for
+  *open* PRs are not pruned — they are reclaimed when the PR closes. A
+  `workflow_dispatch` input (`pr_numbers`, space-separated) exists for
+  reclaiming previews orphaned before this workflow landed. Guarded by
+  `scripts/test_pr_preview_cleanup.py`.
 
 **Action pinning**: every external action in `build.yml` (`actions/checkout`,
 `aws-actions/configure-aws-credentials`, `actions/github-script`) is pinned to

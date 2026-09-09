@@ -306,5 +306,66 @@ class TestPrintingNotesHtml(unittest.TestCase):
         self.assertIn('<summary>Printing notes</summary>', result)
 
 
+class TestCompositePartPath(unittest.TestCase):
+    """Path-traversal defence for composite assembly parts (issue #505)."""
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.site_dir = os.path.join(self._tmp.name, "site")
+        os.makedirs(self.site_dir)
+        with open(os.path.join(self.site_dir, "lake.stl"), "wb") as f:
+            f.write(b"dummy stl bytes")
+
+    def _resolve(self, part_stl):
+        return gs._composite_part_path(part_stl, site_dir=self.site_dir)
+
+    def test_plain_basename_resolves(self):
+        result = self._resolve("lake.stl")
+        self.assertEqual(result, os.path.join(self.site_dir, "lake.stl"))
+        self.assertTrue(os.path.isfile(result))
+
+    def test_basename_with_space_resolves(self):
+        result = self._resolve("Toothbrush assembly.stl")
+        self.assertIsNotNone(result)
+
+    def test_relative_traversal_rejected(self):
+        self.assertIsNone(self._resolve("../secret.txt"))
+
+    def test_deep_relative_traversal_rejected(self):
+        self.assertIsNone(self._resolve("../../.git/config"))
+
+    def test_traversal_via_subdir_rejected(self):
+        self.assertIsNone(self._resolve("subdir/../../escape.stl"))
+
+    def test_absolute_path_rejected(self):
+        self.assertIsNone(self._resolve("/etc/passwd"))
+
+    def test_trailing_newline_rejected(self):
+        self.assertIsNone(self._resolve("lake.stl\n"))
+
+    def test_uppercase_extension_rejected(self):
+        self.assertIsNone(self._resolve("lake.STL"))
+
+    def test_extra_suffix_after_extension_rejected(self):
+        self.assertIsNone(self._resolve("lake.stl.bak"))
+
+    def test_empty_string_rejected(self):
+        self.assertIsNone(self._resolve(""))
+
+    def test_none_rejected(self):
+        self.assertIsNone(self._resolve(None))
+
+    def test_non_string_int_rejected(self):
+        self.assertIsNone(self._resolve(123))
+
+    def test_non_string_dict_rejected(self):
+        self.assertIsNone(self._resolve({"stl": "x"}))
+
+    def test_subdirectory_name_rejected(self):
+        self.assertIsNone(self._resolve("sub/lake.stl"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,82 @@
+name: PR Preview Cleanup
+
+# PR preview deployments (build.yml's "Deploy PR preview" step) write a full
+# copy of site/ to s3://www.bstjohn.net/3d-models/pr-preview/pr-{N}/{SHA}/ on
+# every push. The main-branch deploy excludes pr-preview/* from its --delete,
+# so nothing else ever reclaims them. This workflow removes a PR's whole
+# prefix when the PR closes (merged or abandoned).
+#
+# This is deliberately a separate workflow rather than a `closed` entry in
+# build.yml's `pull_request` types: build.yml's job is the full render
+# pipeline and its preview-deploy step is gated only on
+# `github.event_name == 'pull_request'`, so a close event there would
+# re-render every model and re-upload the preview it is meant to delete.
+
+# Triggers removed for the public snapshot — this workflow is intentionally disabled.
+# See the private source repository for the active version.
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  id-token: write
+
+# Same group build.yml uses for PR builds (concurrency groups are
+# repo-wide, not per-workflow), so closing a PR cancels any in-flight
+# build for it. Without this, a build still running at close time can
+# re-upload a preview after the delete has run.
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('pages-pr-{0}', github.event.number) || format('pr-preview-cleanup-{0}', github.run_id) }}
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    # Fork PRs get no secrets, so AWS_ROLE_ARN would be empty and the OIDC
+    # step would fail noisily on every fork PR close. Skip instead.
+    if: >-
+      github.event_name == 'workflow_dispatch'
+      || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, linux]
+    defaults:
+      run:
+        shell: nix --extra-experimental-features nix-command --extra-experimental-features flakes develop ${{ github.workspace }}#default --command bash -euo pipefail {0}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A closed PR's refs/pull/N/merge ref is not guaranteed to still
+          # exist, so check out the base branch instead of the default
+          # merge ref. Only flake.nix and .github/actions/setup-nix are
+          # needed here.
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.ref || github.ref_name }}
+
+      - name: Set up Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: github-actions-${{ github.run_id }}
+
+      - name: Delete PR preview prefixes
+        env:
+          # Never interpolate these into the command line: an unvalidated
+          # or empty value would turn the delete target into
+          # .../pr-preview/pr-/ and --recursive would then match EVERY
+          # pr-* prefix in the bucket.
+          PR_NUMBERS: ${{ github.event_name == 'pull_request' && github.event.number || inputs.pr_numbers }}
+        run: |
+          BUCKET_PREFIX="s3://www.bstjohn.net/3d-models/pr-preview"
+          for pr in $PR_NUMBERS; do
+            case "$pr" in
+              ''|*[!0-9]*)
+                echo "::error::Refusing to delete: '$pr' is not a PR number"
+                exit 1
+                ;;
+            esac
+            target="${BUCKET_PREFIX}/pr-${pr}/"
+            count=$(aws s3 ls "$target" --recursive | wc -l)
+            echo "Deleting $count object(s) under $target"
+            aws s3 rm "$target" --recursive --only-show-errors
+          done

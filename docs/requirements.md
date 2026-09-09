@@ -80,3 +80,15 @@ arrive iteratively" above. Don't re-propose photo-outline extraction as the
 starting point for a new model's geometry on the strength of this issue
 alone; treat a reference photo as dimensional context to measure from, not
 as a template to trace.
+
+### Opting in to Claws site-promotion (`docs/promotion/`) before the pilot reports back
+
+Issue #503 asked for a `docs/promotion/3d-models.yaml` manifest to opt this
+repo into Claws' `site-promoter` job (daily growth-marketing agent that files
+promotion issues per configured channel). A full manifest was planned but the
+issue was closed without merging: "Closing for now: perudo
+(St-John-Software/perudo#292) is the pilot for Claws site promotion. Reopen
+once that manifest has run for a few cycles and the output looks right."
+There is no `docs/promotion/` directory in this repo. Don't add one on the
+strength of #503's plan alone — wait for the perudo pilot's results to be
+confirmed good, or for the issue to be explicitly reopened.

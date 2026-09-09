@@ -249,11 +249,13 @@
             stlFile = model.stl;
             sourcePath = model.source;
             // Composite (coloured multi-part) preview — see issue #275.
-            // Colours re-validated as defence-in-depth beyond the schema.
+            // Part names and colours are re-validated here as defence-in-depth
+            // even though the schema already enforces both (issue #505).
             composite = (projectData.assembly && projectData.assembly.stl === model.stl
                 && Array.isArray(projectData.assembly.parts))
               ? projectData.assembly.parts
-                  .filter(p => typeof p.stl === 'string' && /^#[0-9a-fA-F]{6}$/.test(p.color))
+                  .filter(p => typeof p.stl === 'string' && /^[A-Za-z0-9._ -]+\.stl$/.test(p.stl)
+                      && /^#[0-9a-fA-F]{6}$/.test(p.color))
                   .map(p => ({ url: `${p.stl}${cacheBust}`, color: p.color }))
               : null;
             break;

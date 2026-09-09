@@ -79,14 +79,22 @@
       "type": "object",
       "description": "Declares this project ships a composite preview: existing part STLs rendered together, each in a fixed colour. Replaces a monochrome merged-assembly STL for viewing.",
       "properties": {
-        "stl": { "type": "string", "description": "The rendered STL basename whose viewer card this composite replaces (e.g. \"assembly.stl\")." },
+        "stl": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._ -]+\\.stl$",
+          "description": "The rendered STL basename whose viewer card this composite replaces (e.g. \"assembly.stl\"). Basename only — no path separators or traversal segments."
+        },
         "parts": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
             "properties": {
-              "stl": { "type": "string" },
+              "stl": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._ -]+\\.stl$",
+                "description": "Rendered STL basename of this part. Basename only — no path separators or traversal segments."
+              },
               "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" }
             },
             "required": ["stl", "color"],

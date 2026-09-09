@@ -155,6 +155,16 @@ class CopiedInvariantTests(unittest.TestCase):
                 f"{path.name} must declare PUBLIC_REPO identically",
             )
 
+    def test_composite_part_name_filter_parity(self):
+        needle = r"/^[A-Za-z0-9._ -]+\.stl$/.test(p.stl)"
+        for path in VIEWERS:
+            html = read(path)
+            self.assertEqual(
+                html.count(needle),
+                1,
+                f"{path.name} must re-validate composite part stl basenames exactly once (issue #505)",
+            )
+
 
 class ThreeJsVendorTests(unittest.TestCase):
     """Three.js must load same-origin from the staged vendor tree (issue #403)."""
