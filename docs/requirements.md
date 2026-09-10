@@ -92,3 +92,16 @@ once that manifest has run for a few cycles and the output looks right."
 There is no `docs/promotion/` directory in this repo. Don't add one on the
 strength of #503's plan alone — wait for the perudo pilot's results to be
 confirmed good, or for the issue to be explicitly reopened.
+
+### Rotary-dispenser mechanism with the crank inside the housing (#512/#514)
+
+A rotary drum muesli dispenser for a clip-lid cereal box (issue #512) was
+implemented and closed without merging: "This design doesn't make sense to
+me. Seems the cog to turn is on the inside of the box. The chute & user's
+handle should both be on the outside, no?" (#514). No `muesli-dispenser` (or
+similar) project exists in the repo. The generalizable constraint: any
+crank/rotary-mechanism model must put the parts the user actually touches or
+uses — the turning handle and the output chute/spout — on the exterior of the
+enclosure, reachable and visible without opening it. Don't re-propose a
+dispenser or hopper design where the operating mechanism is internal to the
+housing on the strength of #512's plan alone.

@@ -12,6 +12,37 @@ You are the issue-refiner agent for the St-John-Software/3d-models repository �
 3. Read `docs/OPENSCAD_LIBRARIES.md` when the issue proposes a new model or new geometry pattern.
 4. Check `ideas/rejected.md` before proposing any patterns — do not re-propose what the maintainer has already declined.
 
+## Show the geometry before the plan is approved
+
+- For any issue proposing new or changed geometry, write the candidate
+  `.scad` into the worktree and run
+  `scripts/request-issue-preview.sh <issue> <files...>`, then wait for CI
+  and quote/link the resulting "🔍 Model Preview" comment in the plan.
+- **Hard rule:** never run `openscad` on the planner host. The planner runs
+  on `openclaw` (~3.8 GB RAM, shared with the Claws service); all rendering
+  happens on the `ryzen` runner via the preview PR. This is stricter than
+  `AGENTS.md`'s general "capped local render is allowed" guidance, and
+  deliberately so — the planner has no reason to render locally now that a
+  preview PR does it properly.
+- When the proposal introduces a **new project directory**, include a
+  minimal `meta.json` (`{"description": "..."}` — only `description` is
+  required by `meta.schema.json`) among the candidate files, so the model
+  reaches `models.json` and appears in the preview viewer.
+- A change confined to an underscore library (`_*.scad`) produces no
+  thumbnail (build.yml's comment maps changed `.scad` basenames to PNG
+  names, and libraries render no STL). Include at least one renderable that
+  `include`s it, or point the maintainer at the interactive viewer link
+  instead.
+- The preview PR is disposable: draft, `Claws Ignore`, never merged, closed
+  when the plan is decided. Re-running the helper force-pushes and updates
+  the same PR and the same comment.
+- A red preview build means the candidate geometry has a real problem (mesh
+  validation, interference, thumbnail render) — fold that into the plan
+  rather than re-running.
+
+See [playbooks/preview_a_proposed_model.md](../playbooks/preview_a_proposed_model.md)
+for the full loop.
+
 ## For new model proposals
 
 - Name exact `.scad` filenames: library files must be underscore-prefixed (`_*.scad`); renderables get one STL each.

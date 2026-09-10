@@ -9,9 +9,11 @@ to `main` and on PRs.
 
 ## Workflows
 
-One workflow file lives in `.github/workflows/`:
+Two workflow files live in `.github/workflows/`:
 
 - **`build.yml`** — the main build pipeline, documented in detail below.
+- **`pr-preview-cleanup.yml`** — deletes a PR's `pr-preview/pr-{N}/` S3
+  prefix on close; see step 18 below.
 
 Main-branch failures of `build.yml` are not tracked by a workflow in this
 repo. See [Main-branch failure monitoring](#main-branch-failure-monitoring).
@@ -821,6 +823,39 @@ don't fail the entire workflow. All three GitHub API calls (`listFiles`,
 `paginate(listComments)`, `createComment`/`updateComment`) are wrapped in a
 `withRetry(fn, retries=3, delayMs=2000)` helper that retries with linear
 backoff (delay × attempt number) on error.
+
+### Preview PRs for issue planning
+
+No `.scad` is rendered until a real PR exists, which leaves issue-planning
+review blind — the maintainer can't see a proposed model's geometry before
+deciding whether the plan is right (issue #518). `scripts/request-issue-preview.sh`
+closes that gap by reusing this pipeline exactly as-is, rather than building a
+second, parallel render path: the issue planner pushes candidate `.scad`
+sources to a `claws/preview-issue-<N>` branch and opens a **draft** PR
+labelled **Claws Ignore**. That PR then runs the ordinary `pull_request`
+path above — steps 5 through 20, unmodified — on the `ryzen` runner, gets a
+`pr-preview/pr-<N>/<sha8>/` deployment, and receives the same "🔍 Model
+Preview" comment (thumbnails, mesh validation, interference, triangle
+counts) any other PR gets. There is no special-casing anywhere in
+`build.yml` for this: from the pipeline's point of view it is an ordinary
+draft PR.
+
+The preview PR is disposable and must never be merged — it is draft,
+carries `[do not merge]` in its title, and is labelled `Claws Ignore` so
+Claws itself skips it. Closing it (once the plan is decided) is what
+reclaims its `pr-preview/pr-<N>/` prefix, via `pr-preview-cleanup.yml`
+exactly as for any other PR. Re-running the script force-pushes the same
+branch, which updates the same PR and the same comment rather than creating
+a new one.
+
+The PR body deliberately refers to "issue `<N>`" as plain text with no
+leading `#` — a `#518`-style cross-reference would link the preview PR into
+the issue's timeline and risks Claws treating it as the issue's real
+implementation PR (e.g. marking the issue **In Review**). This is enforced
+by `scripts/test_request_issue_preview.py`'s `GhInvocationTests`.
+
+See [playbooks/preview_a_proposed_model.md](../playbooks/preview_a_proposed_model.md)
+for the full workflow.
 
 ### 21. Enforce Mesh Validation
 

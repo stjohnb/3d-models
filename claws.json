@@ -1,4 +1,0 @@
-{
-  "enabled": true,
-  "notes": "Opted into Claws automation (St-John-Software/claws#2885). Per-job disables live on the dashboard /jobs matrix; list job names in disabledJobs here only to lock them off for this repo."
-}

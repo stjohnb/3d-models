@@ -27,6 +27,7 @@ EXPECTED_HEROES = {
     "drawer-organiser": "drawer_assembly.stl",
     "esp32-display-case": "case_front.stl",
     "macbook-pro-laptop-stand": "laptop_stand.stl",
+    "muesli-dispenser": "dispenser_assembly.stl",
     "nz-ski-fields": "assembly.stl",
     "power-workshop": "screwdriver_handle.stl",
     "scanning-rig": "scanning_rig_assembly.stl",

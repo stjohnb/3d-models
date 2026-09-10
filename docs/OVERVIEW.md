@@ -60,6 +60,8 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── fetch_terrain_heightmap.py  # One-off generator: fetch a lat/lon terrain heightmap PNG (Mapzen terrarium tiles via AWS Open Data); not used by CI
 │   ├── generate_lake_bed.py        # One-off generator: bake lakebed bathymetry PNG from heightmap for nz-ski-fields; not used by CI
 │   ├── render_view.py          # Render an arbitrary OpenSCAD view to PNG via capped-openscad.sh (developer/agent tool, not used by CI)
+│   ├── request-issue-preview.sh  # Opens a disposable draft preview PR so proposed geometry renders on CI during issue planning (#518); see playbooks/preview_a_proposed_model.md
+│   ├── test_request_issue_preview.py  # Tests for request-issue-preview.sh (arg validation, commit-build isolation, gh invocation shape)
 │   ├── scan_pipeline.py        # Photogrammetry CLI: scanning-rig capture video → scaled STL (operator tool, not used by CI)
 │   ├── scan_frames.py          # Frame extraction (ffmpeg), sharpness-binned and hold-aware frame selection for scan_pipeline
 │   ├── scan_masks.py           # Platter-ellipse + salient-object masking for scan_pipeline (COLMAP mask PNGs); mask-geometry tests skip unless `cv2` is importable (`nix develop .#scan`)
@@ -99,7 +101,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── parameters.schema.json  # JSON Schema for per-model parameter manifests (<basename>.parameters.json)
 ├── AGENTS.md             # Canonical root agent instructions: repo summary, read-first docs, and key invariants
 ├── CLAUDE.md             # One-line `@AGENTS.md` include, so the Claude CLI (which only auto-loads CLAUDE.md) picks up the same content
-├── claws.json            # Opts this repo into Claws automation (`{"enabled": true}`); per-job disables listed here as `disabledJobs`, most are toggled on the Claws dashboard instead — see claws-automation.md
+├── claws.json            # Opts this repo into Claws automation (`{"enabled": true}`); per-job disables live here in `disabledJobs` (unioned with the automation host's config) — see claws-automation.md
 ├── .agents/
 │   ├── issue-refiner.md      # Subagent: refines GitHub issues into implementation plans
 │   ├── issue-implementer.md  # Subagent: implements approved plans while preserving CI invariants
