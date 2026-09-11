@@ -384,6 +384,55 @@ wider than the arch so no un-slotted band remains at the shoulders. The arch pro
 reference size (240 × 150 × 100 mm). The dual variant uses `stand_depth = 180 mm`
 (vs 150) so both slots fit within the depth-tapered crown with a ~23 mm divider wall.
 
+### muesli-dispenser/
+
+Rotary drum dispenser that bolts through the side wall of a ~200 x 300 x 200 mm
+clip-lid cereal box: turning an external knob rotates a drum whose scoop
+pocket carries muesli up from the box interior and out a chute below, no
+reaching inside required. First food-contact model in the repo.
+
+| File | Role |
+|------|------|
+| `_muesli_dispenser.scad` | Shared library — `$fn = 64`, all parameters, modules `dispenser_body()`, `dispenser_drum()`, `dispenser_cap()`, `dispenser_knob()`, `dispenser_ring()`, `dispenser_template()`, `dispenser_assembly()`; no top-level geometry |
+| `dispenser_body.scad` | Renderable — housing: mounting flange, chamber around the drum, throat up to the wall port, chute down to the mouth |
+| `dispenser_drum.scad` | Renderable — the rotating drum with its scoop pocket, end journals and hex drive shaft |
+| `dispenser_cap.scad` | Renderable — end cap that closes the body's open end and journals the drum's far end |
+| `dispenser_knob.scad` | Renderable — fluted external knob that presses onto the drum's hex shaft |
+| `dispenser_ring.scad` | Renderable — internal reinforcing ring with captive M4 nut pockets, seats against the box's inside wall face opposite the flange |
+| `dispenser_template.scad` | Renderable — flat drill guide for marking the wall port and four screw holes before cutting the box |
+| `dispenser_assembly.scad` | Renderable — thumbnail-only preview of all parts assembled in place |
+| `dispenser_drum.parameters.json` | Parameter manifest — exposes `pocket_depth` (12–40 mm, default 32) and `pocket_len` (20–56 mm, default 52) to tune dose without changing the drum's outer fit |
+| `meta.json` | Project metadata — tags include `food-contact`; `hardware` lists the M4 screw/nut BOM; `printing_notes` cover material and assembly order |
+
+**Coordinate frame** (documented at the top of `_muesli_dispenser.scad`,
+native OpenSCAD Z-up): the box's outer wall face is the plane Y = 0 with the
+box interior at Y < 0; the drum axis runs horizontally along X at
+`(Y = bore_y, Z = 0)`, parallel to the wall, with the knob on the +X end.
+Muesli path: box interior → port through the wall at `Z = port_z` → funnel
+throat sloping down and out → drum bore → half turn → chute → bowl.
+
+**External-mechanism constraint (issues #512/#514)**: an earlier attempt at
+this same dispenser was closed without merging because its crank and chute
+ended up on opposite faces, putting the turning mechanism inside the box:
+"Seems the cog to turn is on the inside of the box. The chute & user's handle
+should both be on the outside, no?" (#514). The rebuilt design in this
+directory routes both the knob (+X, past the box's side wall) and the chute
+mouth (+Y, out over the bowl) to the exterior — see the coordinate-frame
+comment above. Any future crank/rotary-mechanism model in this repo must put
+every part the user actually touches or uses — the turning handle and the
+output chute/spout — on the exterior of the enclosure, reachable without
+opening it; this is the generalizable form of the constraint, not just a fact
+about this one model.
+
+**Food-contact material note**: `meta.json`'s `printing_notes` calls for
+printing the food-contact parts (`dispenser_body`, `dispenser_drum`,
+`dispenser_cap`, `dispenser_knob`, `dispenser_ring`) in a natural/uncoloured
+food-contact-grade PETG with a stainless or hardened-steel nozzle (not
+brass), avoiding PLA (softens under warm rinsing) and ABS/ASA
+(styrene-based); hand-wash and air-dry, never dishwasher, since layer lines
+trap crumbs. Follow the same material guidance for any future model tagged
+`food-contact`.
+
 ### nz-ski-fields/
 
 Topographic 3D terrain model of the Wakatipu and Cardrona Valley region (South

@@ -35,6 +35,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── esp32-display-case/   # Two-part snap-fit case for the ESP32-2432S028R display board, w/ stylus holder
 ├── hex-connector/        # Single-piece hexagonal male-female connector
 ├── macbook-pro-laptop-stand/  # Parametric vertical laptop dock with swept arch frame
+├── muesli-dispenser/     # Rotary drum dispenser that bolts through a cereal box's side wall; first food-contact model
 ├── nz-ski-fields/        # Topographic terrain model of the NZ ski-fields region (3-part split)
 ├── power-workshop/       # Fisher-Price Power Workshop replacement parts
 ├── scanning-rig/         # Photogrammetry rig: hand-rotated turntable + generic leaning phone stand + keyed connecting link with a low rail + camera setback/boost plinth (the stand's only mount) + optional height/angle riser + optional further-setback spacer
@@ -153,6 +154,7 @@ every routine unit test.
 | `esp32-display-case/` | Two-part snap-fit case for the ESP32-2432S028R ("Cheap Yellow Display") board, with an integrated snap-in stylus holder |
 | `hex-connector/` | Single-piece hex male/female connector, 30mm tall, loose press fit |
 | `macbook-pro-laptop-stand/` | Vertical laptop dock with swept arch ribbons; single-slot and dual-slot (two laptops side by side) variants |
+| `muesli-dispenser/` | Rotary drum dispenser that bolts through a ~200 x 300 x 200 mm cereal box's side wall; turn the external knob to dispense through a chute, no reaching inside; first food-contact model |
 | `nz-ski-fields/` | Topographic NZ terrain model split into three separately-printable parts (lake/terrain/snow); viewer shows them as a coloured composite assembly |
 | `power-workshop/` | Fisher-Price Power Workshop replacement parts sharing a square-peg connection |
 | `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings), a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased), a `rig_link` connecting the two so hand-turning can neither slide the base out from under the fixed masking ellipse nor twist it inside the collar (two keys in the collar bore lock into notches in the base rim), a `scan_boost` plinth standing behind the link's low rail that carries the rig's only stand pocket, an optional `scan_riser` that drops into the boost's own pocket and re-presents an identical one higher up to correct the camera's elevation over the platter without changing the boost, and an optional `scan_setback` spacer that inserts between the link and the boost for another 50mm of setback when the platter still fills the frame |
