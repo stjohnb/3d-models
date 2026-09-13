@@ -370,77 +370,7 @@ jobs:
       - name: Validate STL meshes
         id: validate
         run: |
-          python3 -c "
-          import subprocess, json, glob, os, re, sys, math
-
-          results = []
-          has_failure = False
-
-          for stl in sorted(glob.glob('site/*.stl')):
-              name = os.path.splitext(os.path.basename(stl))[0]
-              proc = subprocess.run(['admesh', stl], capture_output=True, text=True)
-              output = proc.stdout + proc.stderr
-
-              def extract_int(pattern):
-                  m = re.search(pattern + r'\s*:\s*(\d+)', output, re.MULTILINE)
-                  return int(m.group(1)) if m else 0
-
-              def extract_float(pattern, sep=':'):
-                  m = re.search(pattern + r'\s*' + re.escape(sep) + r'\s*([-+]?[\d.]+(?:[eE][-+]?\d+)?)', output, re.MULTILINE)
-                  return float(m.group(1)) if m else 0.0
-
-              triangles   = extract_int(r'Number of facets')
-              unconnected = extract_int(r'Number of unconnected facets')
-              degenerate  = extract_int(r'Degenerate facets')
-              volume      = extract_float(r'Volume')
-
-              min_x = extract_float(r'Min X', '=')
-              max_x = extract_float(r'Max X', '=')
-              min_y = extract_float(r'Min Y', '=')
-              max_y = extract_float(r'Max Y', '=')
-              min_z = extract_float(r'Min Z', '=')
-              max_z = extract_float(r'Max Z', '=')
-              bb_x = max_x - min_x
-              bb_y = max_y - min_y
-              bb_z = max_z - min_z
-
-              # Rough print-time heuristic
-              estimated_minutes = None
-              if volume > 0:
-                  if bb_z < 0.5:
-                      estimated_minutes = max(1, round(volume / 200))
-                  else:
-                      layer_count = bb_z / 0.2
-                      xy_area = volume / bb_z
-                      perimeter = 4 * math.sqrt(xy_area)
-                      time_per_layer = perimeter / 50
-                      total_seconds = layer_count * time_per_layer * 5
-                      estimated_minutes = max(1, round(total_seconds / 60))
-
-              passed = unconnected == 0 and degenerate == 0 and volume > 0
-
-              if not passed:
-                  has_failure = True
-
-              results.append({
-                  'name': name,
-                  'triangles': triangles,
-                  'volume': round(volume, 2),
-                  'degenerate': degenerate,
-                  'unconnected': unconnected,
-                  'passed': passed,
-                  'estimated_minutes': estimated_minutes,
-              })
-
-              status = 'PASS' if passed else 'FAIL'
-              print(f'  {status}: {name} — {triangles} triangles, volume={volume:.2f}')
-
-          with open('site/validation.json', 'w') as f:
-              json.dump(results, f, indent=2)
-
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f'failed={str(has_failure).lower()}\n')
-          "
+          python3 scripts/validate_stl_meshes.py --site-dir site --output site/validation.json
 
       - name: Vendor Three.js runtime
         run: python3 scripts/fetch_threejs.py
@@ -1284,11 +1214,19 @@ jobs:
             if (validationResults.length > 0) {
               const anyFailed = validationResults.some(r => !r.passed);
               body += `### ${anyFailed ? '⚠️' : '✅'} Mesh Validation\n\n`;
-              body += `| Model | Triangles | Volume | Status |\n`;
-              body += `|-------|-----------|--------|--------|\n`;
+              body += `| Model | Size X/Y/Z mm | Min Z | Triangles | Volume | Status |\n`;
+              body += `|-------|---------------|-------|-----------|--------|--------|\n`;
               for (const r of validationResults) {
                 const status = r.passed ? '✅ Pass' : '❌ Fail';
-                body += `| ${r.name} | ${r.triangles.toLocaleString()} | ${r.volume} | ${status} |\n`;
+                const bbox = r.bbox_mm;
+                const size = bbox && typeof bbox.x === 'number' && typeof bbox.y === 'number' && typeof bbox.z === 'number'
+                  ? `${bbox.x} × ${bbox.y} × ${bbox.z}`
+                  : 'unknown';
+                const minZValue = r.bounds_mm && typeof r.bounds_mm.min_z === 'number'
+                  ? r.bounds_mm.min_z.toFixed(2)
+                  : 'unknown';
+                const minZ = r.sits_on_bed === false ? `${minZValue} ⚠️` : minZValue;
+                body += `| ${r.name} | ${size} | ${minZ} | ${r.triangles.toLocaleString()} | ${r.volume} | ${status} |\n`;
               }
               body += `\n`;
               if (anyFailed) {

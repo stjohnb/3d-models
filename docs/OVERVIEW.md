@@ -53,6 +53,8 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 │   ├── generate-gallery.py     # Generates README model gallery from models.json
 │   ├── test_generate_gallery.py  # Tests for generate-gallery's pick_thumbnail hero-selection logic (issue #372)
 │   ├── oembed_helpers.py       # Shared Python helpers (slugify, parse_scad_map, load_meta_failures, etc.)
+│   ├── validate_stl_meshes.py  # ADMesh audit for rendered STLs: mesh integrity, volume, bounds, bed-contact hint, print-time estimate
+│   ├── test_validate_stl_meshes.py  # Tests for validate_stl_meshes.py's ADMesh parsing, JSON output, and deferred-failure behavior
 │   ├── check_interference.py   # Geometric overlap detection for mating part pairs (meta.json mating_pairs)
 │   ├── fetch_openscad_wasm.py  # Fetches pinned openscad-wasm release into $HOME/.cache/3d-models/openscad-wasm/<version>/ and stages to site/openscad/
 │   ├── threejs_assets.py       # Single source of truth for the pinned Three.js version and SHA-256 asset hashes
@@ -367,7 +369,7 @@ design, not a persisted-artifact one (#202) — it produces no build artifacts
 and is excluded from CI. Renders run under `scripts/capped-openscad.sh`
 (`RENDER_MEM_MAX=2G`/`RENDER_TIMEOUT=300` by default). Full usage, view
 presets, and what it does *not* check (mesh validation, interference,
-bounding-box extraction — CI-only gates) are in
+bounding-box/min-Z numeric audit — CI-only gates) are in
 [playbooks/iterate_with_render_view.md](../playbooks/iterate_with_render_view.md).
 
 ## Web Viewer (index.html)
@@ -411,7 +413,7 @@ Reusable how-to guides for common development tasks live in `playbooks/`.
   rapid visual inspection across multiple angles during active model design.
   Covers view presets, the `--y-up` flag for assemblies, and an explicit list of
   what `render_view.py` does _not_ do (mesh validation, interference checks,
-  bounding-box extraction — those are CI-only gates).
+  bounding-box/min-Z numeric audit — those are CI-only gates).
 - **`playbooks/scan_a_capture.md`** — how to run `scan_pipeline.py` over a
   scanning-rig capture video to reconstruct a mesh. Covers the `nix develop
   .#scan` shell, the two-step platter-ellipse confirmation via
@@ -442,7 +444,8 @@ one directly rather than a summary here.
 pinned to `ryzen` (render memory caps are calibrated to that host). All
 tooling comes from this repo's own `flake.nix` devShell, not the runner
 host. The pipeline renders every `.scad` to STL, validates meshes and
-metadata, checks mating-part interference, generates thumbnails/QR
+metadata, records triangle/volume/bounding-box/min-Z validation numbers,
+checks mating-part interference, generates thumbnails/QR
 codes/standalone viewers/`models.json`, and deploys to S3 — PRs get a preview
 deployment and an auto-generated comment. Dependency-graph, mesh, metadata,
 and interference checks all use the **deferred enforcement** pattern:

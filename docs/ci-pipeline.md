@@ -309,7 +309,9 @@ recorded as an unresolved raw string instead of being hashed or bundled
 
 ### 6. Validate STL Meshes
 
-After rendering, each STL is validated using [ADMesh](https://github.com/admesh/admesh):
+After rendering, each STL is validated by
+`scripts/validate_stl_meshes.py` using
+[ADMesh](https://github.com/admesh/admesh):
 
 - **Watertight (manifold)**: No unconnected facets
 - **No degenerate triangles**: Zero degenerate facets
@@ -324,16 +326,21 @@ re-add a generic wall-thickness gate on the strength of "thin walls are
 theoretically risky" alone; a real print failure is the bar for adding a new
 mesh-level check here, not a static geometric threshold.
 
-Additionally, the step extracts **bounding-box dimensions** (Min/Max X/Y/Z)
-from ADMesh output and computes a **rough print-time estimate**
-(`estimated_minutes`) using a heuristic based on layer count (height / 0.2mm)
-and perimeter travel time (at 50mm/s). For near-flat models (`bb_z < 0.5`),
-a simpler volume-based fallback (`volume / 200`) is used. Results —
-including `estimated_minutes` — are written to `site/validation.json` and
-reported in the PR comment as a table (model name, triangle count, volume,
-pass/fail). If any model fails validation, the main-branch deploy is skipped
-and the job exits with failure after the PR comment is posted — ensuring
-reviewers see the full report.
+The script also extracts **bounding-box dimensions** (Min/Max X/Y/Z) from
+ADMesh output, records whether the model appears to sit on the print bed
+(`sits_on_bed`, true when `abs(min_z) <= 0.01`), and computes a **rough
+print-time estimate** (`estimated_minutes`) using a heuristic based on layer
+count (height / 0.2mm) and perimeter travel time (at 50mm/s). For near-flat
+models (`bb_z < 0.5`), a simpler volume-based fallback (`volume / 200`) is
+used. Results are written to `site/validation.json` with the existing fields
+(`name`, `triangles`, `volume`, `degenerate`, `unconnected`, `passed`,
+`estimated_minutes`) plus `bbox_mm`, `bounds_mm`, and `sits_on_bed`.
+`sits_on_bed` is informational only and appears as a hint in the PR comment;
+it is not an enforcement gate.
+
+If any model fails validation, the step records `failed=true` but exits zero.
+The main-branch deploy is skipped and the job exits with failure only after
+the PR comment is posted, ensuring reviewers see the full numeric report.
 
 ### 6.2. Vendor Three.js Runtime
 
@@ -803,7 +810,10 @@ Posts or updates a bot comment on the PR with:
   copy diverged from Python's `str.title()` on inputs like `2x4-jig` (issue
   #399). If `models.json` is missing or unparseable, group headers fall back
   to the raw directory name.
-- A mesh validation table (model name, triangle count, volume, pass/fail)
+- A mesh validation table with triangle count, volume, bounding-box
+  dimensions, and a min-Z bed-contact hint. This is intentionally numeric
+  feedback: rendered screenshots are useful for orientation and massing, but
+  they are not sufficient evidence that functional geometry is intact.
 - **File size and triangle count** for each changed model, displayed next to
   the model name (e.g., "45.2 KB · 3,456 triangles"). Triangle count is
   parsed from the binary STL header (bytes 80–83, little-endian uint32) and

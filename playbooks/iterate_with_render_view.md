@@ -66,8 +66,14 @@ python3 scripts/render_view.py /tmp/some-downloaded-model.scad --view top --y-up
 ## What CI checks that render_view.py does not
 
 `render_view.py` is for visual inspection only. It does not run:
-- ADMesh mesh validation (detects non-manifold geometry, zero-area faces)
+- ADMesh numeric audit: triangle count, volume, bounding-box dimensions, and
+  min-Z bed-contact hint
 - Interference checks between mating parts (`check_interference.py`)
-- Bounding-box extraction or wall-thickness warnings
+- Thumbnail rendering
 
 These gates run automatically in CI on every push. A model that renders correctly can still fail mesh validation — that failure is caught before deployment, not before your local preview.
+
+Use local visual renders for massing, proportion, and obvious shape mistakes.
+When clearance, fit, deleted geometry, or bed-contact suspicion matters, confirm
+it from the CI "Model Preview" validation table or from `site/validation.json`,
+and use the mating-pair interference table when a declared pair must assemble.

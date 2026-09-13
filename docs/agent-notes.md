@@ -41,6 +41,19 @@ just slow.
 Rationale: this failure mode looks like "CI is still starting" unless someone
 explicitly checks for the absence of a run.
 
+## CAD benchmark lesson: prefer numbers for functional checks
+
+ModelRift's CadQuery vs OpenSCAD benchmark found that both tools could produce
+printable functional parts, but the failures that mattered were caught by
+independent numeric inspection rather than screenshots. The repo's matching
+rule is: for new or changed geometry, issue plans and PR review should cite the
+preview comment's mesh validation and interference numbers when function or fit
+is at stake, not just "the render looks right."
+
+Rationale: renders are still useful for massing and orientation, but deleted
+geometry, bad bounds, non-manifold meshes, and declared mating-part overlap need
+numeric checks before they are treated as resolved.
+
 ## A deliberate push to a Claws PR branch can get reverted
 
 The Review Addresser bot can read an intentional, unusual commit pushed to a
