@@ -45,9 +45,9 @@ so they are not rendered directly.
   the exception — it has no circular geometry).
 - **Dimensions.** All dimensions are named variables in millimetres, declared at
   the top of each file, with derived values computed from base parameters.
-- **Viewer orientation.** OpenSCAD is Z-up; the web viewer is Y-up. Assembly and
-  tube-shaped files apply `rotate([-90, 0, 0])` at the top level; upright or
-  symmetric models omit it.
+- **Viewer orientation.** OpenSCAD is Z-up and the web viewer is Y-up. Sources
+  stay Z-up and never add a top-level `rotate([-90, 0, 0])`; the viewers apply
+  the conversion to every mesh themselves.
 - **Metadata.** Each project has a `meta.json` validated against
   `meta.schema.json`. Models may ship a `<basename>.parameters.json` manifest
   (validated against `parameters.schema.json`) exposing numeric/boolean

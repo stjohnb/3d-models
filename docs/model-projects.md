@@ -403,6 +403,7 @@ reaching inside required. First food-contact model in the repo.
 | `dispenser_assembly.scad` | Renderable — thumbnail-only preview of all parts assembled in place |
 | `dispenser_drum.parameters.json` | Parameter manifest — exposes `pocket_depth` (12–40 mm, default 32) and `pocket_len` (20–56 mm, default 52) to tune dose without changing the drum's outer fit |
 | `meta.json` | Project metadata — tags include `food-contact`; `hardware` lists the M4 screw/nut BOM; `printing_notes` cover material and assembly order |
+| `dependency-graph.md` | Auto-generated `include` dependency graph |
 
 **Coordinate frame** (documented at the top of `_muesli_dispenser.scad`,
 native OpenSCAD Z-up): the box's outer wall face is the plane Y = 0 with the
