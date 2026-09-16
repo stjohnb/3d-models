@@ -969,6 +969,35 @@ range.
 | `meta.json` | Project metadata (description, tags, difficulty) |
 | `IMG_2843.jpg`, `IMG_2844.jpg` | Reference photos |
 
+### square-post-shim/
+
+| File | Role |
+|------|------|
+| `square_post_shim.scad` | Renderable — L-shaped corner shim |
+| `square_post_shim.parameters.json` | In-browser customizer manifest for `square_post_shim` |
+| `meta.json` | Project metadata (description, tags, difficulty, printing notes) |
+
+L-shaped corner shim that takes up play between a square exercise-bike post
+and its socket (issue #533). Caliper readings from the issue: socket inside
+30.86mm and 31.42mm; post outside 30.80mm and 30.17mm. Pairing the loose
+axes (30.80mm post in the 31.42mm socket, 30.17mm post in the 30.86mm
+socket) gives gaps of 0.62mm and 0.69mm, so the default `shim_t = 0.6` is
+snug on both faces at once — which is why the shim is an L rather than a
+flat strip: both axes need taking up together.
+
+The part is modelled in print orientation, Z-up, flange flat on the bed:
+an L can't lie flat without a 90-degree overhang, so it prints standing
+upright on its flange with the two legs as vertical walls and a tapered
+lead-in at the free end. No supports are needed. Wall thickness on an
+upright wall like this comes from extrusion line width rather than layer
+height, so a printed part is worth checking with calipers against the
+nominal `shim_t`.
+
+Fit the shim on the post corner diagonally opposite the socket's pop-pin
+knob, with the flange hooked over the top of the collar rim so it can't
+slide down the tube — that corner keeps both legs clear of the pin hole
+and pushes the post toward the pin side.
+
 ### toothbrush/
 
 Multi-part toothbrush and toothpaste holder system with a solid base,

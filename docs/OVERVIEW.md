@@ -40,6 +40,7 @@ Three.js viewer to [bstjohn.net/3d-models](https://www.bstjohn.net/3d-models/).
 ├── power-workshop/       # Fisher-Price Power Workshop replacement parts
 ├── scanning-rig/         # Photogrammetry rig: hand-rotated turntable + generic leaning phone stand + keyed connecting link with a low rail + camera setback/boost plinth (the stand's only mount) + optional height/angle riser + optional further-setback spacer
 ├── sink-tray/            # Sink tray foot
+├── square-post-shim/     # L-shaped corner shim for a square exercise-bike post/socket fit
 ├── toothbrush/           # Toothbrush/toothpaste holder system
 ├── ukulele-wall-hook/    # Single-piece wall-mounted yoke that cradles a ukulele neck
 ├── vacuum-hose/          # Vacuum hose fittings (adapter and reducer)
@@ -161,6 +162,7 @@ every routine unit test.
 | `power-workshop/` | Fisher-Price Power Workshop replacement parts sharing a square-peg connection |
 | `scanning-rig/` | Fully-printed photogrammetry rig: hand-rotated turntable (V-groove race + centring spindle, no bearings), a generic leaning phone stand (default fits an iPhone 15 Pro, bare or cased), a `rig_link` connecting the two so hand-turning can neither slide the base out from under the fixed masking ellipse nor twist it inside the collar (two keys in the collar bore lock into notches in the base rim), a `scan_boost` plinth standing behind the link's low rail that carries the rig's only stand pocket, an optional `scan_riser` that drops into the boost's own pocket and re-presents an identical one higher up to correct the camera's elevation over the platter without changing the boost, and an optional `scan_setback` spacer that inserts between the link and the boost for another 50mm of setback when the platter still fills the frame |
 | `sink-tray/` | Single-file sink tray foot with counterbore |
+| `square-post-shim/` | L-shaped corner shim that wraps one corner of a square exercise-bike post and shims two adjacent faces at once, with a flange that hooks over the socket collar rim |
 | `toothbrush/` | Multi-part holder system with dovetail-attached clips and a removable drip tray |
 | `ukulele-wall-hook/` | Single-piece wall-mounted yoke with two upturned prongs that cradle a ukulele neck behind the headstock |
 | `vacuum-hose/` | Adapter and reducer fittings for workshop dust collection hose |
