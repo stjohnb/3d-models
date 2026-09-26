@@ -1,0 +1,13 @@
+{
+  "parameters": [
+    { "name": "outer_l", "label": "Outer length (mm)", "type": "number", "min": 60, "max": 200, "step": 1, "default": 100 },
+    { "name": "outer_w", "label": "Outer width (mm)", "type": "number", "min": 40, "max": 150, "step": 1, "default": 70 },
+    { "name": "outer_h", "label": "Outer height (mm)", "type": "number", "min": 34, "max": 120, "step": 1, "default": 70 },
+    { "name": "wall", "label": "Wall thickness (mm)", "type": "number", "min": 1.2, "max": 3, "step": 0.2, "default": 1.6 },
+    { "name": "floor_t", "label": "Floor thickness (mm)", "type": "number", "min": 1, "max": 3, "step": 0.2, "default": 1.6 },
+    { "name": "corner_r", "label": "Outer corner radius (mm)", "type": "number", "min": 2, "max": 8, "step": 0.5, "default": 4 },
+    { "name": "scoops", "label": "Thumb scoops", "type": "boolean", "default": true },
+    { "name": "scoop_w", "label": "Scoop width (mm)", "type": "number", "min": 10, "max": 40, "step": 1, "default": 26 },
+    { "name": "scoop_depth", "label": "Scoop depth (mm)", "type": "number", "min": 13, "max": 50, "step": 1, "default": 22 }
+  ]
+}

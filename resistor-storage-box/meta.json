@@ -1,0 +1,13 @@
+{
+  "description": "Open-top 100 x 70 x 70 mm box that files resistor-kit bags on edge like index cards, with a thumb scoop in each end wall for pinching a bag out, and a push-on lid with an inner locating lip.",
+  "hero": "resistor_box.stl",
+  "tags": ["electronics", "organizer", "storage", "workshop"],
+  "version": "0.1.0",
+  "difficulty": "beginner",
+  "printing_notes": [
+    "Print both parts as exported, without supports: the box floor-down, the lid top-face-down (its locating lip rises from the bed). Any filament; PLA is fine on a bench.",
+    "Bags stand on their long edge along the 100 mm length and file across the 70 mm width like index cards; a 25-value 1/4 W kit fills the width. Use the end-wall scoops to pinch one bag's end and lift it out.",
+    "The lid's lip drops 5 mm inside the walls with 0.3 mm of clearance per side; if it is tight or loose, adjust lid_clearance by 0.1 mm and re-render only the lid. Push a thumb up through an end scoop to lift the lid.",
+    "outer_l, outer_w, outer_h and wall are shared parameters: change them on both the box and the lid."
+  ]
+}

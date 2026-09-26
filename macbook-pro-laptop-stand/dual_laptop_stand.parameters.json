@@ -1,0 +1,67 @@
+{
+  "parameters": [
+    {
+      "name": "slot_gap_1",
+      "label": "Front slot width (mm)",
+      "type": "number",
+      "min": 5,
+      "max": 40,
+      "step": 0.5,
+      "default": 18
+    },
+    {
+      "name": "slot_gap_2",
+      "label": "Rear slot width (mm)",
+      "type": "number",
+      "min": 5,
+      "max": 40,
+      "step": 0.5,
+      "default": 16
+    },
+    {
+      "name": "slot_spacing",
+      "label": "Slot spacing, centre-to-centre (mm)",
+      "type": "number",
+      "min": 30,
+      "max": 60,
+      "step": 1,
+      "default": 40
+    },
+    {
+      "name": "groove_depth",
+      "label": "Slot depth (mm)",
+      "type": "number",
+      "min": 10,
+      "max": 80,
+      "step": 5,
+      "default": 70
+    },
+    {
+      "name": "stand_width",
+      "label": "Overall width (mm)",
+      "type": "number",
+      "min": 150,
+      "max": 320,
+      "step": 5,
+      "default": 240
+    },
+    {
+      "name": "stand_depth",
+      "label": "Base depth (mm)",
+      "type": "number",
+      "min": 140,
+      "max": 220,
+      "step": 5,
+      "default": 180
+    },
+    {
+      "name": "stand_height",
+      "label": "Height (mm)",
+      "type": "number",
+      "min": 60,
+      "max": 140,
+      "step": 5,
+      "default": 100
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "parameters": [
+    {
+      "name": "cap_neck_d",
+      "label": "Cap neck diameter — narrowest (mm)",
+      "type": "number",
+      "min": 14,
+      "max": 40,
+      "step": 0.1,
+      "default": 27.4
+    },
+    {
+      "name": "cap_flange_d",
+      "label": "Cap flange diameter — widest (mm)",
+      "type": "number",
+      "min": 16,
+      "max": 50,
+      "step": 0.1,
+      "default": 33.7
+    },
+    {
+      "name": "prong_t",
+      "label": "Prong thickness (mm)",
+      "type": "number",
+      "min": 2.5,
+      "max": 8,
+      "step": 0.5,
+      "default": 4
+    }
+  ]
+}

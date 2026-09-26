@@ -1,0 +1,8 @@
+{
+  "parameters": [
+    { "name": "setback_shift", "label": "Extra setback added behind the boost — costs elevation (mm)", "type": "number", "min": 50, "max": 150, "step": 5, "default": 135 },
+    { "name": "setback_clear", "label": "Spacer-to-rail clearance (mm)", "type": "number", "min": 0.2, "max": 1, "step": 0.05, "default": 0.35 },
+    { "name": "rail_w", "label": "Rail outer width — must match rig link (mm)", "type": "number", "min": 30, "max": 80, "step": 5, "default": 40 },
+    { "name": "rail_h", "label": "Rail height — must match rig link (mm)", "type": "number", "min": 8, "max": 30, "step": 1, "default": 12 }
+  ]
+}

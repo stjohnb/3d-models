@@ -1,0 +1,40 @@
+{
+  "parameters": [
+    {
+      "name": "z_exaggeration",
+      "label": "Vertical exaggeration (×)",
+      "type": "number",
+      "min": 1,
+      "max": 5,
+      "step": 0.25,
+      "default": 2
+    },
+    {
+      "name": "model_size_mm",
+      "label": "Model width (mm)",
+      "type": "number",
+      "min": 50,
+      "max": 200,
+      "step": 5,
+      "default": 100
+    },
+    {
+      "name": "base_thickness_mm",
+      "label": "Base thickness (mm)",
+      "type": "number",
+      "min": 1,
+      "max": 10,
+      "step": 0.5,
+      "default": 3
+    },
+    {
+      "name": "lake_level_m",
+      "label": "Lake level (m)",
+      "type": "number",
+      "min": 290,
+      "max": 360,
+      "step": 5,
+      "default": 310
+    }
+  ]
+}

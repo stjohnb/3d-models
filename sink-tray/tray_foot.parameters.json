@@ -1,0 +1,40 @@
+{
+  "parameters": [
+    {
+      "name": "total_height",
+      "label": "Total height (mm)",
+      "type": "number",
+      "min": 22,
+      "max": 50,
+      "step": 1,
+      "default": 25
+    },
+    {
+      "name": "r0",
+      "label": "Screw shaft radius (mm)",
+      "type": "number",
+      "min": 1.5,
+      "max": 2.5,
+      "step": 0.1,
+      "default": 2
+    },
+    {
+      "name": "r1",
+      "label": "Counterbore radius (mm)",
+      "type": "number",
+      "min": 3,
+      "max": 4,
+      "step": 0.1,
+      "default": 4
+    },
+    {
+      "name": "r2",
+      "label": "Outer radius (mm)",
+      "type": "number",
+      "min": 5,
+      "max": 15,
+      "step": 0.5,
+      "default": 6
+    }
+  ]
+}

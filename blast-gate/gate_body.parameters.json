@@ -1,0 +1,13 @@
+{
+  "parameters": [
+    {
+      "name": "pvc_od",
+      "label": "PVC OD (mm)",
+      "type": "number",
+      "min": 30,
+      "max": 80,
+      "step": 1,
+      "default": 51
+    }
+  ]
+}

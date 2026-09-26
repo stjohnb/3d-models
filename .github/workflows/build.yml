@@ -1,0 +1,1373 @@
+name: Build Models
+
+# Triggers removed for the public snapshot — this workflow is intentionally disabled.
+# See the private source repository for the active version.
+on:
+  workflow_dispatch:
+permissions:
+  # write needed at workflow scope for gallery commit on main pushes;
+  # acceptable trade-off for a single-job workflow on a self-hosted runner.
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  # Issue-preview pushes get their own group (pages-claws/preview-issue-<id>)
+  # so they never cancel a main build; pr-preview-cleanup.yml joins the same
+  # group before deleting the prefix, so a delete cancels an in-flight render.
+  group: pages-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || (startsWith(github.ref, 'refs/heads/claws/preview-issue-') && github.ref_name) || 'main' }}
+  cancel-in-progress: true
+
+# The org's CI runs on self-hosted NixOS runners, and every tool this
+# workflow shells out to — openscad (EGL-headless wrapper), admesh, python3,
+# node, imagemagick, zip, qrencode, aws — comes from this repo's own
+# flake.nix via `nix develop`, isolated in the nix store from whatever other
+# repos put on the same runners. Do NOT add actions/setup-node,
+# actions/setup-python, sudo/apt-get, or ask for packages on the runner
+# itself; add tools to flake.nix instead.
+env:
+  # Memory/time caps for capped-openscad.sh STL renders (issue #272).
+  # Thumbnail/orthographic-view steps override these lower via step-level env.
+  #
+  # DELIBERATE VALUES — do not lower without checking the heaviest models:
+  # the full-res (512 px) nz-ski-fields part renders. The #248 merge build
+  # spent 56 min cold-rendering the three parts, and the full-res assembly
+  # variant measured 31 min / >8G peak on the ryzen runner (32 GB) before it
+  # moved to a 128 px preview heightmap (#271). 28G is cgroup-enforced by
+  # capped-openscad.sh, so a runaway render still fails cleanly without
+  # freezing the host. Renders are cached, so the full cost only recurs when
+  # a heavy .scad source (or the OpenSCAD version) changes. The job is no
+  # longer pinned to the ryzen host (see below), so this cap is a hard
+  # ceiling every runner it lands on must comfortably exceed, not a
+  # calibration to one known box.
+  RENDER_MEM_MAX: 28G
+  RENDER_TIMEOUT: "3600"
+
+jobs:
+  build:
+    # Any [self-hosted, linux] runner may run this job: nothing here is
+    # host-specific (no GPU, no per-runner cache), and every tool comes from
+    # this repo's flake.nix. RENDER_MEM_MAX (above) is a hard cgroup ceiling
+    # sized for the heaviest known render, not a calibration to one host —
+    # today's eligible runners, ryzen (32 GB) and nas (62 GB), both clear it
+    # comfortably. Accepted trade-off: a small on-demand box such as
+    # hetzner-runner (4 cores / 8 GB), if ever registered with these labels,
+    # would swap and be OOM-killed by a heavy render instead of being
+    # protected by the cap. See docs/ci-pipeline.md for the full rationale.
+    runs-on: [self-hosted, linux]
+
+    # Every run step executes inside the flake's default devShell. The job
+    # therefore starts with checkout + setup-nix, and the first devShell
+    # entry after a flake.lock bump downloads the toolchain closure into the
+    # runner's nix store (warm runs are unaffected).
+    #
+    # The shell below adds `-u` (nounset) at the job level: every step's
+    # `run:` block must be nounset-safe (guard optional vars with
+    # `${VAR:-}`), since referencing an unset variable now hard-fails instead
+    # of silently expanding to empty.
+    defaults:
+      run:
+        shell: nix --extra-experimental-features nix-command --extra-experimental-features flakes develop ${{ github.workspace }}#default --command bash -euo pipefail {0}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history: scripts/project_dates.py reads each project dir's
+          # last-commit date for landing-page recency ordering (#345).
+          fetch-depth: 0
+
+      - name: Set up Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Resolve issue preview target
+        id: issue_preview
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/claws/preview-issue-')
+        run: |
+          ISSUE_ID="${GITHUB_REF_NAME#claws/preview-issue-}"
+          if ! [[ "$ISSUE_ID" =~ ^([0-9]+|clw_[A-Za-z0-9]+)$ ]]; then
+            echo "::error::'$ISSUE_ID' is not a valid issue id (expected digits or clw_<alnum>)"
+            exit 1
+          fi
+          {
+            echo "issue_id=$ISSUE_ID"
+            echo "short_sha=${GITHUB_SHA::8}"
+            echo "enabled=true"
+          } >> "$GITHUB_OUTPUT"
+          echo "Issue preview for $ISSUE_ID at ${GITHUB_SHA::8}"
+
+      - name: Verify dependency graphs are up-to-date
+        id: depgraph
+        run: |
+          bash scripts/scad-dep-graph.sh
+          if ! git diff --quiet -- '*/dependency-graph.md'; then
+            echo "::warning::Dependency graphs are out of date. Run: bash scripts/scad-dep-graph.sh"
+            git diff -- '*/dependency-graph.md'
+            git checkout -- '*/dependency-graph.md'
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate project metadata
+        id: metadata
+        run: |
+          python3 -c "
+          import json, glob, os, sys
+          from jsonschema import validate, ValidationError
+
+          with open('meta.schema.json') as f:
+              schema = json.load(f)
+
+          files = sorted(glob.glob('*/meta.json'))
+          if not files:
+              print('No meta.json files found — skipping validation')
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('failed=false\n')
+              sys.exit(0)
+
+          errors = 0
+          failed_paths = []
+          for path in files:
+              try:
+                  with open(path) as f:
+                      data = json.load(f)
+              except json.JSONDecodeError as e:
+                  print(f'  FAIL: {path} — invalid JSON: {e}')
+                  errors += 1
+                  failed_paths.append(path)
+                  continue
+              try:
+                  validate(instance=data, schema=schema)
+              except ValidationError as e:
+                  print(f'  FAIL: {path} — {e.message}')
+                  errors += 1
+                  failed_paths.append(path)
+                  continue
+              hero = data.get('hero')
+              if hero is not None:
+                  src = os.path.join(os.path.dirname(path), hero[:-4] + '.scad')
+                  if os.path.basename(src).startswith('_') or not os.path.isfile(src):
+                      print(f'  FAIL: {path} — hero {hero!r} has no renderable source at {src}')
+                      errors += 1
+                      failed_paths.append(path)
+                      continue
+              print(f'  PASS: {path}')
+
+          # Write failed paths so downstream steps can skip invalid meta.json files
+          with open('.meta-failures', 'w') as f:
+              f.write('\n'.join(failed_paths))
+
+          if errors:
+              print(f'::warning::{errors} meta.json file(s) failed schema validation')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'failed={str(bool(errors)).lower()}\n')
+          "
+
+      - name: Validate parameters manifests
+        id: param_meta
+        run: |
+          python3 -c "
+          import glob, json, os, sys
+          from jsonschema import validate, ValidationError
+
+          sys.path.insert(0, 'scripts')
+          from external_assets import external_assets_for
+
+          with open('parameters.schema.json') as f:
+              schema = json.load(f)
+
+          # Always create the file so the enforce step's check is honest,
+          # even when no manifests exist yet.
+          with open('.param-failures', 'w'):
+              pass
+
+          files = sorted(glob.glob('*/*.parameters.json'))
+          if not files:
+              print('No parameters.json files found — skipping validation')
+              with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+                  f.write('failed=false\n')
+              sys.exit(0)
+
+          errors = 0
+          failed_paths = []
+          for path in files:
+              try:
+                  with open(path) as f:
+                      data = json.load(f)
+              except json.JSONDecodeError as e:
+                  print(f'  FAIL: {path} — invalid JSON: {e}')
+                  errors += 1
+                  failed_paths.append(path)
+                  continue
+              try:
+                  validate(instance=data, schema=schema)
+              except ValidationError as e:
+                  print(f'  FAIL: {path} — {e.message}')
+                  errors += 1
+                  failed_paths.append(path)
+                  continue
+              # Cross-validation: default must be within [min, max] for number params.
+              bounds_ok = True
+              for param in data['parameters']:
+                  if param.get('type') == 'number':
+                      pmin = param['min']
+                      pmax = param['max']
+                      pdef = param['default']
+                      if pmax < pmin:
+                          pname = param['name']
+                          print(f'  FAIL: {path} — parameter {pname!r}: max ({pmax}) < min ({pmin})')
+                          errors += 1
+                          failed_paths.append(path)
+                          bounds_ok = False
+                          break
+                      if not (pmin <= pdef <= pmax):
+                          pname = param['name']
+                          print(f'  FAIL: {path} — parameter {pname!r}: default {pdef} is outside [{pmin}, {pmax}]')
+                          errors += 1
+                          failed_paths.append(path)
+                          bounds_ok = False
+                          break
+              if not bounds_ok:
+                  continue
+              # Cross-validation: manifest must sit next to a renderable .scad.
+              project_dir, fname = os.path.split(path)
+              basename = fname[:-len('.parameters.json')]
+              if basename.startswith('_'):
+                  print(f'  FAIL: {path} — library files (_*.scad) cannot have parameter manifests')
+                  errors += 1
+                  failed_paths.append(path)
+                  continue
+              scad_path = os.path.join(project_dir, basename + '.scad')
+              if not os.path.isfile(scad_path):
+                  print(f'  FAIL: {path} — no matching renderable .scad found at {scad_path}')
+                  errors += 1
+                  failed_paths.append(path)
+                  continue
+              # Cross-validation: a renderable that pulls in an asset from
+              # outside its project dir (e.g. a scans/ reference mesh, #439)
+              # cannot be customized in the browser — the wasm FS is written
+              # flat from the project's own files, so ../scans/... does not
+              # resolve there. Refuse the combination rather than ship a
+              # customizer that 404s. Scoped to this manifest's own
+              # renderable — a scan-importing sibling must not disable the
+              # customizer for the rest of the project.
+              ext = external_assets_for(scad_path, project_dir)
+              if ext:
+                  print(f'  FAIL: {path} — {scad_path} imports {ext} from outside {project_dir}; '
+                        f'the in-browser customizer cannot resolve external assets, so a model '
+                        f'importing a scan reference mesh must not ship a parameters manifest')
+                  errors += 1
+                  failed_paths.append(path)
+                  continue
+              print(f'  PASS: {path}')
+
+          with open('.param-failures', 'w') as f:
+              f.write('\n'.join(failed_paths))
+
+          if errors:
+              print(f'::warning::{errors} parameters.json file(s) failed validation')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'failed={str(bool(errors)).lower()}\n')
+          "
+
+      - name: Run Python unit tests for build scripts
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
+      # The flake's `openscad` is a wrapper around openscad-unstable that
+      # forces the EGL/llvmpipe software-GL path (QT_QPA_PLATFORM=offscreen,
+      # DISPLAY unset) — no Xvfb, no X server, no NVIDIA EGL stack involved.
+      # This replaces the old "Prepare Xvfb environment" step and its lock
+      # file / EGL-vendor-pinning workarounds (issues #361;
+      # St-John-Software/nixos-config#110, #111).
+      - name: Verify headless OpenSCAD rendering
+        id: gl_smoke
+        continue-on-error: true
+        env:
+          RENDER_MEM_MAX: 4G
+          RENDER_TIMEOUT: "120"
+        run: |
+          printf 'cube(10);\n' > "$RUNNER_TEMP/glsmoke.scad"
+          rm -f "$RUNNER_TEMP/glsmoke.png"
+          bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" \
+            -o "$RUNNER_TEMP/glsmoke.png" --imgsize=64,48 \
+            "$RUNNER_TEMP/glsmoke.scad" || true
+          ok=false
+          if [ -s "$RUNNER_TEMP/glsmoke.png" ] \
+             && [ "$(od -An -tx1 -N8 "$RUNNER_TEMP/glsmoke.png" | tr -d ' \n')" = "89504e470d0a1a0a" ]; then
+            ok=true
+          fi
+          if [ "$ok" = true ]; then
+            echo "Headless OpenSCAD PNG rendering works (EGL offscreen via the flake's openscad wrapper)."
+          else
+            echo "::warning::Headless OpenSCAD PNG rendering is broken — the flake's openscad wrapper could not produce a PNG, so every thumbnail render below will fail too. Check the openscadHeadless wrapper in flake.nix."
+          fi
+          echo "headless_gl=$ok" >> "$GITHUB_OUTPUT"
+
+      - name: Check OpenSCAD version
+        id: scad_version
+        run: |
+          mkdir -p site
+          CURRENT_VERSION="$(openscad --version 2>&1)"
+          CURRENT_VERSION="${CURRENT_VERSION%%$'\n'*}"
+          echo "Current OpenSCAD version: $CURRENT_VERSION"
+          echo "$CURRENT_VERSION" > site/openscad-version.txt
+
+          STORED_VERSION=""
+          if [ -f .openscad-version ]; then
+            STORED_VERSION="$(cat .openscad-version)"
+            STORED_VERSION="${STORED_VERSION%%$'\r'*}"
+          fi
+
+          if [ "$CURRENT_VERSION" != "$STORED_VERSION" ]; then
+            echo "::warning::OpenSCAD version changed: '$STORED_VERSION' -> '$CURRENT_VERSION'. Update .openscad-version and expect a full re-render."
+          else
+            echo "OpenSCAD version matches stored value ($CURRENT_VERSION)"
+          fi
+
+      - name: Render STL files
+        run: |
+          mkdir -p site
+          > site/.scad-map
+          OPENSCAD_VERSION="$(cat site/openscad-version.txt)"
+          CACHE_DIR="${RENDER_CACHE_DIR:-$HOME/.cache/3d-models/render}"
+          mkdir -p "$CACHE_DIR"
+          find . -name '*.scad' -not -path './.github/*' | while read -r file; do
+            name="$(basename "$file" .scad)"
+            name_re='^[A-Za-z0-9._ -]+$'
+            if [[ ! "$name" =~ $name_re ]]; then
+              echo "::error::Refusing to render $file: filename contains characters outside [A-Za-z0-9._ -]"
+              exit 1
+            fi
+            # Skip library files (underscore-prefixed by convention)
+            if [[ "$(basename "$file")" == _* ]]; then
+              echo "  Skipping $file (library, underscore-prefixed)"
+              continue
+            fi
+            dir="$(dirname "$file" | sed 's|^\./||' | cut -d/ -f1)"
+            src="$(echo "$file" | sed 's|^\./||')"
+            key="$(python3 scripts/render_cache.py key "$file" --openscad-version "$OPENSCAD_VERSION")"
+            cached="$CACHE_DIR/$key.stl"
+            if [ "${RENDER_CACHE_DISABLED:-}" != "1" ] && [ -s "$cached" ]; then
+              echo "  Cache HIT: $file ($key)"
+              cp "$cached" "site/$name.stl"
+              touch "$cached"   # refresh mtime so the prune keeps active entries
+              echo "$name.stl	$dir	$src" >> site/.scad-map
+              continue
+            fi
+            echo "Rendering: $file -> site/$name.stl (cache MISS $key)"
+            # --backend=CGAL: openscad-unstable's default Manifold backend
+            # emits zero-area (degenerate) facets for the drawer baseplate
+            # grids — 112 per model, which fails admesh validation. CGAL is
+            # the backend the 2021.01 renders used and produces clean meshes;
+            # PNG previews below don't full-render, so only STL export needs
+            # the flag.
+            # Log goes to $RUNNER_TEMP (per-job, not shared) — /tmp is
+            # world-writable on the shared self-hosted runners, and the
+            # "library, no top-level geometry" branch below trusts this
+            # file's contents (issue #424).
+            bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" --backend=CGAL --export-format binstl -o "site/$name.stl" "$file" > "$RUNNER_TEMP/scad.log" 2>&1 && rc=0 || rc=$?
+            cat "$RUNNER_TEMP/scad.log"
+            if [ "$rc" -eq 124 ] || [ "$rc" -ge 128 ]; then
+              echo "::error::render exceeded memory/time cap: $file (rc=$rc)"
+              rm -f "site/$name.stl"
+              exit 1
+            elif grep -qiE 'top level object is empty|nothing to export' "$RUNNER_TEMP/scad.log"; then
+              echo "  Skipping $file (library, no top-level geometry)"
+              rm -f "site/$name.stl"
+            elif [ $rc -ne 0 ] && { [ ! -s "site/$name.stl" ] || [ "$(stat -c%s "site/$name.stl" 2>/dev/null || echo 0)" -le 84 ]; }; then
+              echo "::warning::$file exited $rc with no geometry — skipping (suspected library)"
+              rm -f "site/$name.stl"
+            elif [ $rc -ne 0 ]; then
+              echo "  ERROR rendering $file"
+              exit 1
+            else
+              # Record mapping: stl-name → project-dir → source-path
+              echo "$name.stl	$dir	$src" >> site/.scad-map
+              # Populate the cache atomically so a concurrent build never reads
+              # a half-written STL.
+              if [ "${RENDER_CACHE_DISABLED:-}" != "1" ]; then
+                cp "site/$name.stl" "$cached.tmp.$$" && mv "$cached.tmp.$$" "$cached"
+              fi
+            fi
+          done
+          # Bound cache growth: drop entries not touched in 30 days.
+          find "$CACHE_DIR" -maxdepth 1 -name '*.stl' -type f -mtime +30 -delete 2>/dev/null || true
+
+      - name: Validate STL meshes
+        id: validate
+        run: |
+          python3 scripts/validate_stl_meshes.py --site-dir site --output site/validation.json
+
+      - name: Vendor Three.js runtime
+        run: python3 scripts/fetch_threejs.py
+
+      - name: Bundle openscad-wasm and sources for in-browser customizer
+        run: |
+          python3 scripts/fetch_openscad_wasm.py
+
+          # Source .scad files are already public on GitHub; staging them
+          # under site/sources/ lets the in-browser customizer fetch them
+          # so openscad-wasm can resolve `include <...>` at render time.
+          find . -name '*.scad' \
+            -not -path './.github/*' \
+            -not -path './site/*' \
+            -not -path './.cache/*' \
+            | while read -r f; do
+              rel="${f#./}"
+              mkdir -p "site/sources/$(dirname "$rel")"
+              cp "$f" "site/sources/$rel"
+            done
+
+          # Parameter manifests that passed validation also go to S3 so the
+          # browser can fetch them. Skip ones in .param-failures.
+          if [ -s .param-failures ]; then
+            mapfile -t failed_params < .param-failures
+          else
+            failed_params=()
+          fi
+          find . -name '*.parameters.json' \
+            -not -path './site/*' \
+            -not -path './.cache/*' \
+            | while read -r f; do
+              rel="${f#./}"
+              skip=0
+              for failed in "${failed_params[@]}"; do
+                [ "$rel" = "$failed" ] && skip=1 && break
+              done
+              [ $skip -eq 1 ] && continue
+              mkdir -p "site/sources/$(dirname "$rel")"
+              cp "$f" "site/sources/$rel"
+            done
+
+          # Binary render assets (e.g. surface() heightmaps) referenced by a
+          # sibling .scad must also be staged so the in-browser customizer can
+          # write them into the wasm FS. Match by basename appearing in a .scad
+          # in the same directory so unrelated images (screenshots) aren't staged.
+          find . -name '*.png' \
+            -not -path './.github/*' \
+            -not -path './site/*' \
+            -not -path './.cache/*' \
+            | while read -r f; do
+              dir="$(dirname "$f")"
+              bn="$(basename "$f")"
+              if grep -qF "$bn" "$dir"/*.scad 2>/dev/null; then
+                rel="${f#./}"
+                mkdir -p "site/sources/$(dirname "$rel")"
+                cp "$f" "site/sources/$rel"
+              fi
+            done
+
+          # Per-project file listings so the browser can discover library
+          # files (S3 doesn't serve directory indexes).
+          for dir in site/sources/*/; do
+            [ -d "$dir" ] || continue
+            python3 -c "
+          import json, os, sys
+          d = sys.argv[1]
+          scads = sorted(f for f in os.listdir(d) if f.endswith('.scad') or f.endswith('.png'))
+          with open(os.path.join(d, 'manifest.json'), 'w') as out:
+              json.dump(scads, out)
+          " "$dir"
+          done
+
+      # node comes from the flake devShell (this replaces the old
+      # actions/setup-node + relocate-to-$RUNNER_TEMP dance from issue #356 —
+      # setup-node's prebuilt tarball and the runner tool cache are both
+      # unusable on the NixOS runners).
+      - name: Smoke-test WASM customizer rendering
+        run: |
+          node scripts/test_wasm_customizer.mjs
+          node scripts/test_hash_routing.mjs
+          node scripts/test_landing_order.mjs
+          node scripts/test_hash_history.mjs
+
+      - name: Check mating part interference
+        id: interference
+        run: |
+          python3 -m unittest discover -s scripts -p "test_check_interference.py" -v
+          python3 scripts/check_interference.py
+
+      - name: Generate standalone HTML viewers
+        run: python3 scripts/generate-standalone.py
+
+      - name: Bundle project zips
+        run: |
+          declare -A project_files
+          while IFS=$'\t' read -r stl dir src; do
+            project_files[$dir]+="site/$stl"$'\n'
+          done < site/.scad-map
+
+          for dir in "${!project_files[@]}"; do
+            mapfile -t files < <(printf '%s' "${project_files[$dir]}")
+            if [ ${#files[@]} -ge 2 ]; then
+              zipname="site/${dir}.zip"
+              echo "Bundling ${#files[@]} files into $zipname"
+              zip -j "$zipname" "${files[@]}" || { echo "::error::Failed to create $zipname"; exit 1; }
+            else
+              echo "Skipping $dir (only ${#files[@]} file)"
+            fi
+          done
+
+      - name: Bundle project source zips
+        run: |
+          mapfile -t dirs < <(cut -f2 site/.scad-map | sort -u)
+          for dir in "${dirs[@]}"; do
+            [ -d "$dir" ] || continue
+            zipname="site/${dir}-source.zip"
+            echo "Bundling source for $dir into $zipname"
+            git ls-files -z -- "$dir" | xargs -0 -r zip -q "$zipname" \
+              || { echo "::error::Failed to create $zipname"; exit 1; }
+            # Assets imported from outside the project (a scans/ reference
+            # mesh, #439) are not in git ls-files for $dir, and a source zip
+            # without them cannot be re-rendered.
+            mapfile -t extra < <(python3 scripts/external_assets.py "$dir")
+            if [ ${#extra[@]} -gt 0 ]; then
+              echo "  + external assets: ${extra[*]}"
+              printf '%s\0' "${extra[@]}" | xargs -0 -r zip -q "$zipname" \
+                || { echo "::error::Failed to add external assets to $zipname"; exit 1; }
+            fi
+          done
+
+      # No Xvfb: the flake's openscad wrapper renders PNGs offscreen via
+      # EGL/llvmpipe, so the old xvfb-run retry/lock-cleanup machinery is gone.
+      #
+      # OpenSCAD exits 0 after "Cannot create OpenGL OffscreenView" but leaves
+      # a 0-byte file behind, and a 0-byte PNG syncs to S3 just as happily as
+      # a real one (issue #359: every thumbnail on the live site was empty, so
+      # the landing gallery rendered as bare text). Only a file starting with
+      # the 8-byte PNG signature counts as rendered — same check as the
+      # gl_smoke probe above. Failures are recorded here; they skip the S3
+      # deploy (steps.thumbnails.outputs.failed is one of the conjuncts on
+      # the "Deploy to S3 (main)" if:) and hard-fail the build in the
+      # "Enforce thumbnail rendering" step at the end — the same deferred
+      # enforcement shape as mesh/metadata/interference/parameters. Skipping
+      # the deploy matters because a broken PNG is deleted above and the sync
+      # runs with --delete, so deploying would strip the last good thumbnails
+      # off the live site (issue #359).
+      - name: Render PNG thumbnails
+        id: thumbnails
+        env:
+          RENDER_MEM_MAX: 4G
+          RENDER_TIMEOUT: "120"
+        run: |
+          valid_png() {
+            [ -s "$1" ] || return 1
+            [ "$(od -An -tx1 -N8 "$1" | tr -d ' \n')" = "89504e470d0a1a0a" ]
+          }
+          : > .thumb-failures
+          while IFS="$(printf "\t")" read -r stl dir src; do
+            name="${stl%.stl}"
+            echo "Rendering thumbnail: $src -> site/$name.png"
+            bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" -o "site/$name.png" --imgsize=800,600 "$src" \
+              || echo "::warning::Failed to render thumbnail for $name"
+            if ! valid_png "site/$name.png"; then
+              echo "::warning::No valid PNG produced for $name"
+              rm -f "site/$name.png"
+              printf '%s\n' "$name" >> .thumb-failures
+            fi
+          done < site/.scad-map
+
+          expected=$(grep -c . site/.scad-map || true)
+          n=$(grep -c . .thumb-failures || true)
+          if [ "${n:-0}" -gt 0 ]; then
+            echo "::warning::${n} of ${expected} models produced no valid PNG thumbnail"
+            cat .thumb-failures
+            echo "failed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "All ${expected} thumbnails rendered."
+            echo "failed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Render extra orthographic views for complex-interior models
+        env:
+          RENDER_MEM_MAX: 4G
+          RENDER_TIMEOUT: "120"
+        run: |
+          cat > "$RUNNER_TEMP/render-interior-views.sh" << 'SCRIPT'
+          while IFS="$(printf "\t")" read -r stl dir src; do
+            if [ ! -f "$dir/meta.json" ]; then
+              continue
+            fi
+            if ! python3 -c "import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d.get('complex_interior') else 1)" "$dir/meta.json" 2>/dev/null; then
+              continue
+            fi
+            name="${stl%.stl}"
+            echo "Rendering orthographic views for $src (complex_interior=true)"
+            for spec in "top:0,0,0,0,0,0,500:ortho" "bottom:0,0,0,180,0,0,500:ortho" "front:0,0,0,90,0,0,500:ortho"; do
+              view="${spec%%:*}"; rest="${spec#*:}"; cam="${rest%%:*}"; proj="${rest##*:}"
+              out="site/${name}_${view}.png"
+              echo "  $view -> $out"
+              if bash "$GITHUB_WORKSPACE/scripts/capped-openscad.sh" -o "$out" --imgsize=800,600 \
+                --camera="$cam" --projection="$proj" --viewall --autocenter "$src"; then
+                # Guard against OpenSCAD exiting 0 but writing an empty/corrupt file
+                if [ ! -s "$out" ]; then
+                  echo "::warning::Empty PNG for $view view of $name — removing"
+                  rm -f "$out"
+                fi
+              else
+                echo "::warning::Failed to render $view view for $name"
+                rm -f "$out"
+              fi
+            done
+          done < site/.scad-map
+          SCRIPT
+
+          bash "$RUNNER_TEMP/render-interior-views.sh"
+
+      - name: Generate QR codes
+        run: |
+          mkdir -p site/qr
+          # Slugs come from the canonical slugify() in scripts/oembed_helpers.py
+          # (the same one index.html, embed.html and generate-gallery.py use).
+          # There is deliberately no Bash re-derivation here: a shell copy has
+          # no parity test and would silently drift (issue #398).
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import slugify, parse_scad_map, BASE_URL
+
+          scad_map = parse_scad_map('site/.scad-map')
+          with open(sys.argv[1], 'w') as out:
+              for stl, info in sorted(scad_map.items()):
+                  name = stl[:-4] if stl.endswith('.stl') else stl
+                  url = BASE_URL + '/#' + slugify(info['dir']) + '/' + slugify(stl)
+                  out.write(name + '\t' + url + '\n')
+          " "$RUNNER_TEMP/qr-urls.tsv"
+
+          while IFS="$(printf '\t')" read -r name url; do
+            echo "QR: $url -> site/qr/${name}.png"
+            qrencode -o "site/qr/${name}.png" -s 8 -m 2 \
+              --foreground=E0E0E0 --background=1A1A2E \
+              "$url" \
+              || echo "::warning::Failed to generate QR for $name"
+          done < "$RUNNER_TEMP/qr-urls.tsv"
+
+      - name: Generate OG hero image
+        run: |
+          # ImageMagick from the flake ships no default font (no distro
+          # type.xml), so ANY text-capable operation fails with
+          #   "unable to read font `(null)'"  --  including montage, which
+          # labels each tile by default. `+label` does not suppress the lookup;
+          # MAGICK_FONT and a hand-supplied type.xml are both ignored. Naming a
+          # font explicitly is the only fix that works (issue #352).
+          # Liberation-Sans resolves via fontconfig: the flake's devShell pins
+          # FONTCONFIG_FILE to a font set containing liberation_ttf, so this
+          # works identically on every runner. ImageMagick font names are
+          # HYPHENATED: "DejaVu Sans", "Helvetica" and "sans" do NOT resolve.
+          OG_FONT='Liberation-Sans'
+
+          # ImageMagick 7 ships `magick`; IM6 only has `convert`.
+          if command -v magick >/dev/null 2>&1; then
+            IM_CONVERT=(magick)
+          else
+            IM_CONVERT=(convert)
+          fi
+
+          # Tiles come from site/.scad-map, not a site/*.png glob: the glob
+          # also swept the _top/_bottom/_front orthographic views written by
+          # the complex_interior step, and the untiled montage was a
+          # 1224x14168 strip (issue #458). One tile per project (meta.json
+          # `hero` when it rendered), capped to the 5x3 grid.
+          python3 -c "
+          import glob, json, os, sys
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import (
+              parse_scad_map, load_meta_failures, og_hero_thumbnails,
+              OG_HERO_MAX_TILES,
+          )
+
+          scad_map = parse_scad_map('site/.scad-map')
+          failed = load_meta_failures()
+          heroes = {}
+          for path in sorted(glob.glob('*/meta.json')):
+              if path in failed:
+                  continue
+              try:
+                  with open(path) as f:
+                      meta = json.load(f)
+              except (OSError, json.JSONDecodeError):
+                  continue
+              hero = meta.get('hero')
+              if hero:
+                  heroes[os.path.dirname(path)] = hero
+
+          existing = {os.path.basename(p) for p in glob.glob('site/*.png')}
+          tiles = og_hero_thumbnails(scad_map, heroes, existing)
+          print('OG hero tiles: %d of max %d' % (len(tiles), OG_HERO_MAX_TILES))
+          with open(sys.argv[1], 'w') as out:
+              for name in tiles:
+                  print('  ' + name)
+                  out.write('site/' + name + '\n')
+          " "$RUNNER_TEMP/og-tiles.txt"
+
+          ok=0
+          mapfile -t THUMBS < "$RUNNER_TEMP/og-tiles.txt"
+          if [ ${#THUMBS[@]} -gt 0 ] && [ -e "${THUMBS[0]}" ]; then
+            # Two stages on purpose: -resize/-extent chained onto montage are
+            # silently ignored (confirmed: the deployed og-hero.png was
+            # 1224x14168). montage writes MIFF on stdout; the second stage
+            # centres the grid on a 1200x630 dark canvas.
+            if montage "${THUMBS[@]}" \
+              -font "$OG_FONT" \
+              -geometry 232x202+4+4 \
+              -tile 5x3 \
+              -background '#1a1a2e' \
+              miff:- \
+              | "${IM_CONVERT[@]}" miff:- \
+                -font "$OG_FONT" \
+                -background '#1a1a2e' \
+                -gravity center \
+                -extent 1200x630 \
+                png:site/og-hero.png; then
+              ok=1
+            else
+              echo "::warning::montage failed to composite og-hero.png; falling back to a plain hero image"
+            fi
+          fi
+
+          if [ "$ok" -eq 0 ]; then
+            if "${IM_CONVERT[@]}" -size 1200x630 xc:'#1a1a2e' \
+              -font "$OG_FONT" \
+              -gravity center -pointsize 48 -fill white \
+              -annotate 0 '3D Printable Models' \
+              site/og-hero.png; then
+              ok=1
+            fi
+          fi
+
+          if [ "$ok" -eq 0 ]; then
+            rm -f site/og-hero.png
+            echo "::warning::Could not generate site/og-hero.png; social previews will 404 for this deploy"
+          else
+            identify -format '%wx%h\n' site/og-hero.png || true
+          fi
+
+      - name: Generate models manifest
+        run: |
+          # Build grouped models.json from .scad-map, merging estimated_minutes from validation
+          python3 -c "
+          import json, os, sys
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import load_meta_failures, project_display_name
+          from scripts.project_dates import project_updated
+
+          # Load OpenSCAD version used for this render
+          openscad_version = ''
+          try:
+              with open('site/openscad-version.txt') as f:
+                  openscad_version = f.read().strip()
+          except FileNotFoundError:
+              pass
+
+          # Load validation results keyed by model name
+          validation = {}
+          try:
+              with open('site/validation.json') as f:
+                  for entry in json.load(f):
+                      validation[entry['name']] = entry
+          except (FileNotFoundError, json.JSONDecodeError):
+              pass
+
+          failed_meta = load_meta_failures()
+
+          # Manifests that failed validation are excluded from models.json
+          # so the customizer never offers a broken parameter set.
+          failed_params = set()
+          try:
+              with open('.param-failures') as f:
+                  failed_params = {p.strip() for p in f if p.strip()}
+          except FileNotFoundError:
+              pass
+
+          groups = {}
+          with open('site/.scad-map') as f:
+              for line in f:
+                  line = line.strip()
+                  if not line:
+                      continue
+                  stl, project_dir, source = line.split('\t', 2)
+                  project_name = project_display_name(project_dir)
+                  groups.setdefault(project_name, {'dir': project_dir, 'files': []})
+                  file_entry = {'stl': stl, 'source': source}
+                  qr_path = f\"site/qr/{stl.replace('.stl', '.png')}\"
+                  if os.path.exists(qr_path):
+                      file_entry['qr'] = f\"qr/{stl.replace('.stl', '.png')}\"
+                  # Merge estimated_minutes from validation
+                  val_name = stl.rsplit('.', 1)[0]
+                  if val_name in validation and validation[val_name].get('estimated_minutes') is not None:
+                      file_entry['estimated_minutes'] = validation[val_name]['estimated_minutes']
+                  # Attach parameter manifest if present and validated.
+                  # The customizer reads file_entry['parameters'] and
+                  # discovers project sources via sources/<dir>/manifest.json.
+                  source_basename = os.path.splitext(os.path.basename(source))[0]
+                  params_path = os.path.join(project_dir, source_basename + '.parameters.json')
+                  if os.path.isfile(params_path) and params_path not in failed_params:
+                      try:
+                          with open(params_path) as pf:
+                              file_entry['parameters'] = json.load(pf)
+                      except json.JSONDecodeError:
+                          pass
+                  groups[project_name]['files'].append(file_entry)
+
+          # Last-commit date per project dir, for the landing page's recency
+          # ordering. Empty on a shallow clone — see scripts/project_dates.py.
+          updated = project_updated([g['dir'] for g in groups.values()])
+
+          result = {}
+          for k in sorted(groups):
+              entry = {'dir': groups[k]['dir'], 'files': sorted(groups[k]['files'], key=lambda m: m['stl'])}
+              zip_path = f\"site/{groups[k]['dir']}.zip\"
+              if os.path.exists(zip_path):
+                  entry['zip'] = f\"{groups[k]['dir']}.zip\"
+              src_zip_path = f\"site/{groups[k]['dir']}-source.zip\"
+              if os.path.exists(src_zip_path):
+                  entry['sourceZip'] = f\"{groups[k]['dir']}-source.zip\"
+              # Merge metadata from meta.json if it exists and passed validation
+              meta_path = os.path.join(groups[k]['dir'], 'meta.json')
+              if os.path.isfile(meta_path) and meta_path not in failed_meta:
+                  try:
+                      with open(meta_path) as mf:
+                          meta = json.load(mf)
+                  except json.JSONDecodeError:
+                      meta = {}
+                  # Only propagate viewer-relevant fields to the manifest.
+                  # license, relatedModels, and mating_pairs are intentionally excluded.
+                  for field in ('description', 'tags', 'difficulty', 'version', 'hardware', 'hero', 'assembly', 'printing_notes'):
+                      if field in meta:
+                          entry[field] = meta[field]
+              if openscad_version:
+                  entry['rendered_with'] = openscad_version
+              if groups[k]['dir'] in updated:
+                  entry['updated'] = updated[groups[k]['dir']]
+              result[k] = entry
+
+          with open('site/models.json', 'w') as f:
+              json.dump(result, f, indent=2)
+          "
+          echo "Generated models.json:"
+          cat site/models.json
+
+      - name: Generate sitemap.xml
+        run: |
+          python3 -c "
+          import sys
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import build_sitemap, parse_scad_map, stl_lastmods
+          stls = sorted(parse_scad_map('site/.scad-map'))
+          lastmods = stl_lastmods('site/models.json')
+          with open('site/sitemap.xml', 'w') as f:
+              f.write(build_sitemap(stls, lastmods))
+          print(f'Wrote sitemap.xml with {len(stls) + 1} URLs, {len(lastmods)} with lastmod')
+          "
+
+      - name: Generate README gallery
+        id: gallery
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        continue-on-error: true
+        run: python3 scripts/generate-gallery.py
+
+      - name: Smoke-test gallery script (PR only)
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 scripts/generate-gallery.py && rc=0 || rc=$?
+          git checkout -- README.md || true
+          exit $rc
+
+      - name: Generate structured data
+        run: |
+          python3 -c "
+          import json, os, sys
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import build_structured_data, load_meta_failures, parse_scad_map
+
+          scad_map = parse_scad_map('site/.scad-map')
+          failed_meta = load_meta_failures()
+
+          project_descriptions = {}
+          for stl, info in scad_map.items():
+              project_dir = info['dir']
+              if project_dir in project_descriptions:
+                  continue
+              meta_path = os.path.join(project_dir, 'meta.json')
+              if os.path.isfile(meta_path) and meta_path not in failed_meta:
+                  try:
+                      with open(meta_path) as mf:
+                          meta = json.load(mf)
+                  except json.JSONDecodeError:
+                      meta = {}
+                  if 'description' in meta:
+                      project_descriptions[project_dir] = meta['description']
+
+          stl_sizes = {}
+          for stl in scad_map:
+              stl_path = f'site/{stl}'
+              if os.path.isfile(stl_path):
+                  stl_sizes[stl] = os.path.getsize(stl_path)
+
+          jsonld = build_structured_data(scad_map, project_descriptions, stl_sizes)
+
+          with open('site/structured-data.json', 'w') as f:
+              json.dump(jsonld, f, indent=2)
+
+          print('Generated structured-data.json')
+          "
+
+      - name: Generate OEmbed JSON files
+        run: |
+          python3 -c "
+          import json, os, sys
+          from html import escape
+          from urllib.parse import quote
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import slugify, display_name, thumbnail_name, parse_scad_map, BASE_URL
+
+          scad_map = parse_scad_map('site/.scad-map')
+
+          for stl, info in sorted(scad_map.items()):
+              model_name = display_name(stl).title()
+              project_slug = slugify(info['dir'])
+              model_slug = slugify(stl)
+              png = thumbnail_name(stl)
+              embed_src = escape(f'{BASE_URL}/embed.html#{project_slug}/{model_slug}')
+
+              oembed = {
+                  'version': '1.0',
+                  'type': 'rich',
+                  'title': f\"{model_name} – {info['project']}\",
+                  'provider_name': 'St. John Software',
+                  'provider_url': 'https://www.bstjohn.net',
+                  'thumbnail_url': f'{BASE_URL}/{quote(png)}',
+                  'thumbnail_width': 800,
+                  'thumbnail_height': 600,
+                  'width': 800,
+                  'height': 600,
+                  # sandbox: allow-scripts needed for Three.js rendering,
+                  # allow-same-origin needed to fetch models.json and STL files
+                  # from the same origin. This is safe since embed.html is
+                  # controlled first-party content.
+                  'html': f'<iframe src=\"{embed_src}\" width=\"800\" height=\"600\" frameborder=\"0\" allowfullscreen sandbox=\"allow-scripts allow-same-origin\"></iframe>',
+              }
+
+              out_dir = f'site/oembed/{project_slug}'
+              os.makedirs(out_dir, exist_ok=True)
+              out_path = f'{out_dir}/{model_slug}.json'
+              with open(out_path, 'w') as f:
+                  json.dump(oembed, f, indent=2)
+              print(f'  Generated {out_path}')
+          "
+
+      - name: Generate changed projects list
+        if: github.event_name == 'pull_request' || steps.issue_preview.outputs.enabled == 'true'
+        run: |
+          # `|| true`: no .scad changes in the diff is a normal outcome, and
+          # the job-level default shell runs with pipefail on.
+          git diff --name-only HEAD~1 HEAD | { grep '\.scad$' || true; } | \
+            sed 's|/.*||' | sort -u | \
+            python3 -c "
+          import json, sys
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import project_display_name
+          dirs = [d.strip() for d in sys.stdin if d.strip()]
+          projects = [project_display_name(d) for d in dirs]
+          with open('site/changed.json', 'w') as f:
+              json.dump(projects, f)
+          print('Changed projects:', projects)
+          "
+
+      - name: Copy index.html and embed.html to site with cache-busting hash and injected data
+        run: |
+          sed "s/__BUILD_HASH__/${GITHUB_SHA::8}/g" index.html > site/index.html
+          sed "s/__BUILD_HASH__/${GITHUB_SHA::8}/g" embed.html > site/embed.html
+          sed "s/__BUILD_HASH__/${GITHUB_SHA::8}/g" openscad-worker.js > site/openscad-worker.js
+          cp filament-colors.json site/filament-colors.json
+          cp favicon.svg site/favicon.svg
+          cp site.webmanifest site/site.webmanifest
+          cp robots.txt site/robots.txt
+          cp llms.txt site/llms.txt
+          python3 -c "
+          import json, sys
+          from html import escape
+          sys.path.insert(0, '.')
+          from scripts.oembed_helpers import slugify, display_name, parse_scad_map, BASE_URL
+
+          with open('site/index.html') as f:
+              html = f.read()
+
+          # Inject structured data
+          with open('site/structured-data.json') as f:
+              jsonld = f.read()
+
+          # Escape characters that could break out of <script> when embedded inline.
+          jsonld = jsonld.replace('&', '\\u0026').replace('<', '\\u003c').replace('>', '\\u003e')
+
+          tag = '<script type=\"application/ld+json\">\n' + jsonld + '\n</script>'
+          html = html.replace('<!-- __STRUCTURED_DATA__ -->', tag)
+
+          # Inject OEmbed discovery link tags
+          link_tags = []
+          for stl, info in sorted(parse_scad_map('site/.scad-map').items()):
+              model_name = display_name(stl).title()
+              project_slug = slugify(info['dir'])
+              model_slug = slugify(stl)
+              href = f'{BASE_URL}/oembed/{project_slug}/{model_slug}.json'
+              title = f'{model_name} – {info[\"project\"]}'
+              link_tags.append(f'<link rel=\"alternate\" type=\"application/json+oembed\" href=\"{escape(href)}\" title=\"{escape(title)}\">')
+
+          html = html.replace('<!-- __OEMBED_LINKS__ -->', '\n  '.join(link_tags))
+
+          with open('site/index.html', 'w') as f:
+              f.write(html)
+
+          print(f'Injected structured data and {len(link_tags)} OEmbed link tags into index.html')
+          "
+
+      - name: Write issue preview summary
+        if: steps.issue_preview.outputs.enabled == 'true'
+        continue-on-error: true
+        env:
+          ISSUE_ID: ${{ steps.issue_preview.outputs.issue_id }}
+          SHORT_SHA: ${{ steps.issue_preview.outputs.short_sha }}
+        run: |
+          python3 scripts/preview_summary.py \
+            --issue "$ISSUE_ID" --sha "$SHORT_SHA" --commit "$GITHUB_SHA" \
+            --changed-from-git --site site \
+            --out site/preview-summary.json \
+            --markdown-out "${GITHUB_STEP_SUMMARY:-}"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: github-actions-${{ github.run_id }}
+
+      - name: Deploy to S3 (main)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && steps.validate.outputs.failed != 'true' && steps.metadata.outputs.failed != 'true' && steps.interference.outputs.failed != 'true' && steps.param_meta.outputs.failed != 'true' && steps.thumbnails.outputs.failed != 'true'
+        run: aws s3 sync ./site s3://www.bstjohn.net/3d-models/ --delete --exclude "pr-preview/*" --exclude "issue-preview/*"
+
+      - name: Commit README gallery update
+        if: >-
+          github.ref == 'refs/heads/main' && github.event_name == 'push'
+          && steps.gallery.outcome == 'success'
+          && steps.validate.outputs.failed != 'true'
+        continue-on-error: true
+        run: |
+          if git diff --quiet README.md; then
+            echo "README gallery is already up to date"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add README.md
+            git commit -m "docs: update model gallery [skip ci]"
+            git pull --rebase
+            git push
+          fi
+
+      - name: Deploy PR preview
+        if: github.event_name == 'pull_request'
+        run: |
+          SHORT_SHA="${{ github.event.pull_request.head.sha }}"
+          SHORT_SHA="${SHORT_SHA::8}"
+          aws s3 sync ./site "s3://www.bstjohn.net/3d-models/pr-preview/pr-${{ github.event.number }}/${SHORT_SHA}/" --delete
+
+      - name: Deploy issue preview
+        # Ungated on validation, like PR previews, so a red candidate build
+        # is still inspectable in the viewer.
+        if: steps.issue_preview.outputs.enabled == 'true'
+        env:
+          ISSUE_ID: ${{ steps.issue_preview.outputs.issue_id }}
+          SHORT_SHA: ${{ steps.issue_preview.outputs.short_sha }}
+        run: |
+          aws s3 sync ./site "s3://www.bstjohn.net/3d-models/issue-preview/${ISSUE_ID}/${SHORT_SHA}/" --delete
+
+      - name: Comment on PR with thumbnails
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            async function withRetry(fn, retries = 3, delayMs = 2000) {
+              for (let attempt = 1; attempt <= retries; attempt++) {
+                try {
+                  return await fn();
+                } catch (err) {
+                  if (attempt === retries) throw err;
+                  console.log(`Attempt ${attempt} failed: ${err.message}. Retrying in ${delayMs * attempt}ms...`);
+                  await new Promise(r => setTimeout(r, delayMs * attempt));
+                }
+              }
+            }
+
+            function getStlMetadata(stlPath) {
+              try {
+                const stat = fs.statSync(stlPath);
+                const size = stat.size;
+                if (size < 84) return { size, triangles: null };
+                const buf = Buffer.alloc(84);
+                const fd = fs.openSync(stlPath, 'r');
+                fs.readSync(fd, buf, 0, 84, 0);
+                fs.closeSync(fd);
+                const triangles = buf.readUInt32LE(80);
+                if (size !== 84 + triangles * 50) return { size, triangles: null };
+                return { size, triangles };
+              } catch {
+                return null;
+              }
+            }
+
+            function formatSize(bytes) {
+              if (bytes < 1024) return `${bytes} bytes`;
+              if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+              return `${(bytes / 1048576).toFixed(1)} MB`;
+            }
+
+            const prNumber = context.payload.pull_request.number;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const shortSha = context.payload.pull_request.head.sha.substring(0, 8);
+            const baseUrl = `https://www.bstjohn.net/3d-models/pr-preview/pr-${prNumber}/${shortSha}`;
+
+            // Get files changed in this PR
+            const { data: files } = await withRetry(() => github.rest.pulls.listFiles({
+              owner,
+              repo,
+              pull_number: prNumber,
+            }));
+
+            // Canonical project display names come from models.json, whose keys
+            // the "Generate models manifest" step derives with
+            // scripts/oembed_helpers.py::project_display_name(). Read them here
+            // instead of re-deriving in JS — a JS re-implementation silently
+            // diverged from Python str.title() on inputs like '2x4-jig' and
+            // 'ESP32-case' (issue #399).
+            const dirToProject = new Map();
+            try {
+              const models = JSON.parse(fs.readFileSync('site/models.json', 'utf8'));
+              for (const [project, entry] of Object.entries(models)) {
+                if (entry && entry.dir) dirToProject.set(entry.dir, project);
+              }
+            } catch (e) {
+              console.log('No models.json found; falling back to raw directory names');
+            }
+
+            // Build a map of changed SCAD files: png-name → project-name
+            const changedModels = new Map();
+            for (const f of files) {
+              if (!f.filename.endsWith('.scad')) continue;
+              const png = path.basename(f.filename, '.scad') + '.png';
+              const dir = f.filename.split('/')[0];
+              changedModels.set(png, dirToProject.get(dir) || dir);
+            }
+
+            // Read validation results
+            let validationResults = [];
+            try {
+              validationResults = JSON.parse(fs.readFileSync('site/validation.json', 'utf8'));
+            } catch (e) {
+              console.log('No validation results found');
+            }
+
+            // Only show thumbnails for models changed in this PR
+            const pngFiles = fs.readdirSync('site')
+              .filter(f => f.endsWith('.png') && changedModels.has(f))
+              .sort();
+
+            if (pngFiles.length === 0 && validationResults.length === 0) {
+              console.log('No changed model thumbnails or validation results found, skipping comment');
+              return;
+            }
+
+            // Group PNGs by project
+            const groups = {};
+            for (const png of pngFiles) {
+              const project = changedModels.get(png);
+              if (!groups[project]) groups[project] = [];
+              groups[project].push(png);
+            }
+
+            // Find existing bot comment to update instead of creating duplicates
+            // Use paginate to avoid missing the bot comment on PRs with >30 comments.
+            const allComments = await withRetry(() => github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: prNumber,
+              per_page: 100,
+            }));
+
+            const marker = '## 🔍 Model Preview';
+            const existing = allComments.find(c =>
+              c.user.type === 'Bot' && c.body.includes(marker)
+            );
+
+            // Collect all previously-deployed SHAs for this PR from the existing comment body.
+            const prPreviewPattern = new RegExp(
+              `pr-preview/pr-${prNumber}/([a-f0-9]{8})/`,
+              'g'
+            );
+            const previousShas = [];
+            if (existing) {
+              let m;
+              while ((m = prPreviewPattern.exec(existing.body)) !== null) {
+                if (m[1] !== shortSha && !previousShas.includes(m[1])) {
+                  previousShas.push(m[1]);
+                }
+              }
+            }
+
+            let body = `## 🔍 Model Preview\n\n`;
+            body += `**[View interactive 3D models](${baseUrl}/)**\n\n`;
+
+            const MAX_PREV_BUILDS = 10;
+            const trimmedShas = previousShas.slice(0, MAX_PREV_BUILDS);
+            if (trimmedShas.length > 0) {
+              const suffixSegment = `/pr-preview/pr-${prNumber}/${shortSha}`;
+              const siteBase = baseUrl.replace(suffixSegment, '');
+              if (siteBase === baseUrl) {
+                console.warn(`Warning: could not strip SHA segment from baseUrl — skipping previous builds section. baseUrl=${baseUrl}`);
+              } else {
+                // Note: once more than MAX_PREV_BUILDS+1 builds have deployed, trimmedShas will
+                // always be MAX_PREV_BUILDS items and hiddenCount will always be 1. The
+                // "1 older omitted" label will therefore persist on every subsequent build —
+                // this is expected behaviour of the rolling window approach.
+                const hiddenCount = previousShas.length - trimmedShas.length;
+                const suffix = hiddenCount > 0 ? ` — ${hiddenCount} older omitted` : '';
+                body += `<details>\n<summary>Previous builds (${trimmedShas.length}${suffix})</summary>\n\n`;
+                for (const sha of trimmedShas) {
+                  const prevUrl = `${siteBase}/pr-preview/pr-${prNumber}/${sha}/`;
+                  body += `- [\`${sha}\`](${prevUrl})\n`;
+                }
+                body += `\n</details>\n\n`;
+              }
+            }
+
+            for (const project of Object.keys(groups).sort()) {
+              body += `### ${project}\n\n`;
+              for (const png of groups[project]) {
+                const name = png.replace(/\.png$/, '').replace(/[-_]/g, ' ');
+                const stlFile = path.join('site', png.replace(/\.png$/, '.stl'));
+                const meta = getStlMetadata(stlFile);
+                let stats = '';
+                if (meta) {
+                  stats = formatSize(meta.size);
+                  if (meta.triangles !== null) stats += ` · ${meta.triangles.toLocaleString()} triangles`;
+                  stats = ` — ${stats}`;
+                }
+                body += `**${name}**${stats}\n`;
+                body += `![${name}](${baseUrl}/${encodeURIComponent(png)})\n\n`;
+              }
+            }
+
+            if (validationResults.length > 0) {
+              const anyFailed = validationResults.some(r => !r.passed);
+              body += `### ${anyFailed ? '⚠️' : '✅'} Mesh Validation\n\n`;
+              body += `| Model | Size X/Y/Z mm | Min Z | Triangles | Volume | Status |\n`;
+              body += `|-------|---------------|-------|-----------|--------|--------|\n`;
+              for (const r of validationResults) {
+                const status = r.passed ? '✅ Pass' : '❌ Fail';
+                const bbox = r.bbox_mm;
+                const size = bbox && typeof bbox.x === 'number' && typeof bbox.y === 'number' && typeof bbox.z === 'number'
+                  ? `${bbox.x} × ${bbox.y} × ${bbox.z}`
+                  : 'unknown';
+                const minZValue = r.bounds_mm && typeof r.bounds_mm.min_z === 'number'
+                  ? r.bounds_mm.min_z.toFixed(2)
+                  : 'unknown';
+                const minZ = r.sits_on_bed === false ? `${minZValue} ⚠️` : minZValue;
+                body += `| ${r.name} | ${size} | ${minZ} | ${r.triangles.toLocaleString()} | ${r.volume} | ${status} |\n`;
+              }
+              body += `\n`;
+              if (anyFailed) {
+                body += `> **Mesh issues detected.** Models with ❌ have non-manifold geometry, degenerate triangles, or non-positive volume. These will slice incorrectly and produce failed prints.\n\n`;
+              }
+            }
+
+            // Read interference results
+            let interferenceResults = [];
+            try {
+              interferenceResults = JSON.parse(fs.readFileSync('site/interference.json', 'utf8'));
+            } catch (e) {
+              console.log('No interference results found');
+            }
+
+            if (interferenceResults.length > 0) {
+              const anyFailed = interferenceResults.some(r => !r.passed);
+              const allSkipped = interferenceResults.every(r => r.skipped);
+              const headerIcon = anyFailed ? '⚠️' : allSkipped ? '⏭️' : '✅';
+              body += `### ${headerIcon} Mating Part Interference\n\n`;
+              body += `| Part A | Part B | Overlap | Status |\n`;
+              body += `|--------|--------|---------|--------|\n`;
+              for (const r of interferenceResults) {
+                const status = r.skipped ? '⏭️ Skip' : r.passed ? '✅ Pass' : '❌ Fail';
+                const vol = r.overlap_volume_mm3 !== null && r.overlap_volume_mm3 !== undefined
+                  ? `${r.overlap_volume_mm3.toFixed(1)} mm³`
+                  : r.error || 'N/A';
+                body += `| ${r.part_a} | ${r.part_b} | ${vol} | ${status} |\n`;
+              }
+              body += `\n`;
+              if (anyFailed) {
+                body += `> **Interference detected.** Mating parts with ❌ physically overlap and won't assemble correctly.\n\n`;
+              }
+            }
+
+            body += `---\n*Preview deployed to [${baseUrl}](${baseUrl}/)*`;
+
+            if (existing) {
+              await withRetry(() => github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              }));
+              console.log('Updated existing preview comment');
+            } else {
+              await withRetry(() => github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: prNumber,
+                body,
+              }));
+              console.log('Created new preview comment');
+            }
+
+      - name: Enforce mesh validation
+        if: steps.validate.outputs.failed == 'true'
+        run: |
+          echo "::error::Mesh validation failed — one or more STL files have integrity issues. See the PR comment for details."
+          cat site/validation.json
+          exit 1
+
+      - name: Enforce dependency graph check
+        if: steps.depgraph.outputs.failed == 'true'
+        run: |
+          echo "::error::Dependency graphs are out of date. Run: bash scripts/scad-dep-graph.sh"
+          exit 1
+
+      - name: Enforce metadata validation
+        if: steps.metadata.outputs.failed == 'true'
+        run: |
+          echo "::error::Metadata validation failed — one or more meta.json files don't match meta.schema.json"
+          exit 1
+
+      - name: Enforce interference check
+        if: steps.interference.outputs.failed == 'true'
+        run: |
+          echo "::error::Mating part interference detected — one or more part pairs overlap. See the PR comment for details."
+          cat site/interference.json
+          exit 1
+
+      - name: Enforce parameters validation
+        if: steps.param_meta.outputs.failed == 'true'
+        run: |
+          echo "::error::Parameters manifest validation failed"
+          cat .param-failures
+          exit 1
+
+      - name: Enforce thumbnail rendering
+        if: steps.thumbnails.outputs.failed == 'true'
+        run: |
+          echo "::error::Thumbnail rendering produced no valid PNG for the models listed below. The flake's openscad wrapper renders offscreen via EGL/llvmpipe — check the gl_smoke step output and the openscadHeadless wrapper in flake.nix."
+          cat .thumb-failures
+          exit 1
