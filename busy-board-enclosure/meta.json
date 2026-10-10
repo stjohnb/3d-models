@@ -1,0 +1,32 @@
+{
+  "description": "Three-part printed housing for the busy board PCB v0.1 (100 x 100 mm): a play-side panel with the display and bar-graph windows, 16 LED holes, four 24 mm arcade buttons, two panel pots and an EC11 encoder; a back tray with a 3 x AAA battery compartment behind the board; and a screwed battery door. No fixing or solder joint is reachable from the play side.",
+  "hero": "busy_board_panel.stl",
+  "tags": ["electronics", "enclosure", "toy", "child-safe"],
+  "version": "0.1.0",
+  "difficulty": "intermediate",
+  "complex_interior": true,
+  "relatedModels": ["ha-carlink-enclosure", "heating-controller-box"],
+  "hardware": [
+    { "item": "Busy board PCB v0.1, assembled", "quantity": 1, "notes": "St-John-Software/electronics, hardware/busy-board/; dimensions from docs/busy-board/PCB.md" },
+    { "item": "24 mm arcade button, panel-nut type", "quantity": 4, "notes": "Timer, B, C and power; held by its own panel nut, no push-on cap" },
+    { "item": "B10K panel pot with anti-rotation lug", "quantity": 2, "notes": "M7 bushing; set pot_hole_d to 9.8 for a 3/8 inch bushing" },
+    { "item": "EC11 rotary encoder, panel-mount (bushing and nut)", "quantity": 1 },
+    { "item": "Knob, set-screw fixing, about 20 mm", "quantity": 3, "notes": "On the pots and the encoder; no push-on knobs" },
+    { "item": "3 x AAA battery holder with leads", "quantity": 1, "notes": "Leads crimped to a JST-XH housing for J1" },
+    { "item": "M3 heat-set insert (4.6 mm OD, up to 6 mm long)", "quantity": 11, "notes": "Four PCB bosses, six tray posts, one door boss; set insert_hole_d to 2.6 for self-tapping screws instead" },
+    { "item": "M3 x 6 pan-head screw", "quantity": 4, "notes": "From the board's back into the panel bosses" },
+    { "item": "M3 x 10 countersunk screw", "quantity": 6, "notes": "Through the tray floor into the panel posts" },
+    { "item": "M3 x 8 countersunk screw", "quantity": 1, "notes": "Battery door" },
+    { "item": "5 mm LED spacer, 7 mm long", "quantity": 16, "notes": "Under D1-D16 so the lens tips just enter the panel holes" },
+    { "item": "Cable tie, up to 3 mm wide", "quantity": 2, "notes": "Control leads through the two panel tie loops" }
+  ],
+  "printing_notes": [
+    "Print all three parts as exported, without supports: the panel play-face down, the tray floor down, the door outer-face down. PETG or ASA, 3 perimeters.",
+    "Press the eleven M3 heat-set inserts (four PCB bosses, six posts, the door boss) before assembly.",
+    "Seat the ring LEDs D1-D16 on 7 mm spacers so the lenses just enter the panel holes; the 5.8 mm flange cannot pass, so no lens stands proud. Seat DS1, BG1 and BG2 flat or on socket strips; they show through the windows from behind.",
+    "Assembly order: panel face down; fit the buttons, pots and encoder with their panel nuts (pot and encoder lugs in their slots) and the set-screw knobs; board onto the four bosses with M3 x 6 from its back; control leads over the board's bottom edge to J2-J8 via the two tie loops; battery holder into the compartment from the back with its leads through the notch to J1; tray on; six M3 x 10 from the back; door last with its M3 x 8.",
+    "The battery door needs a screwdriver to open (adult-only access); the programming header J9 is only reachable with the tray off.",
+    "VERIFY against the delivered parts and adjust: arcade button depth, nut and switch reach (button_depth, button_nut_d, button_switch_reach); pot and encoder bushings (pot_hole_d, enc_hole_d) and lug radii (pot_lug_r, enc_lug_r); knob diameter (knob_d); battery holder size (batt_l, batt_w, batt_h); and the JST-XH lead room (raise pcb_to_panel and led_raise together).",
+    "wall, corner_r, edge_r, inner_d and insert_hole_d and pcb_to_panel are shared by the panel and the tray, and floor_t, batt_l, batt_w, door_t and door_clear by the tray and the door: set them identically on every part that exposes them."
+  ]
+}

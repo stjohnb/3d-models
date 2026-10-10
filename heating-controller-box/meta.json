@@ -1,0 +1,31 @@
+{
+  "description": "Two-part, fully printed wall enclosure for an ESP32-2432S028R (\"Cheap Yellow Display\") heating and hot-water controller that replaces a Danfoss FP720 programmer. The base tray locates the relay board, Hi-Link PSU and WAGO block behind a partition rib that keeps the mains bay apart from the low-voltage display wiring, and carries a stylus sleeve on its right-hand side. The faceplate frames the display and carries two Hand-Off-Auto toggles and two indicator lamps. Every fixing uses an M3 heat-set insert.",
+  "hero": "heating_controller_lid.stl",
+  "tags": ["electronics", "enclosure", "esp32", "home-assistant", "wall-mount"],
+  "version": "0.1.0",
+  "difficulty": "intermediate",
+  "complex_interior": true,
+  "relatedModels": ["esp32-display-case"],
+  "hardware": [
+    { "item": "ESP32-2432S028R display board (Cheap Yellow Display) with its stylus", "quantity": 1 },
+    { "item": "2-channel opto-isolated 5 V relay board (SRD-05VDC-SL-C)", "quantity": 1 },
+    { "item": "Hi-Link HLK-10M05B AC-DC PSU on stripboard with a 2x2 screw terminal", "quantity": 1 },
+    { "item": "XURUI XT-13A SPDT centre-off toggle switch", "quantity": 2, "notes": "Hand-Off-Auto, one per circuit; 12 mm keyed panel hole" },
+    { "item": "230 V panel indicator lamp", "quantity": 2, "notes": "Amber for heating, blue for hot water; 10 mm panel hole assumed" },
+    { "item": "WAGO 221-415 5-way lever connector", "quantity": 1 },
+    { "item": "M3 heat-set insert (4.6 mm OD, up to 5.7 mm long)", "quantity": 12, "notes": "4 CYD, 4 relay, 4 corner posts" },
+    { "item": "M3 x 6 screw", "quantity": 8, "notes": "CYD and relay board" },
+    { "item": "M3 x 10 countersunk screw", "quantity": 4, "notes": "Lid to base" },
+    { "item": "Wall screw, up to 4.5 mm", "quantity": 4 }
+  ],
+  "printing_notes": [
+    "Print in PETG or ASA with 3 perimeters, in the exported orientation, without supports.",
+    "Press the heat-set inserts in with a soldering iron before fitting the boards. Support the lid face flat while pressing the CYD inserts, because only about 1.2 mm of skin is behind them.",
+    "Without inserts, set insert_hole_d to 2.6 and use self-tapping screws; the lid screws then become 3 mm self-tappers.",
+    "Test the toggle hole fit and adjust toggle_hole_d by 0.2 mm either way. Confirm toggle_key_w and the lamp cut-out before the final print.",
+    "Shift the display window with window_off_x and window_off_y, and adjust cyd_display_h, after a test fit.",
+    "The stylus drops cap-up into the right-hand sleeve and pushes out through the open bottom.",
+    "Fix the base to the wall before fitting the PSU and the relay board, which sit over two of the wall screws.",
+    "Leave the relay NC screw terminals empty."
+  ]
+}

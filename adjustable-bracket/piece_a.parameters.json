@@ -1,0 +1,31 @@
+{
+  "parameters": [
+    {
+      "name": "thickness",
+      "label": "Thickness (mm)",
+      "type": "number",
+      "min": 6,
+      "max": 15,
+      "step": 1,
+      "default": 10
+    },
+    {
+      "name": "total_span",
+      "label": "Total span (mm)",
+      "type": "number",
+      "min": 100,
+      "max": 200,
+      "step": 5,
+      "default": 140
+    },
+    {
+      "name": "slot_length",
+      "label": "Slot length (mm)",
+      "type": "number",
+      "min": 20,
+      "max": 30,
+      "step": 5,
+      "default": 30
+    }
+  ]
+}

@@ -1,0 +1,199 @@
+{
+  "parameters": [
+    {
+      "name": "inner_w",
+      "label": "Cavity width (mm)",
+      "type": "number",
+      "min": 160,
+      "max": 200,
+      "step": 1,
+      "default": 164
+    },
+    {
+      "name": "inner_h",
+      "label": "Cavity height (mm)",
+      "type": "number",
+      "min": 128,
+      "max": 140,
+      "step": 1,
+      "default": 128
+    },
+    {
+      "name": "inner_d",
+      "label": "Cavity depth (mm)",
+      "type": "number",
+      "min": 36,
+      "max": 60,
+      "step": 1,
+      "default": 40
+    },
+    {
+      "name": "wall",
+      "label": "Wall thickness (mm)",
+      "type": "number",
+      "min": 1.6,
+      "max": 4,
+      "step": 0.2,
+      "default": 2.4
+    },
+    {
+      "name": "insert_hole_d",
+      "label": "Insert hole diameter (mm; 2.6 = self-tap pilot)",
+      "type": "number",
+      "min": 2.4,
+      "max": 4.4,
+      "step": 0.1,
+      "default": 4
+    },
+    {
+      "name": "insert_depth",
+      "label": "Insert pocket depth (mm)",
+      "type": "number",
+      "min": 6,
+      "max": 7.5,
+      "step": 0.5,
+      "default": 6
+    },
+    {
+      "name": "relay_boss_h",
+      "label": "Relay boss height (mm)",
+      "type": "number",
+      "min": 8,
+      "max": 10,
+      "step": 0.5,
+      "default": 8
+    },
+    {
+      "name": "relay_cx",
+      "label": "Relay board centre X (mm)",
+      "type": "number",
+      "min": 48,
+      "max": 52,
+      "step": 0.5,
+      "default": 50
+    },
+    {
+      "name": "lid_screw_l",
+      "label": "Lid screw length (mm)",
+      "type": "number",
+      "min": 8,
+      "max": 12,
+      "step": 1,
+      "default": 10
+    },
+    {
+      "name": "psu_l",
+      "label": "PSU assembly length (mm)",
+      "type": "number",
+      "min": 47,
+      "max": 64,
+      "step": 0.5,
+      "default": 62
+    },
+    {
+      "name": "psu_w",
+      "label": "PSU assembly width (mm)",
+      "type": "number",
+      "min": 28,
+      "max": 34,
+      "step": 0.5,
+      "default": 30
+    },
+    {
+      "name": "cradle_clear",
+      "label": "Cradle clearance (mm)",
+      "type": "number",
+      "min": 0.2,
+      "max": 1,
+      "step": 0.1,
+      "default": 0.4
+    },
+    {
+      "name": "cradle_h",
+      "label": "Cradle height (mm)",
+      "type": "number",
+      "min": 4,
+      "max": 12,
+      "step": 1,
+      "default": 8
+    },
+    {
+      "name": "cable_floor",
+      "label": "Cable entry through the floor",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "cable_wall",
+      "label": "Cable entry through the right wall",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "name": "cable_wall_d",
+      "label": "Wall cable hole diameter (mm)",
+      "type": "number",
+      "min": 6,
+      "max": 12,
+      "step": 0.5,
+      "default": 8
+    },
+    {
+      "name": "vents",
+      "label": "Vent slots",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "mount_hole_d",
+      "label": "Wall screw hole diameter (mm)",
+      "type": "number",
+      "min": 3.5,
+      "max": 5,
+      "step": 0.1,
+      "default": 4.5
+    },
+    {
+      "name": "stylus_sleeve",
+      "label": "Stylus sleeve",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "stylus_bore_d",
+      "label": "Stylus shaft bore (mm)",
+      "type": "number",
+      "min": 5.2,
+      "max": 6.4,
+      "step": 0.1,
+      "default": 5.6
+    },
+    {
+      "name": "stylus_cap_d",
+      "label": "Stylus cap counterbore (mm)",
+      "type": "number",
+      "min": 8,
+      "max": 8.8,
+      "step": 0.1,
+      "default": 8.4
+    },
+    {
+      "name": "stylus_cap_depth",
+      "label": "Stylus cap counterbore depth (mm)",
+      "type": "number",
+      "min": 4,
+      "max": 10,
+      "step": 0.5,
+      "default": 8
+    },
+    {
+      "name": "stylus_l",
+      "label": "Stylus length (mm)",
+      "type": "number",
+      "min": 80,
+      "max": 92,
+      "step": 0.1,
+      "default": 87.3
+    }
+  ]
+}

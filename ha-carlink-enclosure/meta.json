@@ -1,0 +1,28 @@
+{
+  "description": "Two-part printed under-dash enclosure for the ha-carlink carrier PCB v0.1 (100 x 70 mm). The tray carries four M3 insert standoffs, a 14500 LiFePO4 cell trough behind a divider rib, a USB-C window and the OBD-II wire slot with a cable-tie strain-relief shelf; the lid clamps the board with four long bosses and retains the cell.",
+  "hero": "carlink_enclosure_base.stl",
+  "tags": ["electronics", "enclosure", "esp32", "automotive", "home-assistant"],
+  "version": "0.1.0",
+  "difficulty": "intermediate",
+  "complex_interior": true,
+  "relatedModels": ["heating-controller-box", "esp32-display-case"],
+  "hardware": [
+    { "item": "ha-carlink carrier PCB v0.1, assembled", "quantity": 1, "notes": "St-John-Software/electronics, hardware/ha-carlink/; dimensions from docs/ha-carlink/PCB.md" },
+    { "item": "M3 heat-set insert (4.6 mm OD, up to 5.7 mm long)", "quantity": 4, "notes": "One per standoff; set insert_hole_d to 2.6 instead for self-tapping screws" },
+    { "item": "M3 x 30 countersunk screw", "quantity": 4, "notes": "Through a lid boss into its standoff insert" },
+    { "item": "3.6 mm cable tie", "quantity": 2, "notes": "OBD-II pigtail through the shelf tie-slot pairs" },
+    { "item": "14500 LiFePO4 cell with leads crimped to a JST-XH housing", "quantity": 1, "notes": "Backup cell for J2" },
+    { "item": "Foam strip or double-sided tape", "quantity": 1, "notes": "Optional cell wrap/packing in the trough" }
+  ],
+  "printing_notes": [
+    "Print both parts as exported without supports: the base floor-down, the lid outer-face-down. PETG or ASA is recommended for a car interior, 3 perimeters.",
+    "Press the four M3 heat-set inserts into the standoffs before fitting the board.",
+    "Assembly order: board onto the standoffs, cell into the trough with its lead through the divider notch into J2, lid on, then the four corner screws.",
+    "The USB and OBD-II slot positions come from the board design, not a measured board; check usb_z0/usb_h and obd_h against the real DevKitC-1 and terminal after the first print.",
+    "Lay the pigtail in the shelf's cable groove and tie it down through the two tie-slot pairs.",
+    "Set insert_hole_d to 2.6 for self-tapping screws instead of heat-set inserts.",
+    "Lift the lid off (four screws) to change the mini-blade fuse.",
+    "If the lid rim sits proud of the tray because a boss printed long, lower boss_extra (down to -2) and re-render the lid; the M3 x 30 screw only has headroom to shorten the boss, not lengthen it.",
+    "wall, floor_t, corner_r, standoff_h, cell_d and cell_l are shared parameters: set them identically on the base and the lid."
+  ]
+}

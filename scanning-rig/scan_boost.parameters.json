@@ -1,0 +1,58 @@
+{
+  "parameters": [
+    {
+      "name": "boost_floor_h",
+      "label": "Pocket floor height — fit scan_riser on top for elevation (mm)",
+      "type": "number",
+      "min": 25,
+      "max": 110,
+      "step": 5,
+      "default": 90
+    },
+    {
+      "name": "boost_setback",
+      "label": "Pocket setback behind the rig link's rail (mm)",
+      "type": "number",
+      "min": 10,
+      "max": 120,
+      "step": 2,
+      "default": 26
+    },
+    {
+      "name": "boost_tilt",
+      "label": "Nose-down pitch given to the stand (degrees)",
+      "type": "number",
+      "min": 0,
+      "max": 30,
+      "step": 5,
+      "default": 20
+    },
+    {
+      "name": "rail_w",
+      "label": "Rail outer width — must match rig link (mm)",
+      "type": "number",
+      "min": 30,
+      "max": 80,
+      "step": 5,
+      "default": 40
+    },
+    {
+      "name": "rail_h",
+      "label": "Rail height — must match rig link (mm)",
+      "type": "number",
+      "min": 8,
+      "max": 30,
+      "step": 1,
+      "default": 12
+    },
+    {
+      "name": "boost_clear",
+      "label": "Plinth-to-rail clearance (mm)",
+      "type": "number",
+      "min": 0.2,
+      "max": 1,
+      "step": 0.05,
+      "default": 0.35
+    }
+  ]
+}

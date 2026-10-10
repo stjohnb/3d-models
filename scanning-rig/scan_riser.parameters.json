@@ -1,0 +1,13 @@
+{
+  "parameters": [
+    {
+      "name": "riser_h",
+      "label": "Added height above the boost's pocket floor — sets camera elevation (mm)",
+      "type": "number",
+      "min": 40,
+      "max": 170,
+      "step": 5,
+      "default": 140
+    }
+  ]
+}

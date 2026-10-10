@@ -1,0 +1,22 @@
+{
+  "parameters": [
+    {
+      "name": "pocket_depth",
+      "label": "Scoop pocket depth (mm)",
+      "type": "number",
+      "min": 12,
+      "max": 40,
+      "step": 1,
+      "default": 32
+    },
+    {
+      "name": "pocket_len",
+      "label": "Scoop pocket length (mm)",
+      "type": "number",
+      "min": 20,
+      "max": 56,
+      "step": 1,
+      "default": 52
+    }
+  ]
+}

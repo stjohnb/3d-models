@@ -1,0 +1,8 @@
+{
+  "parameters": [
+    { "name": "grid_x", "label": "Cells across (X)", "type": "number", "min": 1, "max": 5, "step": 1, "default": 5 },
+    { "name": "grid_y", "label": "Cells deep (Y)", "type": "number", "min": 1, "max": 5, "step": 1, "default": 5 },
+    { "name": "interlock", "label": "Interlocking edge tabs", "type": "boolean", "default": true },
+    { "name": "rear_tabs", "label": "Rear (+Y) tabs", "type": "boolean", "default": false }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "parameters": [
+    {
+      "name": "base_d",
+      "label": "Base plate diameter (mm) — keep >= platter + 12",
+      "type": "number",
+      "min": 220,
+      "max": 240,
+      "step": 1,
+      "default": 238
+    },
+    {
+      "name": "race_r",
+      "label": "V-race radius — must match platter (mm)",
+      "type": "number",
+      "min": 40,
+      "max": 85,
+      "step": 1,
+      "default": 82
+    },
+    {
+      "name": "spindle_d",
+      "label": "Centring spindle diameter — must match platter (mm)",
+      "type": "number",
+      "min": 10,
+      "max": 24,
+      "step": 0.5,
+      "default": 20
+    },
+    {
+      "name": "foot_pads",
+      "label": "Recess anti-slip pads into the underside",
+      "type": "boolean",
+      "default": true
+    }
+  ]
+}

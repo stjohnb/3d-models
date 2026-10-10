@@ -1,0 +1,49 @@
+{
+  "parameters": [
+    {
+      "name": "slot_gap",
+      "label": "Laptop slot width (mm)",
+      "type": "number",
+      "min": 5,
+      "max": 40,
+      "step": 0.5,
+      "default": 18
+    },
+    {
+      "name": "groove_depth",
+      "label": "Slot depth (mm)",
+      "type": "number",
+      "min": 10,
+      "max": 60,
+      "step": 5,
+      "default": 30
+    },
+    {
+      "name": "stand_width",
+      "label": "Overall width (mm)",
+      "type": "number",
+      "min": 150,
+      "max": 320,
+      "step": 5,
+      "default": 240
+    },
+    {
+      "name": "stand_depth",
+      "label": "Base depth (mm)",
+      "type": "number",
+      "min": 90,
+      "max": 200,
+      "step": 5,
+      "default": 150
+    },
+    {
+      "name": "stand_height",
+      "label": "Height (mm)",
+      "type": "number",
+      "min": 60,
+      "max": 140,
+      "step": 5,
+      "default": 100
+    }
+  ]
+}

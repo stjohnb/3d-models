@@ -1,0 +1,12 @@
+{
+  "parameters": [
+    { "name": "outer_l", "label": "Outer length (mm; match the box)", "type": "number", "min": 60, "max": 200, "step": 1, "default": 100 },
+    { "name": "outer_w", "label": "Outer width (mm; match the box)", "type": "number", "min": 40, "max": 150, "step": 1, "default": 70 },
+    { "name": "wall", "label": "Wall thickness (mm; match the box)", "type": "number", "min": 1.2, "max": 3, "step": 0.2, "default": 1.6 },
+    { "name": "corner_r", "label": "Outer corner radius (mm; match the box)", "type": "number", "min": 2, "max": 8, "step": 0.5, "default": 4 },
+    { "name": "lid_t", "label": "Lid plate thickness (mm)", "type": "number", "min": 1, "max": 4, "step": 0.2, "default": 2 },
+    { "name": "lip_h", "label": "Lip depth into the cavity (mm)", "type": "number", "min": 3, "max": 10, "step": 0.5, "default": 5 },
+    { "name": "lip_t", "label": "Lip wall thickness (mm)", "type": "number", "min": 1.2, "max": 3, "step": 0.2, "default": 1.6 },
+    { "name": "lid_clearance", "label": "Lip clearance, per side (mm)", "type": "number", "min": 0, "max": 0.8, "step": 0.05, "default": 0.3 }
+  ]
+}

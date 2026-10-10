@@ -1,0 +1,18 @@
+{
+  "parameters": [
+    { "name": "wall", "label": "Wall thickness (mm)", "type": "number", "min": 1.6, "max": 4, "step": 0.2, "default": 2.4 },
+    { "name": "floor_t", "label": "Floor thickness (mm)", "type": "number", "min": 2.6, "max": 5, "step": 0.2, "default": 3 },
+    { "name": "corner_r", "label": "Outer corner radius (mm)", "type": "number", "min": 1.5, "max": 3, "step": 0.5, "default": 3 },
+    { "name": "standoff_h", "label": "Standoff height (mm)", "type": "number", "min": 5, "max": 10, "step": 0.5, "default": 5 },
+    { "name": "insert_hole_d", "label": "Insert pocket diameter (mm)", "type": "number", "min": 2.6, "max": 4.4, "step": 0.1, "default": 4.0 },
+    { "name": "cell_d", "label": "Backup cell diameter (mm)", "type": "number", "min": 13, "max": 15, "step": 0.1, "default": 14.5 },
+    { "name": "cell_l", "label": "Backup cell length (mm)", "type": "number", "min": 45, "max": 60, "step": 0.5, "default": 50.5 },
+    { "name": "usb_span", "label": "USB-C window width (mm)", "type": "number", "min": 18, "max": 32, "step": 1, "default": 26 },
+    { "name": "usb_z0", "label": "USB-C window height above board (mm)", "type": "number", "min": 2, "max": 10, "step": 0.5, "default": 6 },
+    { "name": "usb_h", "label": "USB-C window height (mm)", "type": "number", "min": 8, "max": 16, "step": 0.5, "default": 12 },
+    { "name": "obd_h", "label": "OBD-II wire slot height (mm)", "type": "number", "min": 6, "max": 18, "step": 0.5, "default": 11 },
+    { "name": "cable_d", "label": "OBD-II pigtail diameter (mm)", "type": "number", "min": 3, "max": 12, "step": 0.5, "default": 7 },
+    { "name": "shelf_l", "label": "Strain-relief shelf reach (mm)", "type": "number", "min": 16, "max": 30, "step": 1, "default": 20 },
+    { "name": "tie_pairs", "label": "Cable-tie slot pairs", "type": "number", "min": 1, "max": 2, "step": 1, "default": 2 }
+  ]
+}
