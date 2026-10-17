@@ -1,0 +1,25 @@
+{
+  "description": "Gridfinity-compatible organiser for a 422 × 425 × 69 mm long-implement drawer: a 10 × 10 grid of the drawer-organiser's 5×5 tiles, a flared and an unflared container split by a continuous diagonal (3 + 3 cells at the front, 2 + 4 at the rear), two 2×9 slots each built from the printed 2×5 half plus a 2×4 back piece, and a 4×1 across their front, with an assembly preview.",
+  "hero": "drawer_long_assembly.stl",
+  "tags": ["organizer", "storage", "gridfinity", "drawer"],
+  "version": "2.0.0",
+  "difficulty": "intermediate",
+  "complex_interior": true,
+  "relatedModels": ["drawer-organiser"],
+  "mating_pairs": [
+    ["drawer_long_container_2x10_half.stl", "drawer_baseplate_4x5.stl"],
+    ["drawer_long_container_4x1.stl", "drawer_baseplate_4x5.stl"],
+    ["drawer_long_container_left_front.stl", "drawer_baseplate_5x5.stl"],
+    ["drawer_long_container_left_back.stl", "drawer_baseplate_5x5.stl"],
+    ["drawer_long_container_centre_front.stl", "drawer_baseplate_4x5.stl"],
+    ["drawer_long_container_centre_back.stl", "drawer_baseplate_4x5.stl"]
+  ],
+  "printing_notes": [
+    "Floor (420 x 420mm): two drawer_baseplate_5x5 in the front row and two drawer_baseplate_5x5_back behind, downloaded from the drawer-organiser project. The tile seam falls at columns 5|6. Lower each tile onto its neighbours so the edge tabs drop into their slots; do not press them together in-plane.",
+    "The wide pair (columns 1-6) is four distinct pieces split 5 + 5 on the tile seam: drawer_long_container_left_front and _left_back (flared) and drawer_long_container_centre_front and _centre_back. Print one of each; the boundary between them is a single diagonal wall.",
+    "Each narrow slot is the already printed drawer_long_container_2x10_half (front five cells) plus drawer_long_container_2x9_back (back four cells). Print two of each, one per slot.",
+    "Print drawer_long_container_4x1 whole; it sits across the front of both narrow slots.",
+    "Seat every piece on the assembled baseplate to align, then glue the flat faces with CA. All pieces print flat on the bed, floor down, with no supports.",
+    "The 5mm of depth slack (425 - 420) goes at the front. The outermost +X tabs on the right-hand tiles mate with nothing and add 1.8mm to the width; if the drawer is tight against the right wall, clip them flush with side cutters."
+  ]
+}

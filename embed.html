@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#0f3460">
+  <meta name="color-scheme" content="dark">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <title>3D Model Embed</title>
+
+  <!-- Plausible Analytics -->
+  <script defer data-domain="bstjohn.net" src="https://plausible.bstjohn.net/js/script.file-downloads.hash.outbound-links.pageview-props.tagged-events.js"></script>
+  <script>window.plausible = window.plausible || function() { (window.plausible.q = window.plausible.q || []).push(arguments) }</script>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0f3460;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #cross-btn {
+      position: absolute;
+      top: 0.5rem;
+      left: 0.5rem;
+      background: rgba(0,0,0,0.5);
+      border: none;
+      color: #e0e0e0;
+      font-size: 0.75rem;
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      z-index: 1;
+    }
+    #cross-btn:hover { background: rgba(0,0,0,0.7); }
+    #cross-btn:focus-visible { outline: 2px solid #64b5f6; outline-offset: 2px; }
+    #cross-btn[aria-pressed="true"] {
+      background: rgba(100, 181, 246, 0.3);
+      color: #64b5f6;
+    }
+    #clip-slider {
+      position: absolute;
+      top: 2.4rem;
+      left: 0.5rem;
+      width: 120px;
+      accent-color: #64b5f6;
+      z-index: 1;
+    }
+    #view-controls {
+      position: absolute;
+      bottom: 0.5rem;
+      left: 0.5rem;
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+      max-width: 60vw;
+      z-index: 1;
+    }
+    .view-btn {
+      background: rgba(0,0,0,0.5);
+      border: none;
+      color: #e0e0e0;
+      font-size: 0.7rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .view-btn:hover { background: rgba(0,0,0,0.7); }
+    .view-btn:focus-visible { outline: 2px solid #64b5f6; outline-offset: 2px; }
+    .view-btn:disabled { opacity: 0.4; cursor: default; }
+    .view-btn[aria-pressed="true"] { background: rgba(100,181,246,0.3); color: #64b5f6; }
+    .open-link {
+      position: absolute;
+      bottom: 0.5rem;
+      right: 0.5rem;
+      color: #64b5f6;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 0.75rem;
+      text-decoration: none;
+      z-index: 1;
+    }
+    .open-link:hover { background: rgba(0, 0, 0, 0.7); text-decoration: underline; }
+    .source-link {
+      position: absolute;
+      bottom: 2.4rem;
+      right: 0.5rem;
+      color: #64b5f6;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 0.75rem;
+      text-decoration: none;
+      z-index: 1;
+    }
+    .source-link:hover { background: rgba(0, 0, 0, 0.7); text-decoration: underline; }
+    .printing-notes {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      max-width: 45%;
+      max-height: 60%;
+      overflow-y: auto;
+      color: #e0e0e0;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 0.3rem 0.6rem;
+      border-radius: 4px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 0.75rem;
+      z-index: 1;
+    }
+    .printing-notes summary { cursor: pointer; color: #64b5f6; }
+    .printing-notes ul { margin: 0.4rem 0 0 1rem; }
+    .printing-notes li { margin-bottom: 0.3rem; line-height: 1.35; }
+    .error-message {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #888;
+      font-size: 1rem;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button id="cross-btn" aria-label="Toggle cross section" aria-pressed="false">✂ Section</button>
+  <input type="range" id="clip-slider" min="0" max="100" value="50" style="display:none;" aria-label="Cross section depth">
+  <div id="view-controls">
+    <button class="view-btn" id="rot-x" aria-label="Rotate model 90 degrees about the X axis" disabled>Rotate X</button>
+    <button class="view-btn" id="rot-y" aria-label="Rotate model 90 degrees about the Y axis" disabled>Rotate Y</button>
+    <button class="view-btn" id="rot-z" aria-label="Rotate model 90 degrees about the Z axis" disabled>Rotate Z</button>
+    <button class="view-btn" id="reset-view" aria-label="Reset view orientation and camera" disabled>Reset</button>
+  </div>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/0.170.0/three.module.min.js",
+      "three/addons/": "./vendor/three/0.170.0/addons/"
+    }
+  }
+  </script>
+  <script>
+    // Detect viewer module load failure: if no canvas or error message after 10s, show fallback
+    setTimeout(() => {
+      if (!document.querySelector('canvas') && !document.querySelector('.error-message')) {
+        const div = document.createElement('div');
+        div.className = 'error-message';
+        div.textContent = 'Failed to load viewer — check your network connection';
+        document.body.appendChild(div);
+      }
+    }, 10000);
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const BUILD_HASH = '__BUILD_HASH__';
+    const cacheBust = BUILD_HASH.startsWith('__') ? '' : `?v=${BUILD_HASH}`;
+
+    function slugify(str) {
+      return str.replace(/\.stl$/i, '').replace(/[_\s]+/g, '-').toLowerCase();
+    }
+
+    // Keep in sync with PUBLIC_REPO_URL in scripts/oembed_helpers.py and index.html.
+    const PUBLIC_REPO = 'https://github.com/stjohnb/3d-models';
+    function publicSourceUrl(source) {
+      if (!source) return '';
+      return `${PUBLIC_REPO}/blob/main/${source.split('/').map(encodeURIComponent).join('/')}`;
+    }
+
+    function showError(msg) {
+      const div = document.createElement('div');
+      div.className = 'error-message';
+      div.textContent = msg;
+      // Remove canvas but preserve other elements (e.g. open-link, source-link)
+      const canvas = document.querySelector('canvas');
+      if (canvas) canvas.remove();
+      document.body.appendChild(div);
+    }
+
+    let hash;
+    try {
+      hash = decodeURIComponent(window.location.hash.slice(1));
+    } catch {
+      hash = '';
+    }
+    if (!hash) {
+      showError('No model specified');
+    } else {
+      init(hash);
+    }
+
+    async function init(hash) {
+      const sep = hash.indexOf('/');
+      if (sep === -1) {
+        showError('Invalid model path');
+        return;
+      }
+      const projectSlug = hash.slice(0, sep);
+      const modelSlug = hash.slice(sep + 1);
+
+      let models;
+      try {
+        const resp = await fetch(`models.json${cacheBust}`);
+        if (!resp.ok) throw new Error(resp.status);
+        models = await resp.json();
+      } catch {
+        showError('Failed to load models');
+        return;
+      }
+
+      // Find the matching STL file by slugifying project and model names
+      let stlFile = null;
+      let sourcePath = null;
+      let projectName = null;
+      let composite = null;
+      let printingNotes = null;
+      for (const [project, projectData] of Object.entries(models)) {
+        if (slugify(project) !== projectSlug) continue;
+        projectName = project;
+        printingNotes = Array.isArray(projectData.printing_notes)
+          ? projectData.printing_notes.filter(n => typeof n === 'string' && n.trim())
+          : null;
+        for (const model of projectData.files) {
+          if (slugify(model.stl) === modelSlug) {
+            stlFile = model.stl;
+            sourcePath = model.source;
+            // Composite (coloured multi-part) preview — see issue #275.
+            // Part names and colours are re-validated here as defence-in-depth
+            // even though the schema already enforces both (issue #505).
+            composite = (projectData.assembly && projectData.assembly.stl === model.stl
+                && Array.isArray(projectData.assembly.parts))
+              ? projectData.assembly.parts
+                  .filter(p => typeof p.stl === 'string' && /^[A-Za-z0-9._ -]+\.stl$/.test(p.stl)
+                      && /^#[0-9a-fA-F]{6}$/.test(p.color))
+                  .map(p => ({ url: `${p.stl}${cacheBust}`, color: p.color }))
+              : null;
+            break;
+          }
+        }
+        if (stlFile) break;
+      }
+
+      if (!stlFile) {
+        showError('Model not found');
+        return;
+      }
+
+      // Set document title to model name + project for accessibility
+      const modelName = stlFile.replace(/\.stl$/i, '').replace(/[-_]/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+      document.title = `${modelName} \u2013 ${projectName}`;
+
+      // Add "Open in viewer" link
+      const link = document.createElement('a');
+      link.className = 'open-link';
+      link.href = `index.html#${projectSlug}/${modelSlug}`;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.textContent = 'Open in viewer';
+      document.body.appendChild(link);
+
+      if (sourcePath) {
+        const srcLink = document.createElement('a');
+        srcLink.className = 'source-link';
+        srcLink.href = publicSourceUrl(sourcePath);
+        srcLink.target = '_blank';
+        srcLink.rel = 'noopener noreferrer';
+        srcLink.textContent = 'View source';
+        document.body.appendChild(srcLink);
+      }
+
+      if (printingNotes && printingNotes.length) {
+        const det = document.createElement('details');
+        det.className = 'printing-notes';
+        const sum = document.createElement('summary');
+        sum.textContent = 'Printing notes';
+        det.appendChild(sum);
+        const ul = document.createElement('ul');
+        for (const n of printingNotes) {
+          const li = document.createElement('li');
+          li.textContent = n;
+          ul.appendChild(li);
+        }
+        det.appendChild(ul);
+        document.body.appendChild(det);
+      }
+
+      // Create canvas
+      const canvas = document.createElement('canvas');
+      document.body.appendChild(canvas);
+
+      // Cap the drawing-buffer resolution. Retina DPR 2 quadruples fragment
+      // cost for a barely-visible quality gain; 1.5 keeps edges clean under
+      // MSAA. See docs/web-viewer.md "Render budget" (issue #341).
+      const MAX_PIXEL_RATIO = 1.5;
+
+      // Set up Three.js
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'low-power' });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, MAX_PIXEL_RATIO));
+      renderer.localClippingEnabled = true;
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0f3460);
+
+      const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+
+      // Frame-scheduling state for the on-demand render loop further down.
+      // Declared before makeControls() because invalidate() is attached as an
+      // OrbitControls listener and update() can dispatch 'change' synchronously.
+      let animating = true;
+      let rafId = null;
+      let needsRender = true;
+      let idleFrames = 0;
+      let lastW = 0, lastH = 0;
+
+      // Rebuilt (not just reset) by the Reset button so OrbitControls'
+      // internal spherical state is discarded along with the camera position.
+      let controls = null;
+      function makeControls() {
+        const saved = controls ? controls.target.clone() : new THREE.Vector3();
+        if (controls) controls.dispose();
+        controls = new OrbitControls(camera, canvas);
+        controls.enableDamping = true;
+        // Re-attached here because the Reset button rebuilds the controls
+        // object and drops the old one's listeners.
+        controls.addEventListener('change', invalidate);
+        controls.target.copy(saved);
+        controls.update();
+      }
+      makeControls();
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(1, 2, 3);
+      scene.add(dirLight);
+      const dirLight2 = new THREE.DirectionalLight(0xffffff, 0.4);
+      dirLight2.position.set(-2, -1, -1);
+      scene.add(dirLight2);
+
+      const material = new THREE.MeshPhongMaterial({
+        color: 0x64b5f6,
+        specular: 0x222222,
+        shininess: 40,
+        clippingPlanes: [],
+        clipShadows: false,
+      });
+
+      let errored = false;
+      let clipBBox = null;
+      let clipPlane = null;
+      let defaultCamPos = null;
+      // The scene object the view controls rotate/reset — a Mesh for single
+      // models, a Group for composites (issue #275).
+      let displayObject = null;
+      // Materials the cross-section toggles: one for a single model, one per
+      // coloured part for a composite.
+      const clipMaterials = [];
+
+      const crossBtnEl = document.getElementById('cross-btn');
+      const clipSliderEl = document.getElementById('clip-slider');
+
+      function frameAndEnable(size) {
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const dist = maxDim * 1.8;
+        camera.position.set(dist * 0.6, dist * 0.5, dist * 0.8);
+        defaultCamPos = camera.position.clone();
+        controls.update();
+        if (crossBtnEl) crossBtnEl.disabled = false;
+        document.querySelectorAll('#view-controls .view-btn').forEach(b => { b.disabled = false; });
+        invalidate();
+      }
+
+      if (composite && composite.length) {
+        // Coloured multi-part composite: load each already-co-registered part
+        // STL as its own mesh/material in one Group (issue #275).
+        Promise.all(composite.map(p => new Promise((res, rej) =>
+          new STLLoader().load(p.url, res, undefined, rej)
+        ))).then((geometries) => {
+          for (const g of geometries) g.rotateX(-Math.PI / 2);
+          const union = new THREE.Box3();
+          for (const g of geometries) {
+            g.computeBoundingBox();
+            union.union(g.boundingBox);
+          }
+          const center = new THREE.Vector3();
+          union.getCenter(center);
+
+          const group = new THREE.Group();
+          geometries.forEach((geometry, i) => {
+            geometry.translate(-center.x, -center.y, -center.z);
+            const mat = new THREE.MeshPhongMaterial({
+              color: composite[i].color,
+              specular: 0x222222,
+              shininess: 40,
+              clippingPlanes: [],
+              clipShadows: false,
+            });
+            group.add(new THREE.Mesh(geometry, mat));
+            clipMaterials.push(mat);
+          });
+          scene.add(group);
+          displayObject = group;
+
+          const size = new THREE.Vector3();
+          union.getSize(size);
+          clipBBox = { minY: -size.y / 2, maxY: size.y / 2 };
+          frameAndEnable(size);
+        }).catch(() => {
+          errored = true;
+          animating = false;
+          renderer.dispose();
+          showError('Failed to load model');
+        });
+      } else {
+        const loader = new STLLoader();
+        loader.load(`${stlFile}${cacheBust}`, (geometry) => {
+          // OpenSCAD exports Z-up; Three.js is Y-up. Every STL gets this same
+          // conversion — sources stay in native OpenSCAD coordinates so
+          // thumbnails and print orientation stay correct.
+          geometry.rotateX(-Math.PI / 2);
+          geometry.computeBoundingBox();
+          const halfSizeY = (geometry.boundingBox.max.y - geometry.boundingBox.min.y) / 2;
+          geometry.center();
+          clipBBox = { minY: -halfSizeY, maxY: halfSizeY };
+
+          const mesh = new THREE.Mesh(geometry, material);
+          scene.add(mesh);
+          displayObject = mesh;
+          clipMaterials.push(material);
+
+          const size = new THREE.Vector3();
+          geometry.boundingBox.getSize(size);
+          frameAndEnable(size);
+        }, undefined, () => {
+          errored = true;
+          animating = false;
+          renderer.dispose();
+          showError('Failed to load model');
+        });
+      }
+
+      // Frames of no camera movement and no invalidate() before the loop
+      // suspends itself. Generous (~1.5s) so OrbitControls' damping coast and
+      // any short CSS size transition always finish drawing.
+      const IDLE_FRAMES_BEFORE_SUSPEND = 90;
+
+      // Request one more drawn frame and wake the loop if it has suspended.
+      function invalidate() {
+        needsRender = true;
+        idleFrames = 0;
+        if (animating && rafId === null) rafId = requestAnimationFrame(animate);
+      }
+
+      // Callers invalidate; a zero-size canvas returns early without recording
+      // the size, so it re-sizes correctly when it becomes visible again.
+      function resize() {
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        if (w === 0 || h === 0) return;
+        if (w !== lastW || h !== lastH) {
+          lastW = w; lastH = h;
+          renderer.setSize(w, h, false);
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+        }
+      }
+
+      // The observer owns resizing — animate() must not poll clientWidth,
+      // which forces a layout flush on every frame. It fires only on a real box
+      // change, and always invalidates: a canvas that was hidden and re-shown
+      // at the same CSS size gives resize() nothing to do even though the
+      // compositor discarded the frame.
+      const resizeObserver = new ResizeObserver(() => { resize(); invalidate(); });
+      resizeObserver.observe(canvas);
+
+      canvas.addEventListener('pointerdown', invalidate);
+      canvas.addEventListener('wheel', invalidate, { passive: true });
+      canvas.addEventListener('touchstart', invalidate, { passive: true });
+
+      function animate() {
+        if (!animating) { rafId = null; return; }
+        rafId = requestAnimationFrame(animate);
+        const moved = controls.update();
+        if (needsRender || moved) {
+          needsRender = false;   // cleared before render so a change fired
+          idleFrames = 0;        // during rendering isn't swallowed
+          renderer.render(scene, camera);
+        } else if (++idleFrames > IDLE_FRAMES_BEFORE_SUSPEND) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+      }
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          animating = false;
+          if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null; }
+        } else if (!errored) {
+          animating = true;
+          resize();
+          invalidate();
+        }
+      });
+
+      if (crossBtnEl) {
+        crossBtnEl.disabled = true; // enabled once STL loads
+        crossBtnEl.addEventListener('click', () => {
+          const active = crossBtnEl.getAttribute('aria-pressed') === 'true';
+          if (active) {
+            for (const m of clipMaterials) m.clippingPlanes = [];
+            clipPlane = null;
+            if (clipSliderEl) clipSliderEl.style.display = 'none';
+            crossBtnEl.setAttribute('aria-pressed', 'false');
+          } else {
+            clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0);
+            if (clipBBox) {
+              clipPlane.constant = clipBBox.minY + 0.5 * (clipBBox.maxY - clipBBox.minY);
+            }
+            for (const m of clipMaterials) m.clippingPlanes = [clipPlane];
+            if (clipSliderEl) {
+              clipSliderEl.value = '50';
+              clipSliderEl.style.display = '';
+            }
+            crossBtnEl.setAttribute('aria-pressed', 'true');
+          }
+          invalidate();
+        });
+      }
+
+      if (clipSliderEl) {
+        clipSliderEl.addEventListener('input', () => {
+          if (!clipPlane || !clipBBox) return;
+          const pct = clipSliderEl.value / 100;
+          clipPlane.constant = clipBBox.minY + pct * (clipBBox.maxY - clipBBox.minY);
+          invalidate();
+        });
+      }
+
+      // View controls — rotate 90° per world axis, reset, and switch controls.
+      // displayObject is the Mesh (single) or Group (composite) added above.
+      function recomputeClip() {
+        if (!displayObject) return;
+        const box = new THREE.Box3().setFromObject(displayObject);
+        clipBBox = { minY: box.min.y, maxY: box.max.y };
+        if (clipPlane) {
+          const pct = Number(clipSliderEl.value) / 100;
+          clipPlane.constant = clipBBox.minY + pct * (clipBBox.maxY - clipBBox.minY);
+        }
+      }
+
+      function rotateMesh(axis) {
+        if (!displayObject) return;
+        const v = axis === 'x' ? new THREE.Vector3(1, 0, 0)
+          : axis === 'y' ? new THREE.Vector3(0, 1, 0)
+          : new THREE.Vector3(0, 0, 1);
+        displayObject.rotateOnWorldAxis(v, Math.PI / 2);
+        recomputeClip();
+        invalidate();
+      }
+
+      document.getElementById('rot-x')?.addEventListener('click', () => rotateMesh('x'));
+      document.getElementById('rot-y')?.addEventListener('click', () => rotateMesh('y'));
+      document.getElementById('rot-z')?.addEventListener('click', () => rotateMesh('z'));
+      document.getElementById('reset-view')?.addEventListener('click', () => {
+        if (displayObject) displayObject.rotation.set(0, 0, 0);
+        if (defaultCamPos) camera.position.copy(defaultCamPos);
+        controls.target.set(0, 0, 0);
+        camera.up.set(0, 1, 0);
+        makeControls();
+        recomputeClip();
+        invalidate();
+      });
+
+      resize();
+      invalidate();
+    }
+  </script>
+</body>
+</html>

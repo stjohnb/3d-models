@@ -1,0 +1,40 @@
+{
+  "parameters": [
+    {
+      "name": "total_length",
+      "label": "Total length (mm)",
+      "type": "number",
+      "min": 50,
+      "max": 200,
+      "step": 5,
+      "default": 100
+    },
+    {
+      "name": "od_large_body",
+      "label": "Large end OD (mm)",
+      "type": "number",
+      "min": 51,
+      "max": 80,
+      "step": 1,
+      "default": 53
+    },
+    {
+      "name": "od_small_body",
+      "label": "Small end OD (mm)",
+      "type": "number",
+      "min": 32,
+      "max": 50,
+      "step": 1,
+      "default": 34
+    },
+    {
+      "name": "wall",
+      "label": "Wall thickness (mm)",
+      "type": "number",
+      "min": 1.5,
+      "max": 5,
+      "step": 0.1,
+      "default": 2
+    }
+  ]
+}
