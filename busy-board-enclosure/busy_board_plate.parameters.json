@@ -1,0 +1,21 @@
+{
+  "parameters": [
+    { "name": "panel_t", "label": "Clear plate thickness (mm)", "type": "number", "min": 2.8, "max": 4, "step": 0.2, "default": 3 },
+    { "name": "button_hole_d", "label": "Arcade button hole diameter (mm)", "type": "number", "min": 24, "max": 25, "step": 0.1, "default": 24.5 },
+    { "name": "pot_hole_d", "label": "Pot bushing hole diameter (mm)", "type": "number", "min": 7, "max": 10, "step": 0.1, "default": 7.4 },
+    { "name": "pot_lug", "label": "Pot anti-rotation tab hole", "type": "boolean", "default": true },
+    { "name": "pot_lug_r", "label": "Pot tab radius from the shaft (mm)", "type": "number", "min": 6.5, "max": 10, "step": 0.1, "default": 7.8 },
+    { "name": "pot_lug_d", "label": "Pot tab hole diameter (mm)", "type": "number", "min": 2, "max": 4, "step": 0.1, "default": 3.2 },
+    { "name": "enc_hole_d", "label": "Encoder bushing hole diameter (mm)", "type": "number", "min": 7, "max": 7.6, "step": 0.1, "default": 7.4 },
+    { "name": "enc_lug", "label": "Encoder anti-rotation tab hole", "type": "boolean", "default": false },
+    { "name": "enc_lug_r", "label": "Encoder tab radius from the shaft (mm)", "type": "number", "min": 6, "max": 9, "step": 0.5, "default": 6.5 },
+    { "name": "enc_lug_d", "label": "Encoder tab hole diameter (mm)", "type": "number", "min": 1.5, "max": 3, "step": 0.1, "default": 2.0 },
+    { "name": "tgl_hole_d", "label": "Toggle bushing hole diameter (mm)", "type": "number", "min": 6, "max": 7.2, "step": 0.1, "default": 6.6 },
+    { "name": "tgl_lug", "label": "Toggle locking-ring tab hole", "type": "boolean", "default": true },
+    { "name": "tgl_lug_r", "label": "Toggle tab radius from the bushing (mm)", "type": "number", "min": 5.1, "max": 9, "step": 0.1, "default": 5.2 },
+    { "name": "tgl_lug_d", "label": "Toggle tab hole diameter (mm)", "type": "number", "min": 1.5, "max": 2.6, "step": 0.1, "default": 2.4 },
+    { "name": "slide_screw_pitch", "label": "Slide switch screw pitch (mm)", "type": "number", "min": 19, "max": 26, "step": 0.5, "default": 19 },
+    { "name": "slide_screw_d", "label": "Slide switch screw hole diameter (mm)", "type": "number", "min": 2.2, "max": 3.4, "step": 0.1, "default": 2.4 },
+    { "name": "grille_hole_d", "label": "Buzzer grille hole diameter (mm)", "type": "number", "min": 1.5, "max": 2, "step": 0.1, "default": 1.5 }
+  ]
+}

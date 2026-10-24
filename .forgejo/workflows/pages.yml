@@ -1,0 +1,155 @@
+name: Spec Pages
+
+# Publishes the project spec pages (pages/) to the private fleet pages host,
+# https://pages.home.bstjohn.net (Garage S3 behind Authentik, LAN/tailnet
+# only), following fleet-infra docs/pages.md "Adding a repo":
+#
+#   push to main  -> s3://pages/3d-models/docs/main/<sha8>/, plus the stable
+#                    entry page 3d-models/docs/main/index.html
+#   pull request  -> s3://pages/3d-models/pr/pr-<N>/<sha8>/, linked from a
+#                    "📄 Spec pages" PR comment
+#   PR close      -> pr-preview-cleanup.yml deletes 3d-models/pr/pr-<N>/
+#
+# Separate from build.yml so a pages change does not wait for the OpenSCAD
+# pipeline (build.yml ignores pages/**) and a model change does not
+# re-upload the pages. Nothing is compiled: the committed HTML is the
+# artefact. No OIDC here: Garage takes the org-level PAGES_S3_* secrets,
+# passed only through step env. See docs/ci-pipeline.md, "pages.yml (spec
+# pages)".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'pages/**'
+      - 'scripts/spec_pages.py'
+      - 'scripts/test_spec_pages.py'
+      - 'scripts/pages_pr_comment.py'
+      - 'scripts/pr_preview_comment.py'
+      - '.forgejo/workflows/pages.yml'
+      - 'flake.nix'
+      - 'flake.lock'
+      - '.github/actions/setup-nix/**'
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'pages/**'
+      - 'scripts/spec_pages.py'
+      - 'scripts/test_spec_pages.py'
+      - 'scripts/pages_pr_comment.py'
+      - 'scripts/pr_preview_comment.py'
+      - '.forgejo/workflows/pages.yml'
+      - 'flake.nix'
+      - 'flake.lock'
+      - '.github/actions/setup-nix/**'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+# Not build.yml's pages-* groups (those name the www.bstjohn.net site
+# deploys), so a spec-pages run never cancels a render. Not cancelled in
+# progress: a cancelled run could stop between the supersession delete and
+# the entry page.
+concurrency:
+  group: spec-pages-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || 'main' }}
+  cancel-in-progress: false
+
+env:
+  # Same reason as build.yml: the runner's nix-ld LD_LIBRARY_PATH must not
+  # beat the flake binaries' RUNPATH.
+  LD_LIBRARY_PATH: ""
+
+jobs:
+  publish:
+    # Fork PRs get no secrets; skip rather than fail.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [container, linux]
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: nix --extra-experimental-features nix-command --extra-experimental-features flakes develop ${{ github.workspace }}#default --command bash -euo pipefail {0}
+
+    steps:
+      - uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Nix
+        uses: ./.github/actions/setup-nix
+
+      # Fails when a committed figure differs from its generator's output
+      # or from the page's inline copy, or when a page loads an asset.
+      - name: Check spec pages
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_spec_pages.py' -v
+
+      - name: Publish PR spec pages
+        id: preview
+        if: github.event_name == 'pull_request'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.PAGES_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.PAGES_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: garage
+          AWS_ENDPOINT_URL: https://s3.home.bstjohn.net
+          AWS_CONFIG_FILE: ${{ runner.temp }}/aws-config
+          # Never interpolate these into the script body.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.number }}
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "::error::PAGES_S3_* secrets are empty; see fleet-infra docs/pages.md"
+            exit 1
+          fi
+          # An empty or non-numeric value would widen the supersession delete.
+          case "$PR_NUMBER" in ''|*[!0-9]*) echo "::error::bad PR number '$PR_NUMBER'"; exit 1 ;; esac
+          printf '[default]\ns3 =\n    addressing_style = path\n' > "$AWS_CONFIG_FILE"
+          SHA8="${HEAD_SHA::8}"
+          PREFIX="3d-models/pr/pr-${PR_NUMBER}"
+          aws s3 sync ./pages "s3://pages/${PREFIX}/${SHA8}/" --delete --exclude "*/src/*" --exclude "*.md"
+          aws s3 rm "s3://pages/${PREFIX}/" --recursive --exclude "${SHA8}/*"
+          URL="https://pages.home.bstjohn.net/${PREFIX}/${SHA8}/"
+          echo "$URL"
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+
+      - name: Publish main spec pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.PAGES_S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.PAGES_S3_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: garage
+          AWS_ENDPOINT_URL: https://s3.home.bstjohn.net
+          AWS_CONFIG_FILE: ${{ runner.temp }}/aws-config
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "::error::PAGES_S3_* secrets are empty; see fleet-infra docs/pages.md"
+            exit 1
+          fi
+          printf '[default]\ns3 =\n    addressing_style = path\n' > "$AWS_CONFIG_FILE"
+          SHA8="${HEAD_SHA::8}"
+          PREFIX="3d-models/docs/main"
+          aws s3 sync ./pages "s3://pages/${PREFIX}/${SHA8}/" --delete --exclude "*/src/*" --exclude "*.md"
+          aws s3 rm "s3://pages/${PREFIX}/" --recursive --exclude "${SHA8}/*"
+          # The stable entry page goes up after the supersession delete,
+          # which would otherwise remove it (its key is outside ${SHA8}/).
+          printf '<!doctype html><meta http-equiv="refresh" content="0; url=./%s/"><a href="./%s/">Latest build</a>\n' \
+            "$SHA8" "$SHA8" > "$RUNNER_TEMP/index.html"
+          aws s3 cp "$RUNNER_TEMP/index.html" "s3://pages/${PREFIX}/index.html" \
+            --content-type text/html --cache-control no-cache
+          echo "https://pages.home.bstjohn.net/${PREFIX}/ -> ./${SHA8}/"
+
+      # Best-effort: the pages are already published; a comment failure
+      # must not fail the run.
+      - name: Link spec pages from the PR
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          API_URL: ${{ github.api_url }}
+          REPO: ${{ github.repository }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 scripts/pages_pr_comment.py

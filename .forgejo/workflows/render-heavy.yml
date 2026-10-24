@@ -1,0 +1,148 @@
+name: Render heavy models
+
+# Warms the S3 render cache with every renderable marked heavy in a
+# meta.json `render_memory_gb`, on a runner big enough for them. build.yml
+# never attempts a marked render above its runner's RUNNER_JOB_MEMORY_GB; it
+# defers it and dispatches this workflow for the branch instead, then fails
+# with a message saying to re-run once this has finished (any runner then
+# serves the renders from the cache). See docs/ci-pipeline.md,
+# "render-heavy.yml".
+#
+# This is deliberately a separate workflow_dispatch workflow and not a
+# tier-labelled job in build.yml: Forgejo marks a job whose `needs`
+# succeeded as Waiting and leaves its `if:` to the runner, so such a job
+# would queue forever while ryzen and nas are off and block every PR check.
+
+on:
+  workflow_dispatch:
+    inputs:
+      requested_by:
+        description: >-
+          The build run that requested this (e.g. "run 123"); re-run it
+          once this has finished.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+# Forgejo ignores `permissions:` (kept harmless) and only mints the OIDC
+# token configure-aws-credentials needs when this is set.
+enable-openid-connect: true
+
+concurrency:
+  group: render-heavy-${{ github.ref }}
+  cancel-in-progress: true
+
+# Same render caps as build.yml.
+env:
+  RENDER_MEM_MAX: 28G
+  RENDER_TIMEOUT: "3600"
+  LD_LIBRARY_PATH: ""
+
+jobs:
+  render:
+    # The one job in this repo that waits for a RAM tier: ram-12g is
+    # advertised only by ryzen and nas (12g per job); the always-on
+    # thinkcentre runner stops at ram-6g. It only ever runs on demand, so it
+    # blocks no other CI while they are off. The tier must cover every
+    # meta.json render_memory_gb mark: build.yml's "Validate project
+    # metadata" fails on any mark above it (render_memory.py check-tier).
+    # Labels: https://git.home.bstjohn.net/St-John-Software/fleet-infra/src/branch/main/docs/runner-labels.md
+    runs-on: [container, linux, ram-12g]
+    defaults:
+      run:
+        shell: nix --extra-experimental-features nix-command --extra-experimental-features flakes develop ${{ github.workspace }}#default --command bash -euo pipefail {0}
+
+    steps:
+      - uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+
+      - name: Set up Nix
+        uses: ./.github/actions/setup-nix
+
+      # Not best-effort: writing the cache is this workflow's whole point.
+      - name: Configure AWS credentials
+        uses: https://github.com/aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-session-name: forgejo-actions-${{ github.run_id }}
+
+      - name: Check OpenSCAD version
+        run: |
+          if ! command -v openscad > /dev/null; then
+            echo "::error::openscad not found on PATH — the flake devShell did not provide it"
+            exit 1
+          fi
+          rc=0
+          VERSION_OUTPUT="$(openscad --version 2>&1)" || rc=$?
+          if [ "$rc" -ne 0 ] || [ -z "$VERSION_OUTPUT" ]; then
+            echo "::error::'openscad --version' failed (exit $rc) — the flake's openscad cannot start"
+            printf '%s\n' "$VERSION_OUTPUT"
+            exit 1
+          fi
+          CURRENT_VERSION="${VERSION_OUTPUT%%$'\n'*}"
+          echo "Current OpenSCAD version: $CURRENT_VERSION"
+          echo "$CURRENT_VERSION" > "$RUNNER_TEMP/openscad-version.txt"
+
+      - name: Render heavy models
+        env:
+          # Same prefix rules as build.yml's "Render STL files": only main
+          # writes render-cache/, the prefix main deploys read, so a
+          # dispatch on any other branch cannot plant an STL production
+          # ships.
+          WRITE_PREFIX: ${{ github.ref == 'refs/heads/main' && 'render-cache' || 'render-cache-pr' }}
+        run: |
+          OPENSCAD_VERSION="$(cat "$RUNNER_TEMP/openscad-version.txt")"
+          read_prefixes="render-cache"
+          if [ "$WRITE_PREFIX" != "render-cache" ]; then
+            read_prefixes="render-cache $WRITE_PREFIX"
+          fi
+          : > "$RUNNER_TEMP/heavy-rendered.txt"
+          : > "$RUNNER_TEMP/heavy-cached.txt"
+          python3 scripts/render_memory.py map > "$RUNNER_TEMP/render-memory.tsv"
+          while IFS=$'\t' read -r src need_gb; do
+            key="$(python3 scripts/render_cache.py key "$src" --openscad-version "$OPENSCAD_VERSION")"
+            hit=""
+            for prefix in $read_prefixes; do
+              if aws s3api head-object --bucket www.bstjohn.net --key "3d-models/$prefix/$key.stl" > /dev/null 2>&1 < /dev/null; then
+                hit="$prefix"
+                break
+              fi
+            done
+            if [ -n "$hit" ]; then
+              echo "Already cached: $src ($hit/$key)"
+              printf '%s\n' "$src" >> "$RUNNER_TEMP/heavy-cached.txt"
+              continue
+            fi
+            out="$RUNNER_TEMP/$key.stl"
+            echo "Rendering: $src (marked ${need_gb}G, cache MISS $key)"
+            bash scripts/capped-openscad.sh --backend=CGAL --export-format binstl -o "$out" "$src" < /dev/null && rc=0 || rc=$?
+            if [ "$rc" -ne 0 ] || [ ! -s "$out" ]; then
+              echo "::error::Heavy render failed: $src (rc=$rc)"
+              exit 1
+            fi
+            aws s3 cp "$out" "s3://www.bstjohn.net/3d-models/$WRITE_PREFIX/$key.stl" --only-show-errors < /dev/null
+            printf '%s\n' "$src" >> "$RUNNER_TEMP/heavy-rendered.txt"
+          done < "$RUNNER_TEMP/render-memory.tsv"
+
+      - name: Summarise
+        env:
+          REQUESTED_BY: ${{ inputs.requested_by }}
+        run: |
+          {
+            echo "### Heavy renders for $GITHUB_REF_NAME"
+            echo
+            echo "Rendered:"
+            sed 's/^/- /' "$RUNNER_TEMP/heavy-rendered.txt"
+            echo
+            echo "Already cached:"
+            sed 's/^/- /' "$RUNNER_TEMP/heavy-cached.txt"
+            echo
+            echo "Now re-run the build run that requested this (${REQUESTED_BY:-requested_by input not given}); any runner serves these renders from the cache."
+          } > "$RUNNER_TEMP/heavy-summary.md"
+          cat "$RUNNER_TEMP/heavy-summary.md"
+          cat "$RUNNER_TEMP/heavy-summary.md" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"

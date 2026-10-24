@@ -1,0 +1,10 @@
+{
+  "description": "Two-piece adjustable angle bracket joined with an M5 bolt.",
+  "tags": ["bracket", "hardware", "adjustable"],
+  "version": "1.0.0",
+  "difficulty": "beginner",
+  "hardware": [
+    { "item": "M5x30 bolt", "quantity": 1 },
+    { "item": "M5 nut", "quantity": 1 }
+  ]
+}

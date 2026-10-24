@@ -1,0 +1,21 @@
+{
+  "description": "1:20 scale model of a kids' garden climbing frame in finished planed timber: a 2.61 x 2 x 2.3 m post-and-rail cuboid of 94 mm posts, a 614 mm decked strip over a 520 mm clear slide bay (sized for bought 480–506 mm slides) at 1500 mm joining a 75-degree ladder to a 2.4 m slide, two 94 x 145 cross beams near the centre that carry a swing each and six 35 mm monkey-bar rungs at 300 mm pitch, a boarded climbing wall with holds up to the deck on the slide end, and a 1.5 m rope net on the far end, drawn in real millimetres and scaled at the end. The swing end comes in two versions: the cube-ended climbing_* parts with posts and a far side rail, and the A-frame climbing_*_aframe parts with two raked legs, an apex tie and a trapezoid net.",
+  "hero": "climbing_assembly.stl",
+  "tags": ["garden", "playground", "model", "decorative"],
+  "version": "0.5.0",
+  "difficulty": "intermediate",
+  "printing_notes": [
+    "The frame prints standing on its post and ladder feet and the climbing wall's mid stile; use tree supports under the top rails, cross beams, monkey-bar rungs and deck (the 4.7 mm posts bridge 95-120 mm, the 1.75 mm rungs bridge 25 mm between the beams, and the 1.35 mm deck boards span the joists).",
+    "The climbing wall's boards hang off the slide-end posts from 5 mm up with 0.3 mm gaps between them; the gaps close up on most printers and the 4 x 3 x 2 mm holds print as bumps. Set climbing_wall false to drop the boards, stile and holds, or hold_count 0 for a bare wall.",
+    "The 4.7 mm square net bearer runs between the far-end posts 7.5-12.2 mm above the bed; tree supports carry it with the rails.",
+    "The slide prints as exported, chute underside down, with no supports. Its lower end is cut flat for the ground and its top end is cut vertical to glue to the deck's front edge.",
+    "Print the swing twice, flat on its back, with no supports. Glue the hanger bars under the cross beams on their centrelines: swing 1 under the front beam 61.8 mm from the slide end and 35 mm from the front face, swing 2 under the rear beam 95.6 mm from the slide end and 65 mm from the front face, at 1:20.",
+    "Print the net once, flat, with no supports; its rods are 1.4 mm round. Glue it against the outside of the far end, centred across the depth, with its bottom rope on the bearer top 12.2 mm up and its verticals reaching the far side rail's underside. Set end_net false to drop the bearer and net.",
+    "The A-frame frame (climbing_frame_aframe) prints standing on its post, leg and ladder feet and the wall's mid stile; use tree supports under the beams, apex tie, rails, rungs and deck. Its legs are 4.7 mm square at 1:20, raked 16.9 degrees in toward the beam ends, with flat feet and a horizontal top cut under each beam.",
+    "Print the trapezoid net (climbing_net_aframe) once, flat, with no supports. Glue it in the leg plane, centred on the legs' thickness, with its bottom rope on the bearer top 12.2 mm up and its top reaching the apex tie underside 103 mm up; the border rods lie along the legs' inner faces.",
+    "The *_aframe parts pair with each other and with the same slide and swings, not with the cube frame or net: keep scale_denominator, frame_depth, post_size, beam_depth, bearer_z and net_mesh matching between them. The A-frame net ignores net_width.",
+    "Set scale_denominator identically on every part, and keep slide_run, ladder_angle, frame_depth, post_size, beam_depth, bearer_z, net_width and net_mesh matching between the frame, slide, swing, net and assembly.",
+    "The assembly's show_ground slab and 700 mm post stubs are a viewing aid for the concreted 3.0 m posts; the frame STL has no stubs and stands flat on the bed.",
+    "Set knee_braces false to drop the four 44 x 94 corner braces, and corner_radius 0 for sharp-edged members; the real timber and prices are in cut-list.md."
+  ]
+}

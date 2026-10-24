@@ -1,0 +1,6 @@
+{
+  "parameters": [
+    { "name": "scale_denominator", "label": "Scale denominator (20 = 1:20)", "type": "number", "min": 10, "max": 40, "step": 5, "default": 20 },
+    { "name": "beam_depth", "label": "Cross beam, divider and far side rail depth (mm)", "type": "number", "min": 90, "max": 200, "step": 5, "default": 145 }
+  ]
+}
