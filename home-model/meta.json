@@ -1,0 +1,14 @@
+{
+  "description": "1:100 printable massing model of a two-storey semi-detached house with rear and side extensions, its plot as two butt-jointed base tiles (patio, side path, driveway, fences, locating recesses) and the garden room (shower, office and workshop with a covered outdoor area), built from the architect's drawings.",
+  "hero": "home_assembly.stl",
+  "tags": ["architecture", "house", "model", "decorative"],
+  "version": "0.1.0",
+  "difficulty": "beginner",
+  "printing_notes": [
+    "Print all four parts flat side down at 0.12-0.16 mm layers. The canopy over the front door and the covered-area roof of the garden room need supports.",
+    "Glue the two site tiles edge to edge, then seat the house and garden room in their 0.6 mm recesses.",
+    "Use three perimeters so the 1.2 mm fences print solid.",
+    "Set scale_denominator identically on all four parts; 200 halves everything.",
+    "Garden-room door and window positions and the covered-area post layout are approximate."
+  ]
+}

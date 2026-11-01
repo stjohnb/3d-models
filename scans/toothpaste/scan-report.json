@@ -1,0 +1,51 @@
+{
+  "video": "IMG_3948.MOV",
+  "frames_selected": 150,
+  "mask_mode": "salient",
+  "capture_mode": "continuous",
+  "platter_ellipse": [
+    1095.0,
+    1531.0,
+    820.0,
+    300.0
+  ],
+  "sparse_images_registered": 150,
+  "mm_per_unit": 81.78059355342067,
+  "platter_radius_units": 0.9170879880079196,
+  "plane_inlier_count": 12476,
+  "faces_before_crop": 127374,
+  "faces_after_crop": 89910,
+  "components_kept": 1,
+  "bbox_mm": [
+    [
+      -82.93391242731224,
+      -70.03535814870884,
+      -0.1929100919315374
+    ],
+    [
+      71.4130938361743,
+      43.85294554351201,
+      36.30815258231971
+    ]
+  ],
+  "reference": {
+    "mode": "hull",
+    "slabs": null,
+    "faces": 806,
+    "bytes": 40384,
+    "watertight": true,
+    "bbox_mm": [
+      [
+        -82.93391418457031,
+        -70.03535461425781,
+        -0.1929100900888443
+      ],
+      [
+        71.41309356689453,
+        43.85294723510742,
+        36.30815124511719
+      ]
+    ],
+    "source_faces": 87789
+  }
+}
