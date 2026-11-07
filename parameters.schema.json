@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/St-John-Software/3d-models/blob/main/parameters.schema.json",
+  "title": "3D Model Parameter Manifest",
+  "description": "Customizable OpenSCAD parameters for a renderable .scad source. Strings are forbidden by design — values are spliced into '-Dname=value' argv at render time; non-numeric values would re-introduce shell-quoting gotchas (see issue #203).",
+  "type": "object",
+  "properties": {
+    "parameters": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                "description": "OpenSCAD variable name; must match the variable defined in the .scad source."
+              },
+              "label": {
+                "type": "string",
+                "description": "Human-readable label shown in the customizer UI."
+              },
+              "type": { "const": "number" },
+              "min": { "type": "number" },
+              "max": { "type": "number" },
+              "step": { "type": "number", "exclusiveMinimum": 0 },
+              "default": { "type": "number" }
+            },
+            "required": ["name", "label", "type", "min", "max", "step", "default"],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                "description": "OpenSCAD variable name; must match the variable defined in the .scad source."
+              },
+              "label": {
+                "type": "string",
+                "description": "Human-readable label shown in the customizer UI."
+              },
+              "type": { "const": "boolean" },
+              "default": { "type": "boolean" }
+            },
+            "required": ["name", "label", "type", "default"],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "minItems": 1,
+      "description": "Ordered list of customizable parameters."
+    }
+  },
+  "required": ["parameters"],
+  "additionalProperties": false
+}

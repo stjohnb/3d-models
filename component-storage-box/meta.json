@@ -1,0 +1,13 @@
+{
+  "description": "Single-piece open-top organiser for electronics components that fills a Bambu Lab A1 plate: 250 x 250 mm footprint, 70 mm tall, a 5 x 5 grid of 50 mm cells tiled into ten compartments (two single cells, the rest 2x1, 3x1 and one 3x2).",
+  "tags": ["electronics", "organizer", "storage", "workshop"],
+  "version": "0.2.0",
+  "difficulty": "beginner",
+  "relatedModels": ["resistor-storage-box"],
+  "complex_interior": true,
+  "printing_notes": [
+    "Print floor-down with no supports and no brim: the 250 mm footprint leaves about 3 mm per side on the 256 mm A1 plate. Use a textured plate and a slow first layer to guard against corner lift.",
+    "The wall and floor defaults are first guesses to adjust after a test print; the 50 mm grid pitch stays fixed.",
+    "The layout is the compartments list in the library; asserts refuse overlaps, gaps or spans of 4 or more cells."
+  ]
+}

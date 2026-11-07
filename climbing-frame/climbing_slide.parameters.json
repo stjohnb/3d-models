@@ -1,0 +1,6 @@
+{
+  "parameters": [
+    { "name": "scale_denominator", "label": "Scale denominator (20 = 1:20)", "type": "number", "min": 10, "max": 40, "step": 5, "default": 20 },
+    { "name": "slide_run", "label": "Slide horizontal run (mm)", "type": "number", "min": 1500, "max": 3500, "step": 100, "default": 2400 }
+  ]
+}

@@ -1,0 +1,187 @@
+{
+  "parameters": [
+    {
+      "name": "inner_w",
+      "label": "Cavity width (mm)",
+      "type": "number",
+      "min": 158,
+      "max": 200,
+      "step": 1,
+      "default": 158
+    },
+    {
+      "name": "inner_h",
+      "label": "Cavity height (mm)",
+      "type": "number",
+      "min": 132,
+      "max": 150,
+      "step": 1,
+      "default": 132
+    },
+    {
+      "name": "inner_d",
+      "label": "Cavity depth (mm)",
+      "type": "number",
+      "min": 72,
+      "max": 90,
+      "step": 1,
+      "default": 72
+    },
+    {
+      "name": "wall",
+      "label": "Wall thickness (mm)",
+      "type": "number",
+      "min": 1.6,
+      "max": 4,
+      "step": 0.2,
+      "default": 2.4
+    },
+    {
+      "name": "insert_hole_d",
+      "label": "Insert hole diameter (mm; 2.6 = self-tap pilot)",
+      "type": "number",
+      "min": 2.4,
+      "max": 4.4,
+      "step": 0.1,
+      "default": 4
+    },
+    {
+      "name": "insert_depth",
+      "label": "Insert pocket depth (mm)",
+      "type": "number",
+      "min": 6,
+      "max": 7.5,
+      "step": 0.5,
+      "default": 6
+    },
+    {
+      "name": "lid_screw_l",
+      "label": "Lid screw length (mm)",
+      "type": "number",
+      "min": 8,
+      "max": 12,
+      "step": 1,
+      "default": 10
+    },
+    {
+      "name": "cable_wall",
+      "label": "Cable slot in the bottom wall (cables up the wall surface)",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "cable_x",
+      "label": "Cable slot X (mm)",
+      "type": "number",
+      "min": -20,
+      "max": -14,
+      "step": 1,
+      "default": -18
+    },
+    {
+      "name": "cable_w",
+      "label": "Cable slot width (mm)",
+      "type": "number",
+      "min": 23,
+      "max": 26,
+      "step": 0.5,
+      "default": 24
+    },
+    {
+      "name": "cable_wall_h",
+      "label": "Cable slot height (mm)",
+      "type": "number",
+      "min": 10,
+      "max": 14,
+      "step": 1,
+      "default": 12
+    },
+    {
+      "name": "cable_floor",
+      "label": "Floor knockout (cables from behind)",
+      "type": "boolean",
+      "default": false
+    },
+    {
+      "name": "cable_floor_w",
+      "label": "Floor knockout width (mm)",
+      "type": "number",
+      "min": 6,
+      "max": 8,
+      "step": 0.5,
+      "default": 8
+    },
+    {
+      "name": "tie_anchors",
+      "label": "Cable-tie anchors",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "tie_w",
+      "label": "Cable-tie width (mm)",
+      "type": "number",
+      "min": 2.5,
+      "max": 5,
+      "step": 0.1,
+      "default": 4.8
+    },
+    {
+      "name": "vents",
+      "label": "Vent slots",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "mount_hole_d",
+      "label": "Wall screw hole diameter (mm)",
+      "type": "number",
+      "min": 3.5,
+      "max": 5,
+      "step": 0.1,
+      "default": 4.5
+    },
+    {
+      "name": "stylus_sleeve",
+      "label": "Stylus sleeve",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "stylus_bore_d",
+      "label": "Stylus shaft bore (mm)",
+      "type": "number",
+      "min": 5.2,
+      "max": 6.4,
+      "step": 0.1,
+      "default": 5.6
+    },
+    {
+      "name": "stylus_cap_d",
+      "label": "Stylus cap counterbore (mm)",
+      "type": "number",
+      "min": 8,
+      "max": 8.8,
+      "step": 0.1,
+      "default": 8.4
+    },
+    {
+      "name": "stylus_cap_depth",
+      "label": "Stylus cap counterbore depth (mm)",
+      "type": "number",
+      "min": 4,
+      "max": 10,
+      "step": 0.5,
+      "default": 8
+    },
+    {
+      "name": "stylus_l",
+      "label": "Stylus length (mm)",
+      "type": "number",
+      "min": 80,
+      "max": 92,
+      "step": 0.1,
+      "default": 87.3
+    }
+  ]
+}

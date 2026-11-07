@@ -1,0 +1,11 @@
+{
+  "parameters": [
+    { "name": "plate_xy", "label": "Footprint (mm)", "type": "number", "min": 200, "max": 256, "step": 1, "default": 250 },
+    { "name": "outer_h", "label": "Outer height (mm)", "type": "number", "min": 40, "max": 150, "step": 1, "default": 70 },
+    { "name": "wall_outer", "label": "Outer wall thickness (mm)", "type": "number", "min": 1.2, "max": 3, "step": 0.2, "default": 2 },
+    { "name": "wall_inner", "label": "Divider thickness (mm)", "type": "number", "min": 0.8, "max": 2.4, "step": 0.2, "default": 1.2 },
+    { "name": "floor_t", "label": "Floor thickness (mm)", "type": "number", "min": 1, "max": 3, "step": 0.2, "default": 2 },
+    { "name": "corner_r", "label": "Outer corner radius (mm)", "type": "number", "min": 2, "max": 8, "step": 0.5, "default": 4 },
+    { "name": "cavity_r", "label": "Cavity corner radius (mm)", "type": "number", "min": 1, "max": 5, "step": 0.5, "default": 2 }
+  ]
+}
