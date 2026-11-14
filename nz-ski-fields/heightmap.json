@@ -1,0 +1,14 @@
+{
+  "area_km": 35.0,
+  "elev_max_m": 2305.76953125,
+  "elev_min_m": 278.14453125,
+  "elev_range_m": 2028,
+  "lat": -44.97,
+  "lon": 168.8,
+  "missing_tiles": [],
+  "px": 512,
+  "source": "AWS Open Data Terrain Tiles (Mapzen terrarium)",
+  "tile_count_x": 21,
+  "tile_count_y": 21,
+  "zoom": 14
+}

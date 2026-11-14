@@ -1,0 +1,51 @@
+{
+  "description": "19-inch rack-mount shelf, 2U only (there is no 1U version), that holds four cased Raspberry Pis standing on their long edge. It prints as two 241 mm halves that fit a Bambu Lab A1 bed and bolt together with three M4 bolts at the centre split: pi_rack_shelf_2u_pi is the left half, with the four Pi slots and faceplate windows, and pi_rack_shelf_2u_tray is the right half, a plain boxed tray. Each slot fits a case up to 66 x 30 x 94 mm with the Raspberry Pi 4 or 5 port layout (Ethernet and USB-A on one end, USB-C power and micro-HDMI on one long side); the fit is a first-print estimate, adjustable with pi_fit. Each Pi's Ethernet and USB-A end faces out through its own tall faceplate window, and the open top leaves the cable side clear for right-angle plugs.",
+  "hero": "pi_rack_shelf_2u_pi.stl",
+  "tags": [
+    "rack",
+    "raspberry-pi",
+    "homelab",
+    "shelf"
+  ],
+  "version": "0.1.0",
+  "difficulty": "intermediate",
+  "relatedModels": [
+    "ha-carlink-enclosure",
+    "rf433-bridge-enclosure"
+  ],
+  "mating_pairs": [
+    [
+      "pi_rack_shelf_2u_pi.stl",
+      "pi_rack_shelf_2u_tray.stl"
+    ]
+  ],
+  "hardware": [
+    {
+      "item": "M4 x 12 bolt",
+      "quantity": 3,
+      "notes": "Per shelf: two at the front, one at the rear of the split joint"
+    },
+    {
+      "item": "M4 washer",
+      "quantity": 3,
+      "notes": "Under each bolt head, on the left half's flange"
+    },
+    {
+      "item": "M4 hex nut",
+      "quantity": 3,
+      "notes": "Pressed into the traps in the right half's flange"
+    },
+    {
+      "item": "M6 cage nut and screw",
+      "quantity": 4,
+      "notes": "A 2U shelf has eight ear slots, use at least four"
+    }
+  ],
+  "printing_notes": [
+    "Print every half floor-down exactly as exported, without supports. Both halves are 241.3 mm wide, leaving about 7 mm each side on a 256 mm A1 bed.",
+    "Press the three M4 nuts into the right half's flange traps before fitting the Pis, then bolt the halves together from the left with washers under the heads.",
+    "Shared parameters (face_t, floor_t, box_wall_h and anything else set on both halves) should match on both halves; the bolt positions are fixed so the halves always line up.",
+    "Each Pi stands on its long edge in its own slot with the Ethernet end against the faceplate window and the cable side (USB-C power, micro-HDMI) facing up. The top is open, with about 19 mm of headroom above the case: enough for right-angle plugs, whose bodies stand only a few millimetres proud of the case. The library asserts at least 15 mm.",
+    "The slots fit a generic 66 x 30 x 94 mm case, and the port window sill and inset are first-print guesses: check the fit, then adjust pi_fit, window_sill or window_inset. The rear wall has a cable notch and two vent slits per slot."
+  ]
+}

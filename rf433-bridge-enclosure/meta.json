@@ -1,0 +1,53 @@
+{
+  "description": "Two-part printed box for the assembled RF433 bridge carrier board (62 x 60 mm) with a DOIT ESP32 DevKit v1 (30-pin, USB-C), whose USB end overhangs the carrier by about 7 mm, and a CC1101 module that overhangs its right edge. The tray holds the board on four M3 insert standoffs, has a USB window and an open-topped slot for the SMA jack so the antenna stays outside and can point vertically, and optional floor holes for wall or shelf fixing; the plain lid clamps the board with four screws and leaves the Wi-Fi antenna end clear.",
+  "hero": "rf433_enclosure_base.stl",
+  "tags": [
+    "electronics",
+    "enclosure",
+    "esp32",
+    "rf433",
+    "home-assistant"
+  ],
+  "version": "0.2.0",
+  "difficulty": "intermediate",
+  "complex_interior": true,
+  "relatedModels": [
+    "ha-carlink-enclosure",
+    "heating-controller-box"
+  ],
+  "hardware": [
+    {
+      "item": "Assembled RF433 bridge carrier board",
+      "quantity": 1,
+      "notes": "St-John-Software/electronics, hardware/rf433-bridge/; 62 x 60 mm with a DOIT ESP32 DevKit v1 (30-pin, USB-C), whose USB end overhangs the carrier by about 7 mm, and an E07-M1101D soldered on"
+    },
+    {
+      "item": "M3 heat-set insert (4.6 mm OD)",
+      "quantity": 4,
+      "notes": "One per standoff; set insert_hole_d to 2.6 instead for self-tapping screws"
+    },
+    {
+      "item": "M3 x 25 countersunk screw",
+      "quantity": 4,
+      "notes": "Through a lid boss into its standoff insert"
+    },
+    {
+      "item": "No. 6 or M4 wood screw",
+      "quantity": 2,
+      "notes": "Optional: countersunk floor fixing to a wall or shelf (floor_fixings)"
+    },
+    {
+      "item": "Hinged SMA rubber-duck antenna",
+      "quantity": 1,
+      "notes": "As fitted to the board; its elbow turns it vertical outside the box. A straight antenna needs an optional SMA right-angle adapter."
+    }
+  ],
+  "printing_notes": [
+    "Print both parts as exported without supports: the base floor-down, the lid outer-face-down.",
+    "Press the four M3 heat-set inserts into the standoffs before fitting the board.",
+    "Fit the antenna before power-up (board safety note): drop the board in with the SMA jack into the wall slot, screw the antenna on outside, then fit the lid and the four screws.",
+    "To fix the box to a wall or shelf, screw the empty tray down through the two floor holes before fitting the board.",
+    "The fit uses the devkit and CC1101 overhangs caliper-measured on the assembled board (devkit USB-C face 8.3 mm and module 5.9 mm past the carrier edges); the 0.1.0 base does not fit this board, so reprint the base. Devkit and module heights and screw_l are still design values: check them on this print.",
+    "wall, floor_t, corner_r, standoff_h and above_pcb are shared parameters: set them identically on the base and the lid."
+  ]
+}

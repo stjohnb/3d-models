@@ -1,0 +1,25 @@
+{
+  "description": "Rotary dispenser that bolts through the side wall of a ~200 x 300 x 200 mm clip-lid cereal box: turn the knob to carry muesli through a drum-shaped chamber and out a chute below, no reaching inside the box required. Body, drum, cap, knob and an internal reinforcing ring around the wall port, plus a drill template for marking the port and screw holes before cutting the box.",
+  "hero": "dispenser_assembly.stl",
+  "tags": ["kitchen", "dispenser", "food-contact"],
+  "version": "1.0.0",
+  "difficulty": "intermediate",
+  "hardware": [
+    { "item": "M4 x 40mm machine screw", "quantity": 4, "notes": "Through the flange, wall and ring into captive nuts; see dispenser_ring.stl's nut pockets." },
+    { "item": "M4 nut", "quantity": 4, "notes": "Captive in dispenser_ring.stl's nut pockets." },
+    { "item": "M4 x 12mm machine screw", "quantity": 3, "notes": "Two through dispenser_cap.stl's bosses into nut traps in dispenser_body.stl, one retaining dispenser_knob.stl onto the drum shaft." },
+    { "item": "M4 nut", "quantity": 2, "notes": "Captive in dispenser_body.stl's end-boss nut traps for the cap screws." }
+  ],
+  "mating_pairs": [
+    ["dispenser_drum.stl", "dispenser_body.stl"],
+    ["dispenser_drum.stl", "dispenser_cap.stl"],
+    ["dispenser_knob.stl", "dispenser_drum.stl"]
+  ],
+  "printing_notes": [
+    "Print food-contact parts (dispenser_body, dispenser_drum, dispenser_cap, dispenser_knob, dispenser_ring) in a natural/uncoloured food-contact-grade PETG with a stainless or hardened-steel nozzle, not brass. Avoid PLA (softens under warm rinsing) and ABS/ASA (styrene-based). Layer lines trap crumbs — hand-wash and air-dry, never dishwasher.",
+    "The drum chamber hangs below the box's internal floor: with the box on a flat counter the chute mouth sits well below the counter line, so the dispenser end of the box needs to overhang the edge or the box needs to sit on a riser/shelf so a bowl fits under the chute.",
+    "Cut the wall port and four screw holes using dispenser_template.stl as a drill guide: hold it against the outside of the box wall with its engraved line on the box's internal floor, mark through the port and screw holes, then hole-saw the port and drill the screw holes.",
+    "Assembly order: seat dispenser_ring.stl on the box's inside face with its captive nuts, pass the four M4 x 40mm screws from outside through dispenser_body.stl's flange and the wall into the ring's nuts, drop dispenser_drum.stl into the body's chamber, fit dispenser_cap.stl over the open end with two M4 x 12mm screws into the body's nut traps, then press dispenser_knob.stl onto the drum's hex shaft and secure with the third M4 x 12mm screw.",
+    "One full turn of the knob carries roughly 76 ml (about 32 g) of muesli; about one and a half turns fills a normal bowl. pocket_depth and pocket_len (dispenser_drum.stl's customizer parameters) tune the dose without changing the drum's outer fit."
+  ]
+}

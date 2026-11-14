@@ -1,0 +1,21 @@
+{
+  "parameters": [
+    { "name": "scale_denominator", "label": "Scale denominator (20 = 1:20)", "type": "number", "min": 10, "max": 40, "step": 5, "default": 20 },
+    { "name": "slide_run", "label": "Slide horizontal run (mm)", "type": "number", "min": 1500, "max": 3500, "step": 100, "default": 2400 },
+    { "name": "ladder_angle", "label": "Ladder lean from horizontal (degrees)", "type": "number", "min": 60, "max": 85, "step": 5, "default": 75 },
+    { "name": "frame_depth", "label": "Frame depth along Y (mm)", "type": "number", "min": 1500, "max": 2500, "step": 100, "default": 2000 },
+    { "name": "post_size", "label": "Post and square rail section (mm)", "type": "number", "min": 70, "max": 100, "step": 1, "default": 94 },
+    { "name": "corner_radius", "label": "Eased edge radius on posts and rails (mm, 0 = sharp)", "type": "number", "min": 0, "max": 10, "step": 1, "default": 5 },
+    { "name": "beam_depth", "label": "Cross beam, divider and far side rail depth (mm)", "type": "number", "min": 90, "max": 200, "step": 5, "default": 145 },
+    { "name": "rung_count", "label": "Monkey-bar rungs", "type": "number", "min": 3, "max": 7, "step": 1, "default": 6 },
+    { "name": "rung_pitch", "label": "Monkey-bar rung pitch (mm)", "type": "number", "min": 150, "max": 350, "step": 25, "default": 300 },
+    { "name": "knee_braces", "label": "Knee braces at the corner posts", "type": "boolean", "default": true },
+    { "name": "climbing_wall", "label": "Climbing wall on the slide end", "type": "boolean", "default": true },
+    { "name": "hold_count", "label": "Climbing wall holds", "type": "number", "min": 0, "max": 12, "step": 1, "default": 9 },
+    { "name": "end_net", "label": "Rope net and bearer on the far end", "type": "boolean", "default": true },
+    { "name": "bearer_z", "label": "Net bearer height above ground (mm)", "type": "number", "min": 100, "max": 300, "step": 50, "default": 150 },
+    { "name": "net_width", "label": "Rope net width (mm)", "type": "number", "min": 900, "max": 1800, "step": 100, "default": 1500 },
+    { "name": "net_mesh", "label": "Rope net mesh pitch (mm)", "type": "number", "min": 250, "max": 400, "step": 50, "default": 300 },
+    { "name": "show_ground", "label": "Show ground slab and buried post stubs", "type": "boolean", "default": true }
+  ]
+}

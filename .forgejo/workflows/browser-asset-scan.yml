@@ -1,0 +1,68 @@
+name: Browser Asset Scan
+
+# Checks the Three.js version served to visitors against the public OSV
+# database (https://api.osv.dev). Separate from build.yml so the weekly
+# scheduled run does not redeploy the site. Failures are recorded in
+# .vuln-failures and enforced together in the last step. Accepted findings
+# are .vex/ OpenVEX not_affected statements. See docs/ci-pipeline.md,
+# "browser-asset-scan.yml".
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/threejs_assets.py'
+      - 'scripts/check_browser_asset_vulns.py'
+      - 'scripts/test_check_browser_asset_vulns.py'
+      - '.vex/**'
+      - '.forgejo/workflows/browser-asset-scan.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/threejs_assets.py'
+      - 'scripts/check_browser_asset_vulns.py'
+      - 'scripts/test_check_browser_asset_vulns.py'
+      - '.vex/**'
+      - '.forgejo/workflows/browser-asset-scan.yml'
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # Same reason as build.yml: the runner's nix-ld LD_LIBRARY_PATH must not
+  # beat the flake binaries' RUNPATH.
+  LD_LIBRARY_PATH: ""
+
+jobs:
+  scan:
+    runs-on: [container, linux]
+    timeout-minutes: 10
+    defaults:
+      run:
+        shell: nix --extra-experimental-features nix-command --extra-experimental-features flakes develop ${{ github.workspace }}#default --command bash -euo pipefail {0}
+
+    steps:
+      - uses: https://github.com/actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Nix
+        uses: ./.github/actions/setup-nix
+
+      - name: Unit-test the scanner
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_check_browser_asset_vulns.py' -v
+
+      - name: Scan browser assets against OSV
+        id: scan
+        run: |
+          python3 scripts/check_browser_asset_vulns.py
+
+      - name: Enforce browser asset vulnerability scan
+        run: |
+          if [ -s .vuln-failures ]; then
+            echo "::error::Browser asset vulnerability scan failed"
+            cat .vuln-failures
+            exit 1
+          fi

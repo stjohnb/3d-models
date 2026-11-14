@@ -1,0 +1,33 @@
+{
+  "description": "Two-part, fully printed wall enclosure for an ESP32-2432S028R (\"Cheap Yellow Display\") heating and hot-water controller that replaces a Danfoss FP720 programmer. The faceplate frames the display and carries the 97 x 100 mm heating-controller carrier PCB on four printed heat-set insert posts behind it, component side to the wall, with two Hand-Off-Auto toggles and two indicator lamps beside it, so the whole assembly is wired on the bench. The back box is a plain wall shell with a slot in its bottom wall for the two cables arriving up the wall surface, a cable-tie anchor under each in its wiring channel, an optional floor knockout for cables from behind, and a stylus sleeve on its right-hand side. The shell is 72 mm deep, sized to the 70 mm as-built wiring. Every fixing uses an M3 heat-set insert.",
+  "hero": "heating_controller_lid.stl",
+  "tags": ["electronics", "enclosure", "esp32", "home-assistant", "wall-mount"],
+  "version": "0.5.1",
+  "difficulty": "intermediate",
+  "complex_interior": true,
+  "relatedModels": ["esp32-display-case"],
+  "hardware": [
+    { "item": "ESP32-2432S028R display board (Cheap Yellow Display) with its stylus", "quantity": 1 },
+    { "item": "Heating-controller carrier PCB v2 (97 x 100 mm), populated with the 2-channel relay module and HLK-10M05B PSU", "quantity": 1, "notes": "The relay module sits on 4 x M3 x 8 nylon standoffs on the carrier" },
+    { "item": "XURUI XT-13A SPDT centre-off toggle switch", "quantity": 2, "notes": "Hand-Off-Auto, one per circuit; 12 mm keyed panel hole" },
+    { "item": "230 V panel indicator lamp", "quantity": 2, "notes": "Amber for heating, blue for hot water; 10 mm panel hole assumed" },
+    { "item": "M3 heat-set insert (4.6 mm OD, up to 5.7 mm long)", "quantity": 12, "notes": "4 CYD, 4 carrier posts, 4 corner posts" },
+    { "item": "M3 x 6 screw", "quantity": 8, "notes": "4 CYD, 4 carrier into the faceplate posts (nylon preferred)" },
+    { "item": "M3 x 10 countersunk screw", "quantity": 4, "notes": "Lid to base" },
+    { "item": "Wall screw, up to 4.5 mm", "quantity": 4 },
+    { "item": "4.8 mm nylon cable tie", "quantity": 2, "notes": "Strain relief for the two incoming cables at the base's tie anchors" }
+  ],
+  "printing_notes": [
+    "Print in PETG or ASA with 3 perimeters, in the exported orientation, without supports. The lid prints face down with its carrier posts and rib frame rising from it.",
+    "Press the heat-set inserts in with a soldering iron before fitting the boards: four into the carrier post tips, four into the CYD bosses and four into the base's corner posts. Support the lid face flat while pressing the CYD inserts, because only about 1.2 mm of skin is behind them.",
+    "Without inserts, set insert_hole_d to 2.6 and use self-tapping screws; the lid screws then become 3 mm self-tappers.",
+    "Test the toggle hole fit and adjust toggle_hole_d by 0.2 mm either way. Confirm toggle_key_w and the lamp cut-out before the final print.",
+    "window_off_x is already set to 2.5 from the first fit; window_off_y and cyd_display_h remain adjustable after a test fit.",
+    "The stylus drops cap-up into the right-hand sleeve and pushes out through the open bottom.",
+    "Bench order, faceplate face down: fit the toggles and lamps, then the CYD and its pigtails, then screw the carrier onto the posts component side up (M3 x 6, nylon preferred), then run the leads to J4, J5, J6, J8 and J11 and the relay module headers.",
+    "Lead routing: mains leads run down into the wiring channel and up the right-hand column; SELV leads cross the board's top edge and stay in the top and left strips, never across the mains band; the CPCs run up the gap right of the board to J3. Nothing is earthed: leave J3 pin 3 empty.",
+    "Install: screw the base to the wall, bring both cables up the wall through the bottom slot (supply on the left under J1, boiler cable on the right under J2), lie each along its anchor bar and tie it with at least 150 mm free beyond the anchor, land J1, J2 and J3 with the faceplate face down in front of the box, fold the slack into the wiring channel and screw the faceplate on. Enable cable_floor instead if the cables emerge from the wall behind the box.",
+    "Dry-fit the populated carrier on the printed faceplate, closed onto the box, before wiring: the relay tops and U1 should clear the base floor by about 30 mm and the deepest lead by about 5 mm; deepen inner_d only if the wiring still touches the floor.",
+    "Leave the relay NC screw terminals empty."
+  ]
+}

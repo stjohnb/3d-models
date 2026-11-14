@@ -1,0 +1,5 @@
+{
+  "parameters": [
+    { "name": "scale_denominator", "label": "Scale denominator (100 = 1:100)", "type": "number", "min": 50, "max": 200, "step": 50, "default": 100 }
+  ]
+}
