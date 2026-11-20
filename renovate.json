@@ -1,0 +1,14 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "nix": {
+    "enabled": true
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["nix"],
+      "prBodyNotes": [
+        "A nixpkgs bump can bump OpenSCAD: if it does, update `.openscad-version` in the same PR and expect a full re-render (heavy renders may defer to `render-heavy.yml`)."
+      ]
+    }
+  ]
+}

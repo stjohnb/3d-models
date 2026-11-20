@@ -1,0 +1,12 @@
+{
+  "description": "Flush-fitting blank plug for countersunk 18mm bench dog holes in an 18mm plywood workbench top. A 45-degree tapered head fills the top 2.5mm of the countersink (26.5mm surface diameter); a recessed grip bar in the top face lets needle-nose pliers pull the blank back out.",
+  "tags": ["workshop", "workbench"],
+  "version": "1.0.0",
+  "difficulty": "beginner",
+  "printing_notes": [
+    "Print as exported: bench-top face down, flat on the bed. No supports needed - the grip-bar pockets are small bridges and every other overhang tapers inward.",
+    "The shaft prints at 17.7mm (0.3mm diametral clearance) for an easy push fit in an 18mm hole. If your holes run tight or loose, adjust the clearance parameter in the customizer and re-render.",
+    "To remove a fitted blank, drop needle-nose plier tips into the two notches in the top face, grip the centre bar between them, and pull straight up.",
+    "Print several at once - one per hole you want to blank off."
+  ]
+}

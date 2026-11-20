@@ -1,0 +1,91 @@
+{
+  "parameters": [
+    {
+      "name": "board_w",
+      "label": "Board width (mm)",
+      "type": "number",
+      "min": 40,
+      "max": 60,
+      "step": 0.1,
+      "default": 50.5
+    },
+    {
+      "name": "board_l",
+      "label": "Board length (mm)",
+      "type": "number",
+      "min": 70,
+      "max": 100,
+      "step": 0.1,
+      "default": 86.5
+    },
+    {
+      "name": "component_depth",
+      "label": "Component cavity depth (mm)",
+      "type": "number",
+      "min": 8,
+      "max": 20,
+      "step": 0.5,
+      "default": 13
+    },
+    {
+      "name": "fit_clearance",
+      "label": "Board fit clearance (mm)",
+      "type": "number",
+      "min": 0.1,
+      "max": 1.0,
+      "step": 0.05,
+      "default": 0.4
+    },
+    {
+      "name": "wall",
+      "label": "Wall thickness (mm)",
+      "type": "number",
+      "min": 1.6,
+      "max": 4,
+      "step": 0.2,
+      "default": 2.4
+    },
+    {
+      "name": "corner_margin",
+      "label": "Port cutout end margin (mm)",
+      "type": "number",
+      "min": 4,
+      "max": 15,
+      "step": 0.5,
+      "default": 8
+    },
+    {
+      "name": "pen_holder",
+      "label": "Stylus holder",
+      "type": "boolean",
+      "default": true
+    },
+    {
+      "name": "pen_dia",
+      "label": "Stylus shaft diameter (mm)",
+      "type": "number",
+      "min": 3.0,
+      "max": 6.0,
+      "step": 0.1,
+      "default": 4.1
+    },
+    {
+      "name": "pen_clip_clear",
+      "label": "Stylus clip clearance (mm)",
+      "type": "number",
+      "min": 0.1,
+      "max": 0.6,
+      "step": 0.05,
+      "default": 0.3
+    },
+    {
+      "name": "pen_clip_grip",
+      "label": "Stylus clip grip (deg)",
+      "type": "number",
+      "min": 190,
+      "max": 260,
+      "step": 5,
+      "default": 220
+    }
+  ]
+}

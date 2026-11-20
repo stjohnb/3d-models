@@ -1,0 +1,27 @@
+{
+  "description": "Gridfinity-compatible organiser for a 422 × 425 × 69 mm long-implement drawer: a 10 × 10 grid of the drawer-organiser's 5×5 tiles, a straight flared 2×10 and unflared 4×10 container in columns 1–6, two 2×8 slots each built from the printed 2×5 half plus a 2×3 back piece, a three-sided 4×1 across their front and a 4×1 open on one short side behind them, both open towards the drawer's right wall, with an assembly preview.",
+  "hero": "drawer_long_assembly.stl",
+  "tags": ["organizer", "storage", "gridfinity", "drawer"],
+  "version": "4.1.0",
+  "difficulty": "intermediate",
+  "complex_interior": true,
+  "relatedModels": ["drawer-organiser"],
+  "mating_pairs": [
+    ["drawer_long_container_2x10_half.stl", "drawer_baseplate_4x5.stl"],
+    ["drawer_long_container_2x8_back.stl", "drawer_baseplate_4x5.stl"],
+    ["drawer_long_container_4x1.stl", "drawer_baseplate_4x5.stl"],
+    ["drawer_long_container_4x1_rear.stl", "drawer_baseplate_4x5.stl"],
+    ["drawer_long_container_left_2x10_front.stl", "drawer_baseplate_4x5.stl"],
+    ["drawer_long_container_left_2x10_back.stl", "drawer_baseplate_4x5.stl"],
+    ["drawer_long_container_centre_4x10_half.stl", "drawer_baseplate_4x5.stl"]
+  ],
+  "printing_notes": [
+    "Floor (420 x 420mm): two drawer_baseplate_5x5 in the front row and two drawer_baseplate_5x5_back behind, downloaded from the drawer-organiser project. The tile seam falls at columns 5|6. Lower each tile onto its neighbours so the edge tabs drop into their slots; do not press them together in-plane.",
+    "The wide pair (columns 1-6) is a flared 2x10 and an unflared 4x10, each split 5 + 5 on the tile seam: print drawer_long_container_left_2x10_front and _left_2x10_back (one each; the flare makes them mirror images) and two drawer_long_container_centre_4x10_half (one rotated 180 degrees about Z).",
+    "Each narrow slot is the already printed drawer_long_container_2x10_half (front five cells) plus drawer_long_container_2x8_back (back three cells). Print two of the _2x8_back, one per slot; do not reprint the 2x5 halves.",
+    "Print drawer_long_container_4x1 whole; it is three-sided (floor, one long wall and one short wall). Seat it rotated 180 degrees with its walls at the drawer front and against the wide container, and its open sides towards the slots and the right wall.",
+    "Print drawer_long_container_4x1_rear whole; it is three-sided (floor, both long walls and one short wall). Seat it rotated 180 degrees with its short wall against the wide container and its open side at the right wall; open_right only matters if seating it unrotated.",
+    "Seat every piece on the assembled baseplate to align, then glue the flat faces with CA. All pieces print flat on the bed, floor down, with no supports.",
+    "The 5mm of depth slack (425 - 420) goes at the front. The outermost +X tabs on the right-hand tiles mate with nothing and add 1.8mm to the width; if the drawer is tight against the right wall, clip them flush with side cutters."
+  ]
+}

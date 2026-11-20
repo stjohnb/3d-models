@@ -1,0 +1,11 @@
+{
+  "parameters": [
+    { "name": "scale_denominator", "label": "Scale denominator (20 = 1:20)", "type": "number", "min": 10, "max": 40, "step": 5, "default": 20 },
+    { "name": "frame_depth", "label": "Frame depth along Y (mm)", "type": "number", "min": 1500, "max": 2500, "step": 100, "default": 2000 },
+    { "name": "post_size", "label": "Post and square rail section (mm)", "type": "number", "min": 70, "max": 100, "step": 1, "default": 94 },
+    { "name": "beam_depth", "label": "Cross beam, divider and far side rail depth (mm)", "type": "number", "min": 90, "max": 200, "step": 5, "default": 145 },
+    { "name": "bearer_z", "label": "Net bearer height above ground (mm)", "type": "number", "min": 100, "max": 300, "step": 50, "default": 150 },
+    { "name": "net_width", "label": "Rope net width (mm)", "type": "number", "min": 900, "max": 1800, "step": 100, "default": 1500 },
+    { "name": "net_mesh", "label": "Rope net mesh pitch (mm)", "type": "number", "min": 250, "max": 400, "step": 50, "default": 300 }
+  ]
+}
