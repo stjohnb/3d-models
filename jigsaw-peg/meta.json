@@ -1,0 +1,13 @@
+{
+  "description": "Replacement peg for a missing peg in a jigsaw item. A 5.8mm head stands 7.4mm proud with a chamfered top edge; a 3.6mm shank, 5.5mm long, slips into the 3.8mm x 6mm hole with 0.2mm diametral clearance.",
+  "tags": ["replacement", "toy-parts"],
+  "version": "1.0.0",
+  "difficulty": "beginner",
+  "printing_notes": [
+    "Print as exported: head top face down, flat on the bed, shank pointing up. No supports needed.",
+    "The shank prints at 3.6mm (0.2mm diametral clearance) for a slip fit in the 3.8mm hole; glue it in with PVA or CA. If your hole runs tight or loose, adjust the clearance parameter in the customizer and re-render.",
+    "Keep seat_gap above zero so the head lands on the piece before the shank bottoms out in the 6mm hole.",
+    "PETG or PLA at 0.12-0.16mm layers with 100% infill; layer lines run across the shank, so glue it rather than relying on the print alone.",
+    "Re-measure the height of a surviving peg and set head_h to match."
+  ]
+}

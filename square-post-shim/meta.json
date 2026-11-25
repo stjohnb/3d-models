@@ -1,0 +1,13 @@
+{
+  "description": "L-shaped corner shim that takes up play between a square exercise-bike post (about 30 mm) and its socket. It wraps one corner and shims two faces at once; the flange hooks over the socket rim.",
+  "tags": ["replacement", "fitness"],
+  "version": "1.0.0",
+  "difficulty": "beginner",
+  "printing_notes": [
+    "Print as exported, standing on the flange, no supports, with a brim if adhesion is marginal.",
+    "Use PETG or another tough filament, at least 2 perimeters' worth of line width. Check the printed wall with calipers, because upright walls come out slightly thicker than modelled.",
+    "To pick shim_t, measure socket and post on the same axis and take half the difference.",
+    "Fit it on the corner diagonally opposite the pop-pin, with the flange on top of the collar rim.",
+    "If it's too tight, drop shim_t by 0.1 in the customizer."
+  ]
+}

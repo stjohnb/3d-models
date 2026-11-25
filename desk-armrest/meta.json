@@ -1,0 +1,13 @@
+{
+  "description": "Clip-on elbow rest for a standing desk: slides onto the edge of a 19.37 mm tabletop with no screws or tools. A top plate rests on the tabletop, a 70 mm lower jaw hooks underneath to stop it lifting, and a 130 mm arm cantilevers out from the desk edge. One print per elbow; tabletop thickness, fit clearance and reach are customizer parameters.",
+  "tags": ["household", "desk", "ergonomics"],
+  "version": "1.0.0",
+  "difficulty": "beginner",
+  "printing_notes": [
+    "Print on its side: rotate the Z-up STL 90 degrees in the slicer so a flat profile face lies on the bed. There are no overhangs, no supports are needed, and the elbow and lift loads run along the layers.",
+    "Use a brim (the footprint is about 200 x 36 mm under a 90 mm tall part), 4+ perimeters, 0.2 mm layers and 15-25% infill. PETG is preferred for sustained load.",
+    "Slide on from the front, chamfered mouth first, until the spine meets the desk edge. Check that no frame rail or cable tray sits within 70 mm of the edge; if one does, shorten under_desk.",
+    "The mouth is 19.67 mm. If it is tight, raise fit_clearance in 0.1 mm steps; if it rocks, lower it. Eased tabletop edges may need more.",
+    "Print two; the part is symmetric, so one serves either elbow."
+  ]
+}
